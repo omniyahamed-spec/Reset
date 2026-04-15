@@ -1,6 +1,20 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { CSSProperties, useEffect, useMemo, useState } from "react";
 
 const STORAGE_KEY = "reset90_entries_v1";
+
+type ViewMode = "reset" | "past";
+
+interface ResetEntry {
+  id: number;
+  createdAt: string;
+  displayDate: string;
+  displayTime: string;
+  bothering: string;
+  avoiding: string;
+  nextMove: string;
+  actionTime: string;
+  deadline: string;
+}
 
 export default function Reset90App() {
   const now = useMemo(() => new Date(), []);
@@ -15,20 +29,20 @@ export default function Reset90App() {
     minute: "2-digit",
   });
 
-  const [bothering, setBothering] = useState("");
-  const [avoiding, setAvoiding] = useState("");
-  const [nextMove, setNextMove] = useState("");
-  const [time, setTime] = useState("");
-  const [deadline, setDeadline] = useState("");
-  const [done, setDone] = useState(false);
-  const [entries, setEntries] = useState([]);
-  const [activeView, setActiveView] = useState("reset");
+  const [bothering, setBothering] = useState<string>("");
+  const [avoiding, setAvoiding] = useState<string>("");
+  const [nextMove, setNextMove] = useState<string>("");
+  const [time, setTime] = useState<string>("");
+  const [deadline, setDeadline] = useState<string>("");
+  const [done, setDone] = useState<boolean>(false);
+  const [entries, setEntries] = useState<ResetEntry[]>([]);
+  const [activeView, setActiveView] = useState<ViewMode>("reset");
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        setEntries(JSON.parse(raw));
+        setEntries(JSON.parse(raw) as ResetEntry[]);
       }
     } catch (error) {
       console.error("Failed to load entries", error);
@@ -43,12 +57,14 @@ export default function Reset90App() {
     }
   }, [entries]);
 
-  const canComplete = bothering.trim() && avoiding.trim() && nextMove.trim();
+  const canComplete = Boolean(
+    bothering.trim() && avoiding.trim() && nextMove.trim()
+  );
 
-  function handleCompleteReset() {
+  function handleCompleteReset(): void {
     if (!canComplete) return;
 
-    const entry = {
+    const entry: ResetEntry = {
       id: Date.now(),
       createdAt: new Date().toISOString(),
       displayDate: new Date().toLocaleDateString(undefined, {
@@ -72,7 +88,7 @@ export default function Reset90App() {
     setActiveView("reset");
   }
 
-  function handleNewReset() {
+  function handleNewReset(): void {
     setBothering("");
     setAvoiding("");
     setNextMove("");
@@ -82,11 +98,33 @@ export default function Reset90App() {
     setActiveView("reset");
   }
 
-  function handleDeleteEntry(id) {
+  function handleDeleteEntry(id: number): void {
     setEntries((prev) => prev.filter((entry) => entry.id !== id));
   }
 
-  const styles = {
+  const navButton = (active: boolean): CSSProperties => ({
+    padding: "10px 14px",
+    borderRadius: 999,
+    border: active ? "1px solid #1e1a16" : "1px solid #ddd3c6",
+    background: active ? "#1e1a16" : "#fbf8f3",
+    color: active ? "#ffffff" : "#51493f",
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: "pointer",
+  });
+
+  const primaryButton = (enabled: boolean): CSSProperties => ({
+    padding: "12px 18px",
+    borderRadius: 16,
+    border: "none",
+    background: enabled ? "#1e1a16" : "#9d948a",
+    color: "white",
+    fontWeight: 600,
+    cursor: enabled ? "pointer" : "not-allowed",
+    fontSize: 14,
+  });
+
+  const styles: Record<string, CSSProperties> = {
     page: {
       minHeight: "100vh",
       background: "#f6f2eb",
@@ -133,16 +171,6 @@ export default function Reset90App() {
       flexWrap: "wrap",
       marginTop: 18,
     },
-    navButton: (active) => ({
-      padding: "10px 14px",
-      borderRadius: 999,
-      border: active ? "1px solid #1e1a16" : "1px solid #ddd3c6",
-      background: active ? "#1e1a16" : "#fbf8f3",
-      color: active ? "#ffffff" : "#51493f",
-      fontSize: 14,
-      fontWeight: 600,
-      cursor: "pointer",
-    }),
     card: {
       background: "#fffdf9",
       borderRadius: 24,
@@ -255,16 +283,6 @@ export default function Reset90App() {
       gap: 10,
       flexWrap: "wrap",
     },
-    buttonPrimary: (enabled) => ({
-      padding: "12px 18px",
-      borderRadius: 16,
-      border: "none",
-      background: enabled ? "#1e1a16" : "#9d948a",
-      color: "white",
-      fontWeight: 600,
-      cursor: enabled ? "pointer" : "not-allowed",
-      fontSize: 14,
-    }),
     buttonSecondary: {
       padding: "12px 18px",
       borderRadius: 16,
@@ -375,24 +393,17 @@ export default function Reset90App() {
             For when your mind gets noisy and you need one clear move.
           </h1>
           <p style={styles.sub}>
-            Three prompts. One decision. A simple record of whether you followed
-            through.
+            Three prompts. One decision. A simple record of whether you followed through.
           </p>
 
           <div style={styles.topNav}>
-            <button
-              style={styles.navButton(activeView === "reset")}
-              onClick={() => setActiveView("reset")}
-            >
+            <button style={navButton(activeView === "reset")} onClick={() => setActiveView("reset")}>
               Today&apos;s Reset
             </button>
-            <button
-              style={styles.navButton(activeView === "past")}
-              onClick={() => setActiveView("past")}
-            >
+            <button style={navButton(activeView === "past")} onClick={() => setActiveView("past")}>
               Past Resets ({entries.length})
             </button>
-            <button style={styles.navButton(false)} onClick={handleNewReset}>
+            <button style={navButton(false)} onClick={handleNewReset}>
               New Reset
             </button>
           </div>
@@ -407,20 +418,17 @@ export default function Reset90App() {
               </div>
 
               <div style={styles.presenceBox}>
-                Be honest with today. Name the real issue, catch the avoidance,
-                and pick one move before you open something else.
+                Be honest with today. Name the real issue, catch the avoidance, and pick one move before you open something else.
               </div>
             </div>
 
             <div style={styles.section}>
-              <label style={styles.label}>
-                1. What is actually bothering me?
-              </label>
+              <label style={styles.label}>1. What is actually bothering me?</label>
               <textarea
                 style={styles.textarea}
                 placeholder="Name the real issue, not the polished version."
                 value={bothering}
-                onChange={(e) => setBothering(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setBothering(e.target.value)}
               />
             </div>
 
@@ -430,19 +438,17 @@ export default function Reset90App() {
                 style={styles.textarea}
                 placeholder="What are you postponing, softening, or dodging?"
                 value={avoiding}
-                onChange={(e) => setAvoiding(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setAvoiding(e.target.value)}
               />
             </div>
 
             <div style={styles.section}>
-              <label style={styles.label}>
-                3. What is the smallest next move?
-              </label>
+              <label style={styles.label}>3. What is the smallest next move?</label>
               <textarea
                 style={{ ...styles.textarea, minHeight: 96 }}
                 placeholder="Write one move you can start in under 2 minutes."
                 value={nextMove}
-                onChange={(e) => setNextMove(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNextMove(e.target.value)}
               />
               <div style={styles.helper}>
                 Keep it specific. Not a plan. Not a promise. One visible action.
@@ -452,8 +458,7 @@ export default function Reset90App() {
             <div style={styles.accountability}>
               <div style={styles.accountTitle}>Accountability</div>
               <div style={styles.accountText}>
-                Decide when you will do it. A move with no time attached is
-                usually just another thought.
+                Decide when you will do it. A move with no time attached is usually just another thought.
               </div>
               <div style={styles.inputs}>
                 <div style={styles.inputWrap}>
@@ -462,7 +467,7 @@ export default function Reset90App() {
                     type="time"
                     style={styles.input}
                     value={time}
-                    onChange={(e) => setTime(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTime(e.target.value)}
                   />
                 </div>
                 <div style={styles.inputWrap}>
@@ -471,7 +476,7 @@ export default function Reset90App() {
                     type="date"
                     style={styles.input}
                     value={deadline}
-                    onChange={(e) => setDeadline(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDeadline(e.target.value)}
                   />
                 </div>
               </div>
@@ -479,16 +484,13 @@ export default function Reset90App() {
 
             <div style={styles.buttonRow}>
               <button
-                style={styles.buttonPrimary(canComplete)}
+                style={primaryButton(canComplete)}
                 onClick={handleCompleteReset}
                 disabled={!canComplete}
               >
                 Complete Reset
               </button>
-              <button
-                style={styles.buttonSecondary}
-                onClick={() => setActiveView("past")}
-              >
+              <button style={styles.buttonSecondary} onClick={() => setActiveView("past")}>
                 View Past Resets
               </button>
             </div>
@@ -509,9 +511,7 @@ export default function Reset90App() {
           <div style={styles.listWrap}>
             {entries.length === 0 ? (
               <div style={styles.emptyState}>
-                No resets saved yet. Do one honest reset first. The product
-                starts feeling real when users can see their own pattern, not
-                just answer questions once.
+                No resets saved yet. Do one honest reset first.
               </div>
             ) : (
               entries.map((entry) => (
@@ -520,17 +520,10 @@ export default function Reset90App() {
                     <div style={styles.entryMeta}>
                       <div>{entry.displayDate}</div>
                       <div>{entry.displayTime}</div>
-                      {entry.actionTime ? (
-                        <div>Action time: {entry.actionTime}</div>
-                      ) : null}
-                      {entry.deadline ? (
-                        <div>Deadline: {entry.deadline}</div>
-                      ) : null}
+                      {entry.actionTime ? <div>Action time: {entry.actionTime}</div> : null}
+                      {entry.deadline ? <div>Deadline: {entry.deadline}</div> : null}
                     </div>
-                    <button
-                      style={styles.deleteButton}
-                      onClick={() => handleDeleteEntry(entry.id)}
-                    >
+                    <button style={styles.deleteButton} onClick={() => handleDeleteEntry(entry.id)}>
                       Delete
                     </button>
                   </div>
@@ -556,8 +549,7 @@ export default function Reset90App() {
         )}
 
         <div style={styles.footerNote}>
-          MVP rule: launch this before adding accounts, analytics, streaks, or
-          notifications.
+          MVP rule: launch this before adding accounts, analytics, streaks, or notifications.
         </div>
       </div>
     </div>
