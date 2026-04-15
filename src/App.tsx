@@ -390,7 +390,7 @@ export default function Reset90App() {
         <div style={styles.header}>
           <div style={styles.badge}>RESET</div>
           <h1 style={styles.h1}>
-            For when your mind gets noisy and you need one clear move.
+            Clear your mind.
           </h1>
           <p style={styles.sub}>
             Three prompts. One decision. A simple record of whether you followed through.
