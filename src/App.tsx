@@ -83,10 +83,14 @@ export default function Reset90App() {
       deadline,
     };
 
-    setEntries((prev) => [entry, ...prev]);
-    setDone(true);
-    setActiveView("reset");
-  }
+ setEntries((prev) => [entry, ...prev]);
+setDone(true);
+setActiveView("reset");
+
+if (typeof window !== "undefined" && (window as any).gtag) {
+  (window as any).gtag("event", "reset_completed");
+}
+}
 
   function handleNewReset(): void {
     setBothering("");
