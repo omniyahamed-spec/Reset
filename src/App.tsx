@@ -41,9 +41,7 @@ export default function Reset90App() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        setEntries(JSON.parse(raw) as ResetEntry[]);
-      }
+      if (raw) setEntries(JSON.parse(raw) as ResetEntry[]);
     } catch (error) {
       console.error("Failed to load entries", error);
     }
@@ -57,9 +55,7 @@ export default function Reset90App() {
     }
   }, [entries]);
 
-  const canComplete = Boolean(
-    bothering.trim() && avoiding.trim() && nextMove.trim()
-  );
+  const canComplete = Boolean(bothering.trim() && avoiding.trim() && nextMove.trim());
 
   function handleCompleteReset(): void {
     if (!canComplete) return;
@@ -83,14 +79,14 @@ export default function Reset90App() {
       deadline,
     };
 
- setEntries((prev) => [entry, ...prev]);
-setDone(true);
-setActiveView("reset");
+    setEntries((prev) => [entry, ...prev]);
+    setDone(true);
+    setActiveView("reset");
 
-if (typeof window !== "undefined" && (window as any).gtag) {
-  (window as any).gtag("event", "reset_completed");
-}
-}
+    if (typeof window !== "undefined" && (window as any).gtag) {
+      (window as any).gtag("event", "reset_completed");
+    }
+  }
 
   function handleNewReset(): void {
     setBothering("");
@@ -107,161 +103,218 @@ if (typeof window !== "undefined" && (window as any).gtag) {
   }
 
   const navButton = (active: boolean): CSSProperties => ({
-    padding: "10px 14px",
+    padding: "11px 16px",
     borderRadius: 999,
-    border: active ? "1px solid #1e1a16" : "1px solid #ddd3c6",
-    background: active ? "#1e1a16" : "#fbf8f3",
+    border: active ? "1px solid #1b1815" : "1px solid rgba(122, 113, 104, 0.2)",
+    background: active ? "#1b1815" : "rgba(255,255,255,0.68)",
     color: active ? "#ffffff" : "#51493f",
     fontSize: 14,
     fontWeight: 600,
     cursor: "pointer",
+    boxShadow: active ? "0 10px 24px rgba(27, 24, 21, 0.16)" : "none",
+    backdropFilter: "blur(10px)",
   });
 
   const primaryButton = (enabled: boolean): CSSProperties => ({
-    padding: "12px 18px",
-    borderRadius: 16,
+    padding: "14px 18px",
+    borderRadius: 18,
     border: "none",
-    background: enabled ? "#1e1a16" : "#9d948a",
+    background: enabled
+      ? "linear-gradient(135deg, #1d1a16 0%, #3b332b 100%)"
+      : "#aaa196",
     color: "white",
-    fontWeight: 600,
+    fontWeight: 700,
     cursor: enabled ? "pointer" : "not-allowed",
     fontSize: 14,
+    boxShadow: enabled ? "0 14px 28px rgba(29, 26, 22, 0.18)" : "none",
   });
+
+  const glassCard: CSSProperties = {
+    background: "rgba(255, 253, 249, 0.78)",
+    border: "1px solid rgba(227, 219, 207, 0.75)",
+    boxShadow: "0 24px 60px rgba(67, 53, 33, 0.08)",
+    backdropFilter: "blur(14px)",
+  };
 
   const styles: Record<string, CSSProperties> = {
     page: {
       minHeight: "100vh",
-      background: "#f6f2eb",
+      background:
+        "radial-gradient(circle at top left, rgba(255,255,255,0.8) 0%, rgba(246,242,235,1) 35%, rgba(241,234,225,1) 100%)",
       color: "#1f1c18",
       fontFamily: "Inter, system-ui, sans-serif",
-      padding: "28px 16px 48px",
+      padding: "28px 16px 56px",
       boxSizing: "border-box",
     },
     container: {
-      maxWidth: 760,
+      maxWidth: 860,
       margin: "0 auto",
     },
+    hero: {
+      ...glassCard,
+      borderRadius: 28,
+      padding: "24px 22px 22px",
+      marginBottom: 18,
+      overflow: "hidden",
+      position: "relative",
+    },
+    heroGlow: {
+      position: "absolute",
+      width: 220,
+      height: 220,
+      right: -60,
+      top: -80,
+      background: "radial-gradient(circle, rgba(227,211,188,0.7) 0%, rgba(227,211,188,0) 70%)",
+      pointerEvents: "none",
+    },
     badge: {
-      border: "1px solid #ddd3c6",
+      border: "1px solid rgba(221, 211, 198, 0.9)",
       borderRadius: 999,
-      padding: "6px 12px",
-      fontSize: 12,
-      letterSpacing: "0.2em",
+      padding: "7px 12px",
+      fontSize: 11,
+      letterSpacing: "0.24em",
       color: "#7a7168",
       display: "inline-block",
-      background: "#fbf8f3",
-    },
-    header: {
-      marginBottom: 24,
+      background: "rgba(251,248,243,0.9)",
+      position: "relative",
+      zIndex: 1,
     },
     h1: {
-      fontSize: "clamp(30px, 7vw, 42px)",
+      fontSize: "clamp(32px, 6.5vw, 48px)",
       marginTop: 16,
-      marginBottom: 8,
-      fontWeight: 600,
-      letterSpacing: "-0.04em",
-      lineHeight: 1.05,
+      marginBottom: 10,
+      fontWeight: 700,
+      letterSpacing: "-0.05em",
+      lineHeight: 1.02,
+      maxWidth: 560,
+      position: "relative",
+      zIndex: 1,
     },
     sub: {
       fontSize: 16,
       color: "#6a6258",
-      lineHeight: 1.6,
+      lineHeight: 1.65,
       margin: 0,
-      maxWidth: 560,
+      maxWidth: 540,
+      position: "relative",
+      zIndex: 1,
+    },
+    progressRow: {
+      display: "flex",
+      gap: 10,
+      flexWrap: "wrap",
+      marginTop: 18,
+      position: "relative",
+      zIndex: 1,
+    },
+    progressPill: {
+      padding: "8px 12px",
+      borderRadius: 999,
+      background: "rgba(255,255,255,0.7)",
+      color: "#6b6259",
+      fontSize: 12,
+      fontWeight: 600,
+      border: "1px solid rgba(222, 213, 201, 0.7)",
     },
     topNav: {
       display: "flex",
       gap: 10,
       flexWrap: "wrap",
       marginTop: 18,
+      position: "relative",
+      zIndex: 1,
     },
     card: {
-      background: "#fffdf9",
-      borderRadius: 24,
-      padding: 22,
-      border: "1px solid #e3dbcf",
-      boxShadow: "0 12px 30px rgba(67, 53, 33, 0.05)",
+      ...glassCard,
+      borderRadius: 28,
+      padding: 24,
     },
     row: {
       display: "flex",
       justifyContent: "space-between",
-      alignItems: "flex-start",
-      marginBottom: 22,
+      alignItems: "stretch",
+      marginBottom: 24,
       flexWrap: "wrap",
-      gap: 12,
+      gap: 14,
+    },
+    dateBlock: {
+      padding: "4px 0",
     },
     date: {
-      fontSize: 20,
-      fontWeight: 600,
-      letterSpacing: "-0.02em",
-      marginBottom: 4,
+      fontSize: 22,
+      fontWeight: 700,
+      letterSpacing: "-0.03em",
+      marginBottom: 5,
     },
     time: {
       fontSize: 13,
       color: "#7a7168",
     },
     presenceBox: {
-      background: "#f4efe7",
-      padding: 14,
-      borderRadius: 16,
-      border: "1px solid #e5ddd1",
-      maxWidth: 320,
+      background: "linear-gradient(135deg, rgba(244,239,231,0.9) 0%, rgba(250,246,240,0.9) 100%)",
+      padding: 16,
+      borderRadius: 18,
+      border: "1px solid rgba(229, 221, 209, 0.9)",
+      maxWidth: 360,
       fontSize: 13,
-      lineHeight: 1.55,
+      lineHeight: 1.6,
       color: "#655d54",
+      boxShadow: "inset 0 1px 0 rgba(255,255,255,0.5)",
     },
     section: {
       marginBottom: 20,
     },
     label: {
       fontSize: 14,
-      fontWeight: 600,
-      marginBottom: 8,
+      fontWeight: 700,
+      marginBottom: 9,
       display: "block",
       color: "#2c2722",
+      letterSpacing: "-0.01em",
     },
     textarea: {
       width: "100%",
-      borderRadius: 16,
-      border: "1px solid #dcd3c7",
-      padding: 14,
+      borderRadius: 18,
+      border: "1px solid rgba(220, 211, 199, 1)",
+      padding: 16,
       fontSize: 14,
-      lineHeight: 1.6,
-      background: "#faf7f2",
+      lineHeight: 1.65,
+      background: "rgba(250,247,242,0.95)",
       boxSizing: "border-box",
-      minHeight: 110,
+      minHeight: 116,
       resize: "vertical",
       outline: "none",
+      boxShadow: "inset 0 1px 3px rgba(60, 50, 37, 0.04)",
     },
     helper: {
       marginTop: 8,
       fontSize: 12,
       color: "#80766d",
-      lineHeight: 1.5,
+      lineHeight: 1.55,
     },
     accountability: {
-      background: "#f4efe7",
-      padding: 16,
-      borderRadius: 16,
-      marginTop: 4,
-      marginBottom: 20,
-      border: "1px solid #e5ddd1",
+      background: "linear-gradient(135deg, rgba(244,239,231,0.95) 0%, rgba(249,245,239,0.95) 100%)",
+      padding: 18,
+      borderRadius: 18,
+      marginTop: 8,
+      marginBottom: 22,
+      border: "1px solid rgba(229, 221, 209, 1)",
     },
     accountTitle: {
-      fontWeight: 600,
+      fontWeight: 700,
       fontSize: 14,
       marginBottom: 6,
     },
     accountText: {
       fontSize: 13,
       color: "#6f665d",
-      lineHeight: 1.5,
+      lineHeight: 1.55,
       marginBottom: 12,
     },
     inputs: {
       display: "grid",
       gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-      gap: 10,
+      gap: 12,
     },
     inputWrap: {
       display: "grid",
@@ -270,14 +323,15 @@ if (typeof window !== "undefined" && (window as any).gtag) {
     inputLabel: {
       fontSize: 12,
       color: "#786f66",
-      fontWeight: 600,
+      fontWeight: 700,
+      letterSpacing: "0.01em",
     },
     input: {
       width: "100%",
-      padding: "12px 12px",
-      borderRadius: 12,
-      border: "1px solid #dcd3c7",
-      background: "#fffdf9",
+      padding: "13px 12px",
+      borderRadius: 14,
+      border: "1px solid rgba(220, 211, 199, 1)",
+      background: "rgba(255,253,249,0.98)",
       boxSizing: "border-box",
       outline: "none",
       fontSize: 14,
@@ -286,104 +340,106 @@ if (typeof window !== "undefined" && (window as any).gtag) {
       display: "flex",
       gap: 10,
       flexWrap: "wrap",
+      alignItems: "center",
     },
     buttonSecondary: {
-      padding: "12px 18px",
-      borderRadius: 16,
-      border: "1px solid #dcd3c7",
-      background: "#fffdf9",
+      padding: "14px 18px",
+      borderRadius: 18,
+      border: "1px solid rgba(220, 211, 199, 1)",
+      background: "rgba(255,253,249,0.92)",
       color: "#3d362f",
-      fontWeight: 600,
+      fontWeight: 700,
       cursor: "pointer",
       fontSize: 14,
     },
     result: {
-      marginTop: 20,
-      padding: 16,
-      borderRadius: 16,
-      background: "#eee7dc",
-      border: "1px solid #ddd3c4",
+      marginTop: 22,
+      padding: 18,
+      borderRadius: 18,
+      background: "linear-gradient(135deg, rgba(238,231,220,0.95) 0%, rgba(247,242,235,0.95) 100%)",
+      border: "1px solid rgba(221, 211, 196, 1)",
+      boxShadow: "0 10px 22px rgba(84, 68, 46, 0.06)",
     },
     resultTitle: {
-      fontWeight: 600,
+      fontWeight: 700,
       marginBottom: 8,
-      fontSize: 13,
+      fontSize: 12,
       color: "#655c53",
+      textTransform: "uppercase",
+      letterSpacing: "0.08em",
     },
     resultMove: {
-      fontSize: 18,
-      lineHeight: 1.5,
-      fontWeight: 600,
+      fontSize: 20,
+      lineHeight: 1.45,
+      fontWeight: 700,
       marginBottom: 8,
+      letterSpacing: "-0.03em",
     },
     resultText: {
       fontSize: 13,
       color: "#655c53",
-      lineHeight: 1.6,
+      lineHeight: 1.65,
     },
     listWrap: {
       display: "grid",
       gap: 12,
     },
     emptyState: {
-      background: "#fffdf9",
-      borderRadius: 20,
+      ...glassCard,
+      borderRadius: 22,
       padding: 22,
-      border: "1px solid #e3dbcf",
       color: "#6c645c",
-      lineHeight: 1.6,
+      lineHeight: 1.7,
     },
     entryCard: {
-      background: "#fffdf9",
-      borderRadius: 20,
+      ...glassCard,
+      borderRadius: 22,
       padding: 18,
-      border: "1px solid #e3dbcf",
-      boxShadow: "0 10px 22px rgba(67, 53, 33, 0.04)",
     },
     entryTop: {
       display: "flex",
       justifyContent: "space-between",
       gap: 12,
       alignItems: "flex-start",
-      marginBottom: 12,
+      marginBottom: 14,
     },
     entryMeta: {
       fontSize: 12,
       color: "#7a7168",
-      lineHeight: 1.5,
+      lineHeight: 1.55,
     },
     entryBlock: {
       marginBottom: 12,
     },
     entryLabel: {
-      fontSize: 12,
+      fontSize: 11,
       color: "#7a7168",
-      fontWeight: 600,
-      marginBottom: 4,
+      fontWeight: 700,
+      marginBottom: 5,
       textTransform: "uppercase",
-      letterSpacing: "0.06em",
+      letterSpacing: "0.08em",
     },
     entryText: {
       fontSize: 14,
-      lineHeight: 1.6,
+      lineHeight: 1.65,
       color: "#2f2a25",
       whiteSpace: "pre-wrap",
     },
     deleteButton: {
-      border: "1px solid #ddd3c6",
-      background: "#fbf8f3",
+      border: "1px solid rgba(221, 211, 198, 1)",
+      background: "rgba(251,248,243,0.95)",
       color: "#5f564d",
       borderRadius: 12,
       padding: "8px 10px",
       fontSize: 12,
       cursor: "pointer",
-      fontWeight: 600,
+      fontWeight: 700,
     },
     footerNote: {
       marginTop: 18,
       fontSize: 12,
       color: "#8a8178",
-      lineHeight: 1.6,
+      lineHeight: 1.65,
       textAlign: "center",
     },
   };
@@ -391,14 +447,17 @@ if (typeof window !== "undefined" && (window as any).gtag) {
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <div style={styles.header}>
+        <div style={styles.hero}>
+          <div style={styles.heroGlow} />
           <div style={styles.badge}>RESET</div>
-          <h1 style={styles.h1}>
-            Clear your mind.
-          </h1>
-          <p style={styles.sub}>
-            Three prompts. One decision. A simple record of whether you followed through.
-          </p>
+          <h1 style={styles.h1}>Clear your mind. Make one move.</h1>
+          <p style={styles.sub}>Stop looping. Name it. Face it. Move.</p>
+
+          <div style={styles.progressRow}>
+            <div style={styles.progressPill}>90-second reset</div>
+            <div style={styles.progressPill}>Honest reflection</div>
+            <div style={styles.progressPill}>One clear action</div>
+          </div>
 
           <div style={styles.topNav}>
             <button style={navButton(activeView === "reset")} onClick={() => setActiveView("reset")}>
@@ -416,13 +475,13 @@ if (typeof window !== "undefined" && (window as any).gtag) {
         {activeView === "reset" ? (
           <div style={styles.card}>
             <div style={styles.row}>
-              <div>
+              <div style={styles.dateBlock}>
                 <div style={styles.date}>{formattedDate}</div>
                 <div style={styles.time}>Started at {formattedTime}</div>
               </div>
 
               <div style={styles.presenceBox}>
-                Be honest with today. Name the real issue, catch the avoidance, and pick one move before you open something else.
+                Be honest with today. Name the real issue, catch the avoidance, and choose one move before you open something else.
               </div>
             </div>
 
@@ -454,16 +513,12 @@ if (typeof window !== "undefined" && (window as any).gtag) {
                 value={nextMove}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNextMove(e.target.value)}
               />
-              <div style={styles.helper}>
-                Keep it specific. Not a plan. Not a promise. One visible action.
-              </div>
+              <div style={styles.helper}>Keep it specific. Not a plan. Not a promise. One visible action.</div>
             </div>
 
             <div style={styles.accountability}>
               <div style={styles.accountTitle}>Accountability</div>
-              <div style={styles.accountText}>
-                Decide when you will do it. A move with no time attached is usually just another thought.
-              </div>
+              <div style={styles.accountText}>Decide when you will do it. A move with no time attached is usually just another thought.</div>
               <div style={styles.inputs}>
                 <div style={styles.inputWrap}>
                   <label style={styles.inputLabel}>I will do it at</label>
@@ -487,12 +542,8 @@ if (typeof window !== "undefined" && (window as any).gtag) {
             </div>
 
             <div style={styles.buttonRow}>
-              <button
-                style={primaryButton(canComplete)}
-                onClick={handleCompleteReset}
-                disabled={!canComplete}
-              >
-                Complete Reset
+              <button style={primaryButton(canComplete)} onClick={handleCompleteReset} disabled={!canComplete}>
+                Do it
               </button>
               <button style={styles.buttonSecondary} onClick={() => setActiveView("past")}>
                 View Past Resets
@@ -504,7 +555,7 @@ if (typeof window !== "undefined" && (window as any).gtag) {
                 <div style={styles.resultTitle}>Your move</div>
                 <div style={styles.resultMove}>{nextMove}</div>
                 <div style={styles.resultText}>
-                  Now close this and do it.
+                  Close this. Do it now. Then come back.
                   {time ? ` Start at ${time}.` : ""}
                   {deadline ? ` Finish by ${deadline}.` : ""}
                 </div>
@@ -514,9 +565,7 @@ if (typeof window !== "undefined" && (window as any).gtag) {
         ) : (
           <div style={styles.listWrap}>
             {entries.length === 0 ? (
-              <div style={styles.emptyState}>
-                No resets saved yet. Do one honest reset first.
-              </div>
+              <div style={styles.emptyState}>No resets saved yet. Do one honest reset first.</div>
             ) : (
               entries.map((entry) => (
                 <div key={entry.id} style={styles.entryCard}>
@@ -552,9 +601,7 @@ if (typeof window !== "undefined" && (window as any).gtag) {
           </div>
         )}
 
-        <div style={styles.footerNote}>
-          MVP rule: launch this before adding accounts, analytics, streaks, or notifications.
-        </div>
+        <div style={styles.footerNote}>For people who think too much and act too little.</div>
       </div>
     </div>
   );
