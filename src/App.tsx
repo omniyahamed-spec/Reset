@@ -102,214 +102,179 @@ export default function Reset90App() {
     setEntries((prev) => prev.filter((entry) => entry.id !== id));
   }
 
-  const navButton = (active: boolean): CSSProperties => ({
-    padding: "11px 16px",
-    borderRadius: 999,
-    border: active ? "1px solid #1b1815" : "1px solid rgba(122, 113, 104, 0.2)",
-    background: active ? "#1b1815" : "rgba(255,255,255,0.68)",
-    color: active ? "#ffffff" : "#51493f",
-    fontSize: 14,
-    fontWeight: 600,
-    cursor: "pointer",
-    boxShadow: active ? "0 10px 24px rgba(27, 24, 21, 0.16)" : "none",
-    backdropFilter: "blur(10px)",
-  });
-
-  const primaryButton = (enabled: boolean): CSSProperties => ({
-    padding: "14px 18px",
-    borderRadius: 18,
-    border: "none",
-    background: enabled
-      ? "linear-gradient(135deg, #1d1a16 0%, #3b332b 100%)"
-      : "#aaa196",
-    color: "white",
-    fontWeight: 700,
-    cursor: enabled ? "pointer" : "not-allowed",
-    fontSize: 14,
-    boxShadow: enabled ? "0 14px 28px rgba(29, 26, 22, 0.18)" : "none",
-  });
-
-  const glassCard: CSSProperties = {
-    background: "rgba(255, 253, 249, 0.78)",
-    border: "1px solid rgba(227, 219, 207, 0.75)",
-    boxShadow: "0 24px 60px rgba(67, 53, 33, 0.08)",
-    backdropFilter: "blur(14px)",
-  };
+  function trackPastResets(): void {
+    setActiveView("past");
+    if (typeof window !== "undefined" && (window as any).gtag) {
+      (window as any).gtag("event", "past_resets_viewed");
+    }
+  }
 
   const styles: Record<string, CSSProperties> = {
     page: {
       minHeight: "100vh",
       background:
-        "radial-gradient(circle at top left, rgba(255,255,255,0.8) 0%, rgba(246,242,235,1) 35%, rgba(241,234,225,1) 100%)",
-      color: "#1f1c18",
+        "radial-gradient(circle at top, rgba(47,38,31,0.55) 0%, rgba(18,16,14,1) 32%, rgba(11,10,9,1) 100%)",
+      color: "#f3ece3",
       fontFamily: "Inter, system-ui, sans-serif",
       padding: "28px 16px 56px",
       boxSizing: "border-box",
     },
-    container: {
-      maxWidth: 860,
+    shell: {
+      maxWidth: 920,
       margin: "0 auto",
     },
-    hero: {
-      ...glassCard,
-      borderRadius: 28,
-      padding: "24px 22px 22px",
-      marginBottom: 18,
-      overflow: "hidden",
-      position: "relative",
-    },
-    heroGlow: {
-      position: "absolute",
-      width: 220,
-      height: 220,
-      right: -60,
-      top: -80,
-      background: "radial-gradient(circle, rgba(227,211,188,0.7) 0%, rgba(227,211,188,0) 70%)",
-      pointerEvents: "none",
-    },
-    badge: {
-      border: "1px solid rgba(221, 211, 198, 0.9)",
-      borderRadius: 999,
-      padding: "7px 12px",
-      fontSize: 11,
-      letterSpacing: "0.24em",
-      color: "#7a7168",
-      display: "inline-block",
-      background: "rgba(251,248,243,0.9)",
-      position: "relative",
-      zIndex: 1,
-    },
-    h1: {
-      fontSize: "clamp(32px, 6.5vw, 48px)",
-      marginTop: 16,
-      marginBottom: 10,
-      fontWeight: 700,
-      letterSpacing: "-0.05em",
-      lineHeight: 1.02,
-      maxWidth: 560,
-      position: "relative",
-      zIndex: 1,
-    },
-    sub: {
-      fontSize: 16,
-      color: "#6a6258",
-      lineHeight: 1.65,
-      margin: 0,
-      maxWidth: 540,
-      position: "relative",
-      zIndex: 1,
-    },
-    progressRow: {
-      display: "flex",
-      gap: 10,
-      flexWrap: "wrap",
-      marginTop: 18,
-      position: "relative",
-      zIndex: 1,
-    },
-    progressPill: {
-      padding: "8px 12px",
-      borderRadius: 999,
-      background: "rgba(255,255,255,0.7)",
-      color: "#6b6259",
-      fontSize: 12,
-      fontWeight: 600,
-      border: "1px solid rgba(222, 213, 201, 0.7)",
-    },
-    topNav: {
-      display: "flex",
-      gap: 10,
-      flexWrap: "wrap",
-      marginTop: 18,
-      position: "relative",
-      zIndex: 1,
-    },
-    card: {
-      ...glassCard,
-      borderRadius: 28,
-      padding: 24,
-    },
-    row: {
+    topBar: {
       display: "flex",
       justifyContent: "space-between",
-      alignItems: "stretch",
-      marginBottom: 24,
+      alignItems: "center",
+      gap: 16,
       flexWrap: "wrap",
-      gap: 14,
+      marginBottom: 26,
     },
-    dateBlock: {
-      padding: "4px 0",
+    brand: {
+      fontSize: 12,
+      letterSpacing: "0.32em",
+      textTransform: "uppercase",
+      color: "rgba(243,236,227,0.64)",
     },
-    date: {
-      fontSize: 22,
-      fontWeight: 700,
-      letterSpacing: "-0.03em",
-      marginBottom: 5,
+    nav: {
+      display: "flex",
+      gap: 10,
+      flexWrap: "wrap",
     },
-    time: {
+    navButton: {
+      padding: "10px 14px",
+      borderRadius: 999,
+      border: "1px solid rgba(243,236,227,0.12)",
+      background: "rgba(255,255,255,0.04)",
+      color: "rgba(243,236,227,0.86)",
+      fontWeight: 600,
       fontSize: 13,
-      color: "#7a7168",
+      cursor: "pointer",
+      backdropFilter: "blur(8px)",
     },
-    presenceBox: {
-      background: "linear-gradient(135deg, rgba(244,239,231,0.9) 0%, rgba(250,246,240,0.9) 100%)",
-      padding: 16,
-      borderRadius: 18,
-      border: "1px solid rgba(229, 221, 209, 0.9)",
-      maxWidth: 360,
+    hero: {
+      display: "grid",
+      gap: 18,
+      marginBottom: 30,
+    },
+    dateRow: {
+      display: "flex",
+      justifyContent: "space-between",
+      gap: 12,
+      flexWrap: "wrap",
+      alignItems: "center",
+    },
+    dateText: {
       fontSize: 13,
-      lineHeight: 1.6,
-      color: "#655d54",
-      boxShadow: "inset 0 1px 0 rgba(255,255,255,0.5)",
+      color: "rgba(243,236,227,0.62)",
+      letterSpacing: "0.03em",
     },
-    section: {
-      marginBottom: 20,
-    },
-    label: {
-      fontSize: 14,
+    h1: {
+      margin: 0,
+      fontSize: "clamp(42px, 9vw, 78px)",
+      lineHeight: 0.94,
+      letterSpacing: "-0.06em",
       fontWeight: 700,
-      marginBottom: 9,
+      maxWidth: 720,
+      color: "#f7f1ea",
+    },
+    sub: {
+      margin: 0,
+      fontSize: 18,
+      lineHeight: 1.7,
+      color: "rgba(243,236,227,0.72)",
+      maxWidth: 540,
+    },
+    panel: {
+      border: "1px solid rgba(243,236,227,0.08)",
+      background: "linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)",
+      borderRadius: 32,
+      backdropFilter: "blur(18px)",
+      boxShadow: "0 24px 70px rgba(0,0,0,0.28)",
+      overflow: "hidden",
+    },
+    panelInner: {
+      padding: "28px 22px 22px",
+    },
+    panelTop: {
+      display: "flex",
+      justifyContent: "space-between",
+      gap: 16,
+      alignItems: "flex-start",
+      flexWrap: "wrap",
+      marginBottom: 24,
+    },
+    panelMeta: {
+      fontSize: 12,
+      textTransform: "uppercase",
+      letterSpacing: "0.16em",
+      color: "rgba(243,236,227,0.46)",
+      marginBottom: 10,
+    },
+    panelHint: {
+      maxWidth: 330,
+      fontSize: 13,
+      lineHeight: 1.7,
+      color: "rgba(243,236,227,0.64)",
+      padding: "14px 16px",
+      borderRadius: 20,
+      background: "rgba(255,255,255,0.04)",
+      border: "1px solid rgba(243,236,227,0.08)",
+    },
+    fieldSection: {
+      marginBottom: 22,
+    },
+    fieldLabel: {
       display: "block",
-      color: "#2c2722",
-      letterSpacing: "-0.01em",
+      fontSize: 13,
+      textTransform: "uppercase",
+      letterSpacing: "0.14em",
+      color: "rgba(243,236,227,0.54)",
+      marginBottom: 12,
+      fontWeight: 700,
     },
     textarea: {
       width: "100%",
-      borderRadius: 18,
-      border: "1px solid rgba(220, 211, 199, 1)",
-      padding: 16,
-      fontSize: 14,
-      lineHeight: 1.65,
-      background: "rgba(250,247,242,0.95)",
-      boxSizing: "border-box",
-      minHeight: 116,
+      minHeight: 110,
       resize: "vertical",
+      border: "none",
+      borderBottom: "1px solid rgba(243,236,227,0.12)",
+      background: "transparent",
+      color: "#f6efe7",
+      fontSize: 22,
+      lineHeight: 1.55,
+      padding: "0 0 16px 0",
       outline: "none",
-      boxShadow: "inset 0 1px 3px rgba(60, 50, 37, 0.04)",
+      boxSizing: "border-box",
     },
     helper: {
-      marginTop: 8,
+      marginTop: 10,
       fontSize: 12,
-      color: "#80766d",
-      lineHeight: 1.55,
+      lineHeight: 1.65,
+      color: "rgba(243,236,227,0.42)",
     },
     accountability: {
-      background: "linear-gradient(135deg, rgba(244,239,231,0.95) 0%, rgba(249,245,239,0.95) 100%)",
+      marginTop: 10,
+      marginBottom: 24,
       padding: 18,
-      borderRadius: 18,
-      marginTop: 8,
-      marginBottom: 22,
-      border: "1px solid rgba(229, 221, 209, 1)",
+      borderRadius: 24,
+      background: "rgba(255,255,255,0.03)",
+      border: "1px solid rgba(243,236,227,0.08)",
     },
-    accountTitle: {
-      fontWeight: 700,
-      fontSize: 14,
-      marginBottom: 6,
-    },
-    accountText: {
+    accountabilityTitle: {
       fontSize: 13,
-      color: "#6f665d",
-      lineHeight: 1.55,
-      marginBottom: 12,
+      textTransform: "uppercase",
+      letterSpacing: "0.14em",
+      color: "rgba(243,236,227,0.54)",
+      marginBottom: 8,
+      fontWeight: 700,
+    },
+    accountabilityText: {
+      marginBottom: 14,
+      fontSize: 13,
+      lineHeight: 1.65,
+      color: "rgba(243,236,227,0.58)",
     },
     inputs: {
       display: "grid",
@@ -322,79 +287,99 @@ export default function Reset90App() {
     },
     inputLabel: {
       fontSize: 12,
-      color: "#786f66",
+      color: "rgba(243,236,227,0.46)",
       fontWeight: 700,
-      letterSpacing: "0.01em",
+      letterSpacing: "0.04em",
     },
     input: {
       width: "100%",
-      padding: "13px 12px",
-      borderRadius: 14,
-      border: "1px solid rgba(220, 211, 199, 1)",
-      background: "rgba(255,253,249,0.98)",
+      padding: "13px 14px",
+      borderRadius: 16,
+      border: "1px solid rgba(243,236,227,0.1)",
+      background: "rgba(255,255,255,0.04)",
+      color: "#f6efe7",
+      fontSize: 14,
       boxSizing: "border-box",
       outline: "none",
-      fontSize: 14,
     },
     buttonRow: {
       display: "flex",
-      gap: 10,
+      gap: 12,
       flexWrap: "wrap",
       alignItems: "center",
     },
-    buttonSecondary: {
-      padding: "14px 18px",
-      borderRadius: 18,
-      border: "1px solid rgba(220, 211, 199, 1)",
-      background: "rgba(255,253,249,0.92)",
-      color: "#3d362f",
-      fontWeight: 700,
-      cursor: "pointer",
+    primaryButton: {
+      padding: "15px 24px",
+      borderRadius: 999,
+      border: "none",
+      background: "linear-gradient(135deg, #f4ede2 0%, #cbb79d 100%)",
+      color: "#171412",
+      fontWeight: 800,
       fontSize: 14,
+      cursor: "pointer",
+      boxShadow: "0 16px 34px rgba(203,183,157,0.2)",
+    },
+    secondaryButton: {
+      padding: "15px 18px",
+      borderRadius: 999,
+      border: "1px solid rgba(243,236,227,0.12)",
+      background: "rgba(255,255,255,0.04)",
+      color: "rgba(243,236,227,0.86)",
+      fontWeight: 700,
+      fontSize: 14,
+      cursor: "pointer",
+    },
+    disabledButton: {
+      opacity: 0.44,
+      cursor: "not-allowed",
     },
     result: {
-      marginTop: 22,
-      padding: 18,
-      borderRadius: 18,
-      background: "linear-gradient(135deg, rgba(238,231,220,0.95) 0%, rgba(247,242,235,0.95) 100%)",
-      border: "1px solid rgba(221, 211, 196, 1)",
-      boxShadow: "0 10px 22px rgba(84, 68, 46, 0.06)",
+      marginTop: 24,
+      padding: 22,
+      borderRadius: 24,
+      background: "linear-gradient(135deg, rgba(244,237,226,0.12) 0%, rgba(203,183,157,0.08) 100%)",
+      border: "1px solid rgba(243,236,227,0.12)",
     },
-    resultTitle: {
-      fontWeight: 700,
-      marginBottom: 8,
+    resultLabel: {
       fontSize: 12,
-      color: "#655c53",
       textTransform: "uppercase",
-      letterSpacing: "0.08em",
+      letterSpacing: "0.14em",
+      color: "rgba(243,236,227,0.5)",
+      marginBottom: 8,
+      fontWeight: 700,
     },
     resultMove: {
-      fontSize: 20,
-      lineHeight: 1.45,
+      fontSize: 28,
+      lineHeight: 1.35,
+      letterSpacing: "-0.04em",
       fontWeight: 700,
-      marginBottom: 8,
-      letterSpacing: "-0.03em",
+      color: "#f8f2eb",
+      marginBottom: 10,
     },
     resultText: {
-      fontSize: 13,
-      color: "#655c53",
-      lineHeight: 1.65,
+      fontSize: 14,
+      lineHeight: 1.7,
+      color: "rgba(243,236,227,0.7)",
     },
-    listWrap: {
+    historyWrap: {
       display: "grid",
-      gap: 12,
+      gap: 14,
     },
     emptyState: {
-      ...glassCard,
-      borderRadius: 22,
-      padding: 22,
-      color: "#6c645c",
-      lineHeight: 1.7,
+      borderRadius: 26,
+      padding: 28,
+      border: "1px solid rgba(243,236,227,0.08)",
+      background: "rgba(255,255,255,0.03)",
+      color: "rgba(243,236,227,0.64)",
+      lineHeight: 1.75,
+      fontSize: 15,
     },
     entryCard: {
-      ...glassCard,
-      borderRadius: 22,
-      padding: 18,
+      borderRadius: 26,
+      padding: 20,
+      border: "1px solid rgba(243,236,227,0.08)",
+      background: "rgba(255,255,255,0.03)",
+      backdropFilter: "blur(14px)",
     },
     entryTop: {
       display: "flex",
@@ -402,168 +387,166 @@ export default function Reset90App() {
       gap: 12,
       alignItems: "flex-start",
       marginBottom: 14,
+      flexWrap: "wrap",
     },
     entryMeta: {
       fontSize: 12,
-      color: "#7a7168",
-      lineHeight: 1.55,
+      lineHeight: 1.6,
+      color: "rgba(243,236,227,0.52)",
     },
     entryBlock: {
-      marginBottom: 12,
+      marginBottom: 14,
     },
     entryLabel: {
       fontSize: 11,
-      color: "#7a7168",
-      fontWeight: 700,
-      marginBottom: 5,
       textTransform: "uppercase",
-      letterSpacing: "0.08em",
+      letterSpacing: "0.12em",
+      color: "rgba(243,236,227,0.44)",
+      fontWeight: 700,
+      marginBottom: 6,
     },
     entryText: {
-      fontSize: 14,
-      lineHeight: 1.65,
-      color: "#2f2a25",
+      fontSize: 16,
+      lineHeight: 1.7,
+      color: "#f1e9df",
       whiteSpace: "pre-wrap",
     },
     deleteButton: {
-      border: "1px solid rgba(221, 211, 198, 1)",
-      background: "rgba(251,248,243,0.95)",
-      color: "#5f564d",
-      borderRadius: 12,
-      padding: "8px 10px",
+      border: "1px solid rgba(243,236,227,0.1)",
+      background: "rgba(255,255,255,0.04)",
+      color: "rgba(243,236,227,0.82)",
+      borderRadius: 999,
+      padding: "10px 12px",
       fontSize: 12,
       cursor: "pointer",
       fontWeight: 700,
     },
-    footerNote: {
-      marginTop: 18,
-      fontSize: 12,
-      color: "#8a8178",
-      lineHeight: 1.65,
+    footer: {
+      marginTop: 20,
       textAlign: "center",
+      fontSize: 12,
+      lineHeight: 1.7,
+      color: "rgba(243,236,227,0.36)",
+      letterSpacing: "0.03em",
     },
   };
 
   return (
     <div style={styles.page}>
-      <div style={styles.container}>
-        <div style={styles.hero}>
-          <div style={styles.heroGlow} />
-          <div style={styles.badge}>RESET</div>
-          <h1 style={styles.h1}>Clear your mind. Make one move.</h1>
-          <p style={styles.sub}>Stop looping. Name it. Face it. Move.</p>
-
-          <div style={styles.progressRow}>
-            <div style={styles.progressPill}>90-second reset</div>
-            <div style={styles.progressPill}>Honest reflection</div>
-            <div style={styles.progressPill}>One clear action</div>
-          </div>
-
-          <div style={styles.topNav}>
-            <button style={navButton(activeView === "reset")} onClick={() => setActiveView("reset")}>
-              Today&apos;s Reset
-            </button>
-            <button style={navButton(activeView === "past")} onClick={() => setActiveView("past")}>
-              Past Resets ({entries.length})
-            </button>
-            <button style={navButton(false)} onClick={handleNewReset}>
-              New Reset
-            </button>
+      <div style={styles.shell}>
+        <div style={styles.topBar}>
+          <div style={styles.brand}>Reset</div>
+          <div style={styles.nav}>
+            <button style={styles.navButton} onClick={() => setActiveView("reset")}>Today&apos;s Reset</button>
+            <button style={styles.navButton} onClick={trackPastResets}>History</button>
+            <button style={styles.navButton} onClick={handleNewReset}>New</button>
           </div>
         </div>
 
+        <div style={styles.hero}>
+          <div style={styles.dateRow}>
+            <div style={styles.dateText}>{formattedDate} · {formattedTime}</div>
+          </div>
+          <h1 style={styles.h1}>Clear your mind. Make one move.</h1>
+          <p style={styles.sub}>Stop looping. Name it. Face it. Move.</p>
+        </div>
+
         {activeView === "reset" ? (
-          <div style={styles.card}>
-            <div style={styles.row}>
-              <div style={styles.dateBlock}>
-                <div style={styles.date}>{formattedDate}</div>
-                <div style={styles.time}>Started at {formattedTime}</div>
-              </div>
-
-              <div style={styles.presenceBox}>
-                Be honest with today. Name the real issue, catch the avoidance, and choose one move before you open something else.
-              </div>
-            </div>
-
-            <div style={styles.section}>
-              <label style={styles.label}>1. What is actually bothering me?</label>
-              <textarea
-                style={styles.textarea}
-                placeholder="Name the real issue, not the polished version."
-                value={bothering}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setBothering(e.target.value)}
-              />
-            </div>
-
-            <div style={styles.section}>
-              <label style={styles.label}>2. What am I avoiding?</label>
-              <textarea
-                style={styles.textarea}
-                placeholder="What are you postponing, softening, or dodging?"
-                value={avoiding}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setAvoiding(e.target.value)}
-              />
-            </div>
-
-            <div style={styles.section}>
-              <label style={styles.label}>3. What is the smallest next move?</label>
-              <textarea
-                style={{ ...styles.textarea, minHeight: 96 }}
-                placeholder="Write one move you can start in under 2 minutes."
-                value={nextMove}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNextMove(e.target.value)}
-              />
-              <div style={styles.helper}>Keep it specific. Not a plan. Not a promise. One visible action.</div>
-            </div>
-
-            <div style={styles.accountability}>
-              <div style={styles.accountTitle}>Accountability</div>
-              <div style={styles.accountText}>Decide when you will do it. A move with no time attached is usually just another thought.</div>
-              <div style={styles.inputs}>
-                <div style={styles.inputWrap}>
-                  <label style={styles.inputLabel}>I will do it at</label>
-                  <input
-                    type="time"
-                    style={styles.input}
-                    value={time}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTime(e.target.value)}
-                  />
+          <div style={styles.panel}>
+            <div style={styles.panelInner}>
+              <div style={styles.panelTop}>
+                <div>
+                  <div style={styles.panelMeta}>Today&apos;s reset</div>
                 </div>
-                <div style={styles.inputWrap}>
-                  <label style={styles.inputLabel}>Deadline</label>
-                  <input
-                    type="date"
-                    style={styles.input}
-                    value={deadline}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDeadline(e.target.value)}
-                  />
+                <div style={styles.panelHint}>
+                  Be honest with today. Name the real issue, catch the avoidance, and choose one move before you open something else.
                 </div>
               </div>
-            </div>
 
-            <div style={styles.buttonRow}>
-              <button style={primaryButton(canComplete)} onClick={handleCompleteReset} disabled={!canComplete}>
-                Do it
-              </button>
-              <button style={styles.buttonSecondary} onClick={() => setActiveView("past")}>
-                View Past Resets
-              </button>
-            </div>
+              <div style={styles.fieldSection}>
+                <label style={styles.fieldLabel}>What is actually bothering me?</label>
+                <textarea
+                  style={styles.textarea}
+                  placeholder="Name the real issue, not the polished version."
+                  value={bothering}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setBothering(e.target.value)}
+                />
+              </div>
 
-            {done && (
-              <div style={styles.result}>
-                <div style={styles.resultTitle}>Your move</div>
-                <div style={styles.resultMove}>{nextMove}</div>
-                <div style={styles.resultText}>
-                  Close this. Do it now. Then come back.
-                  {time ? ` Start at ${time}.` : ""}
-                  {deadline ? ` Finish by ${deadline}.` : ""}
+              <div style={styles.fieldSection}>
+                <label style={styles.fieldLabel}>What am I avoiding?</label>
+                <textarea
+                  style={styles.textarea}
+                  placeholder="What are you postponing, softening, or dodging?"
+                  value={avoiding}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setAvoiding(e.target.value)}
+                />
+              </div>
+
+              <div style={styles.fieldSection}>
+                <label style={styles.fieldLabel}>What is the smallest next move?</label>
+                <textarea
+                  style={{ ...styles.textarea, minHeight: 92 }}
+                  placeholder="Write one move you can start in under 2 minutes."
+                  value={nextMove}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNextMove(e.target.value)}
+                />
+                <div style={styles.helper}>Keep it specific. Not a plan. Not a promise. One visible action.</div>
+              </div>
+
+              <div style={styles.accountability}>
+                <div style={styles.accountabilityTitle}>Accountability</div>
+                <div style={styles.accountabilityText}>Decide when you will do it. A move with no time attached is usually just another thought.</div>
+                <div style={styles.inputs}>
+                  <div style={styles.inputWrap}>
+                    <label style={styles.inputLabel}>I will do it at</label>
+                    <input
+                      type="time"
+                      style={styles.input}
+                      value={time}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTime(e.target.value)}
+                    />
+                  </div>
+                  <div style={styles.inputWrap}>
+                    <label style={styles.inputLabel}>Deadline</label>
+                    <input
+                      type="date"
+                      style={styles.input}
+                      value={deadline}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDeadline(e.target.value)}
+                    />
+                  </div>
                 </div>
               </div>
-            )}
+
+              <div style={styles.buttonRow}>
+                <button
+                  style={{ ...styles.primaryButton, ...(canComplete ? {} : styles.disabledButton) }}
+                  onClick={handleCompleteReset}
+                  disabled={!canComplete}
+                >
+                  Do it
+                </button>
+                <button style={styles.secondaryButton} onClick={trackPastResets}>
+                  View Past Resets
+                </button>
+              </div>
+
+              {done && (
+                <div style={styles.result}>
+                  <div style={styles.resultLabel}>Your move</div>
+                  <div style={styles.resultMove}>{nextMove}</div>
+                  <div style={styles.resultText}>
+                    Close this. Do it now. Then come back.
+                    {time ? ` Start at ${time}.` : ""}
+                    {deadline ? ` Finish by ${deadline}.` : ""}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         ) : (
-          <div style={styles.listWrap}>
+          <div style={styles.historyWrap}>
             {entries.length === 0 ? (
               <div style={styles.emptyState}>No resets saved yet. Do one honest reset first.</div>
             ) : (
@@ -601,7 +584,7 @@ export default function Reset90App() {
           </div>
         )}
 
-        <div style={styles.footerNote}>For people who think too much and act too little.</div>
+        <div style={styles.footer}>For people who think too much and act too little.</div>
       </div>
     </div>
   );
