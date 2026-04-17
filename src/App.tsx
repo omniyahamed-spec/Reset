@@ -63,8 +63,8 @@ const HISTORY_MIGRATION_KEYS = [HISTORY_KEY, "reset_history", "past_resets", "en
 const SESSION_KEY = "ritual_reset_session_id";
 
 /**
- * Replace with your real Firebase web config,
- * or move these to env variables.
+ * Keep empty if you do not want Firebase yet.
+ * The app will still work with localStorage + GA.
  */
 const FIREBASE_CONFIG = {
   apiKey: "",
@@ -77,7 +77,7 @@ const FIREBASE_CONFIG = {
 
 const MODE_OPTIONS: ChoiceOption<ModeId>[] = [
   { id: "clarity", label: "I need clarity", hint: "Name the knot." },
-  { id: "steadiness", label: "I need steadiness", hint: "Get your footing back." },
+  { id: "steadiness", label: "I need steadiness", hint: "Get my footing back." },
   { id: "courage", label: "I need courage", hint: "Face the avoided thing." },
   { id: "reentry", label: "I need to re-enter", hint: "Come back from the scroll." },
 ];
@@ -110,7 +110,7 @@ const CONTEXT_OPTIONS: Record<ModeId, ChoiceOption<ContextId>[]> = {
 };
 
 const ACTION_OPTIONS: ChoiceOption<ActionId>[] = [
-  { id: "two_min", label: "Start for 2 minutes" },
+  { id: "two_min", label: "I don’t know — just start 2 minutes" },
   { id: "open_file", label: "Open the file / notes" },
   { id: "reply_line", label: "Reply with one clear line" },
   { id: "five_breaths", label: "Stand up and take 5 breaths" },
@@ -120,10 +120,10 @@ const ACTION_OPTIONS: ChoiceOption<ActionId>[] = [
 ];
 
 const ISSUE_PLACEHOLDERS: Record<ModeId, string> = {
-  clarity: "…starting badly and being seen too early.",
-  steadiness: "…feeling flooded and needing one stable point.",
-  courage: "…avoiding discomfort, not lacking time.",
-  reentry: "…wanting the easy hit instead of the real task.",
+  clarity: "…I’m avoiding starting because it might go wrong.",
+  steadiness: "…I feel pulled in too many directions and need one stable move.",
+  courage: "…I know what to do, but I’m avoiding the discomfort.",
+  reentry: "…I slipped into noise and now I need to restart simply.",
 };
 
 const MODE_LABEL: Record<ModeId, string> = Object.fromEntries(
@@ -207,10 +207,6 @@ function fireEvent(eventName: string, params: Record<string, any> = {}) {
   }
 }
 
-/**
- * Optional Firebase initialization.
- * If projectId is blank, Firestore writes are skipped and the app still works.
- */
 const firebaseReady = Boolean(FIREBASE_CONFIG.projectId);
 const firebaseApp = firebaseReady ? getApps()[0] ?? initializeApp(FIREBASE_CONFIG) : null;
 const db = firebaseApp ? getFirestore(firebaseApp) : null;
@@ -262,11 +258,7 @@ const App: React.FC = () => {
   const contextOptions = useMemo(() => (mode ? CONTEXT_OPTIONS[mode] : []), [mode]);
 
   const activeActionLabel =
-    actionId === "custom"
-      ? customAction.trim()
-      : actionId
-      ? ACTION_LABEL[actionId]
-      : "";
+    actionId === "custom" ? customAction.trim() : actionId ? ACTION_LABEL[actionId] : "";
 
   const latestEntry = useMemo(
     () => history.find((entry) => entry.id === latestId) || null,
@@ -286,7 +278,6 @@ const App: React.FC = () => {
 
   async function handleModeSelect(selected: ModeId) {
     setMode(selected);
-    setStep(2);
 
     fireEvent("quick_reset_used", {
       session_id: sessionId,
@@ -303,11 +294,12 @@ const App: React.FC = () => {
       eventName: "mode_selected",
       mode: selected,
     });
+
+    setTimeout(() => setStep(2), 120);
   }
 
   async function handleContextSelect(selected: ContextId) {
     setContext(selected);
-    setStep(3);
 
     fireEvent("state_selected", {
       session_id: sessionId,
@@ -321,6 +313,8 @@ const App: React.FC = () => {
       mode,
       state: selected,
     });
+
+    setTimeout(() => setStep(3), 120);
   }
 
   function handleIssueContinue() {
@@ -407,9 +401,7 @@ const App: React.FC = () => {
   }
 
   async function updateStatus(id: string, status: Status) {
-    const nextHistory = history.map((item) =>
-      item.id === id ? { ...item, status } : item
-    );
+    const nextHistory = history.map((item) => (item.id === id ? { ...item, status } : item));
     setHistory(nextHistory);
     persistHistory(nextHistory);
 
@@ -419,6 +411,11 @@ const App: React.FC = () => {
       localId: id,
       status,
     });
+  }
+
+  function openHistory() {
+    setView("history");
+    fireEvent("past_resets_viewed", { session_id: sessionId });
   }
 
   const todayLabel = new Intl.DateTimeFormat("en-US", {
@@ -432,7 +429,6 @@ const App: React.FC = () => {
       <style>{`
         :root {
           --bg: #0a0a0c;
-          --bg-soft: #111114;
           --card: rgba(255,255,255,0.05);
           --card-strong: rgba(255,255,255,0.08);
           --line: rgba(234, 227, 214, 0.12);
@@ -442,7 +438,6 @@ const App: React.FC = () => {
           --gold-soft: rgba(178, 144, 98, 0.17);
           --success: #7fb58b;
           --warning: #c39d5e;
-          --radius: 24px;
           --shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
         }
 
@@ -831,7 +826,7 @@ const App: React.FC = () => {
               </button>
               <button
                 className={view === "history" ? "active" : ""}
-                onClick={() => setView("history")}
+                onClick={openHistory}
               >
                 History
               </button>
@@ -842,6 +837,7 @@ const App: React.FC = () => {
             <section className="panel">
               {step === 1 && (
                 <>
+                  <div className="eyebrow">30 second reset</div>
                   <div className="date-line">{todayLabel}</div>
                   <h1>Pause. Choose the kind of reset you need.</h1>
                   <p className="lede">
@@ -852,13 +848,11 @@ const App: React.FC = () => {
                     {MODE_OPTIONS.map((option) => (
                       <button
                         key={option.id}
-                        className="choice"
+                        className={`choice ${mode === option.id ? "active" : ""}`}
                         onClick={() => handleModeSelect(option.id)}
                       >
                         <div className="choice-title">{option.label}</div>
-                        {option.hint ? (
-                          <div className="choice-hint">{option.hint}</div>
-                        ) : null}
+                        {option.hint ? <div className="choice-hint">{option.hint}</div> : null}
                       </button>
                     ))}
                   </div>
@@ -868,22 +862,20 @@ const App: React.FC = () => {
               {step === 2 && mode && (
                 <>
                   <div className="step-row">
-                    <div className="step-badge">Step 2 of 4</div>
+                    <div className="step-badge">Step 2 / 4</div>
                     <button className="linkish" onClick={resetFlow}>
                       Start over
                     </button>
                   </div>
 
                   <h2>What feels most true right now?</h2>
-                  <p className="lede">
-                    Pick the nearest match. It does not need to be exact.
-                  </p>
+                  <p className="lede">Pick what fits.</p>
 
                   <div className="grid two">
                     {contextOptions.map((option) => (
                       <button
                         key={option.id}
-                        className="choice"
+                        className={`choice ${context === option.id ? "active" : ""}`}
                         onClick={() => handleContextSelect(option.id)}
                       >
                         <div className="choice-title">{option.label}</div>
@@ -896,7 +888,7 @@ const App: React.FC = () => {
               {step === 3 && mode && context && (
                 <>
                   <div className="step-row">
-                    <div className="step-badge">Step 3 of 4</div>
+                    <div className="step-badge">Step 3 / 4</div>
                     <button className="linkish" onClick={() => setStep(2)}>
                       Back
                     </button>
@@ -921,11 +913,7 @@ const App: React.FC = () => {
 
                   <p className="helper">Plain language beats smart language.</p>
 
-                  <button
-                    className="cta"
-                    onClick={handleIssueContinue}
-                    disabled={!issue.trim()}
-                  >
+                  <button className="cta" onClick={handleIssueContinue} disabled={!issue.trim()}>
                     Continue
                   </button>
                 </>
@@ -934,16 +922,14 @@ const App: React.FC = () => {
               {step === 4 && mode && context && (
                 <>
                   <div className="step-row">
-                    <div className="step-badge">Step 4 of 4</div>
+                    <div className="step-badge">Step 4 / 4</div>
                     <button className="linkish" onClick={() => setStep(3)}>
                       Back
                     </button>
                   </div>
 
                   <h2>Choose the smallest right move.</h2>
-                  <p className="lede">
-                    Small is the point. Movement first, meaning second.
-                  </p>
+                  <p className="lede">Small is the point. Movement first, meaning second.</p>
 
                   <div className="grid two">
                     {ACTION_OPTIONS.map((option) => (
@@ -983,141 +969,4 @@ const App: React.FC = () => {
                         Now
                       </button>
                       <button
-                        className={`pill ${commitment === "later" ? "active" : ""}`}
-                        onClick={() => setCommitment("later")}
-                      >
-                        In 10 minutes
-                      </button>
-                    </div>
-                  </div>
-
-                  <button
-                    className="cta"
-                    onClick={handleSaveReset}
-                    disabled={
-                      !mode ||
-                      !context ||
-                      !issue.trim() ||
-                      !actionId ||
-                      (actionId === "custom" && !customAction.trim())
-                    }
-                  >
-                    Save this reset
-                  </button>
-                </>
-              )}
-
-              {step === 5 && latestEntry && (
-                <>
-                  <div className="eyebrow">Your next move</div>
-                  <h2>{latestEntry.actionLabel}</h2>
-
-                  <p className="lede">
-                    {latestEntry.commitment === "now"
-                      ? "Start before your mind opens another tab."
-                      : "Good. Keep it alive. Come back and do exactly this."}
-                  </p>
-
-                  <div className="summary-card">
-                    <div className="summary-label">What you named</div>
-                    <div className="summary-value">{latestEntry.issue}</div>
-                    <p className="tiny" style={{ marginTop: 14 }}>
-                      {MODE_LABEL[latestEntry.mode]} · {CONTEXT_LABEL[latestEntry.context]}
-                    </p>
-                  </div>
-
-                  <div className="status-row">
-                    <button
-                      className="pill"
-                      onClick={() => updateStatus(latestEntry.id, "done")}
-                    >
-                      Mark done
-                    </button>
-                    <button
-                      className="pill"
-                      onClick={() => updateStatus(latestEntry.id, "not_yet")}
-                    >
-                      Not yet
-                    </button>
-                    <button className="pill" onClick={resetFlow}>
-                      Do another reset
-                    </button>
-                  </div>
-                </>
-              )}
-            </section>
-          )}
-
-          {view === "history" && (
-            <section className="panel">
-              <div className="history-top">
-                <div>
-                  <div className="eyebrow">History</div>
-                  <h2>Previous resets</h2>
-                </div>
-                <button className="pill" onClick={() => setView("reset")}>
-                  New reset
-                </button>
-              </div>
-
-              {history.length === 0 ? (
-                <div className="empty">
-                  No resets saved yet. Your completed resets will appear here.
-                </div>
-              ) : (
-                <div className="history-list">
-                  {history.map((entry) => (
-                    <article key={entry.id} className="history-card">
-                      <div className="history-top" style={{ marginBottom: 10 }}>
-                        <div className="summary-label" style={{ marginBottom: 0 }}>
-                          {formatDate(entry.createdAt)}
-                        </div>
-                        <div className={`status-tag ${entry.status}`}>
-                          {entry.status === "pending"
-                            ? "pending"
-                            : entry.status === "done"
-                            ? "done"
-                            : "not yet"}
-                        </div>
-                      </div>
-
-                      <div className="summary-value" style={{ fontSize: "1.2rem" }}>
-                        {entry.issue}
-                      </div>
-
-                      <p className="tiny" style={{ marginTop: 10 }}>
-                        {MODE_LABEL[entry.mode]} · {CONTEXT_LABEL[entry.context]}
-                      </p>
-
-                      <div className="summary-card" style={{ marginTop: 14 }}>
-                        <div className="summary-label">Smallest move</div>
-                        <div style={{ fontWeight: 700 }}>{entry.actionLabel}</div>
-                        <p className="tiny" style={{ marginTop: 8 }}>
-                          Commitment: {entry.commitment === "now" ? "Now" : "In 10 minutes"}
-                        </p>
-                      </div>
-
-                      <div className="status-row">
-                        <button className="pill" onClick={() => updateStatus(entry.id, "done")}>
-                          Done
-                        </button>
-                        <button
-                          className="pill"
-                          onClick={() => updateStatus(entry.id, "not_yet")}
-                        >
-                          Not yet
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>
-          )}
-        </div>
-      </div>
-    </>
-  );
-};
-
-export default App;
+                        className={`pill ${commitment === "later" ? "active" : ""
