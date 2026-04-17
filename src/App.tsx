@@ -1,6 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { initializeApp, getApps } from "firebase/app";
-import { addDoc, collection, getFirestore, serverTimestamp } from "firebase/firestore";
 
 declare global {
   interface Window {
@@ -61,19 +59,6 @@ interface HistoryEntry {
 const HISTORY_KEY = "ritual_reset_history";
 const HISTORY_MIGRATION_KEYS = [HISTORY_KEY, "reset_history", "past_resets", "entries"];
 const SESSION_KEY = "ritual_reset_session_id";
-
-/**
- * Keep empty if you do not want Firebase yet.
- * The app will still work with localStorage + GA.
- */
-const FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: "",
-};
 
 const MODE_OPTIONS: ChoiceOption<ModeId>[] = [
   { id: "clarity", label: "I need clarity", hint: "Name the knot." },
@@ -148,6 +133,16 @@ function safeJsonParse(value: string | null) {
   }
 }
 
+function getOrCreateSessionId(): string {
+  if (typeof window === "undefined") return "server";
+  const found = window.localStorage.getItem(SESSION_KEY);
+  if (found) return found;
+
+  const created = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  window.localStorage.setItem(SESSION_KEY, created);
+  return created;
+}
+
 function readHistory(): HistoryEntry[] {
   if (typeof window === "undefined") return [];
 
@@ -157,12 +152,13 @@ function readHistory(): HistoryEntry[] {
       const normalized = raw
         .map((item: any): HistoryEntry | null => {
           if (!item) return null;
+
           const mode = item.mode as ModeId;
           const context = item.context as ContextId;
           const actionId = (item.actionId || item.action || "custom") as ActionId;
 
           return {
-            id: String(item.id || crypto.randomUUID()),
+            id: String(item.id || `${Date.now()}-${Math.random()}`),
             sessionId: String(item.sessionId || getOrCreateSessionId()),
             createdAt: String(item.createdAt || new Date().toISOString()),
             mode,
@@ -191,36 +187,9 @@ function persistHistory(entries: HistoryEntry[]) {
   window.localStorage.setItem(HISTORY_KEY, JSON.stringify(entries));
 }
 
-function getOrCreateSessionId(): string {
-  if (typeof window === "undefined") return "server";
-  const found = window.localStorage.getItem(SESSION_KEY);
-  if (found) return found;
-
-  const created = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  window.localStorage.setItem(SESSION_KEY, created);
-  return created;
-}
-
 function fireEvent(eventName: string, params: Record<string, any> = {}) {
   if (typeof window !== "undefined" && typeof window.gtag === "function") {
     window.gtag("event", eventName, params);
-  }
-}
-
-const firebaseReady = Boolean(FIREBASE_CONFIG.projectId);
-const firebaseApp = firebaseReady ? getApps()[0] ?? initializeApp(FIREBASE_CONFIG) : null;
-const db = firebaseApp ? getFirestore(firebaseApp) : null;
-
-async function writeFirestoreDoc(path: string, payload: Record<string, any>) {
-  if (!db) return;
-
-  try {
-    await addDoc(collection(db, path), {
-      ...payload,
-      createdAt: serverTimestamp(),
-    });
-  } catch (error) {
-    console.error(`Firestore write failed for ${path}`, error);
   }
 }
 
@@ -276,7 +245,7 @@ const App: React.FC = () => {
     setLatestId(null);
   }
 
-  async function handleModeSelect(selected: ModeId) {
+  function handleModeSelect(selected: ModeId) {
     setMode(selected);
 
     fireEvent("quick_reset_used", {
@@ -289,27 +258,14 @@ const App: React.FC = () => {
       mode: selected,
     });
 
-    await writeFirestoreDoc("reset_events", {
-      sessionId,
-      eventName: "mode_selected",
-      mode: selected,
-    });
-
     setTimeout(() => setStep(2), 120);
   }
 
-  async function handleContextSelect(selected: ContextId) {
+  function handleContextSelect(selected: ContextId) {
     setContext(selected);
 
     fireEvent("state_selected", {
       session_id: sessionId,
-      mode,
-      state: selected,
-    });
-
-    await writeFirestoreDoc("reset_events", {
-      sessionId,
-      eventName: "state_selected",
       mode,
       state: selected,
     });
@@ -322,7 +278,7 @@ const App: React.FC = () => {
     setStep(4);
   }
 
-  async function handleSaveReset() {
+  function handleSaveReset() {
     if (!mode || !context || !issue.trim() || !actionId) return;
 
     const label = activeActionLabel.trim();
@@ -337,7 +293,7 @@ const App: React.FC = () => {
     });
 
     const entry: HistoryEntry = {
-      id: crypto.randomUUID(),
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
       sessionId,
       createdAt: new Date().toISOString(),
       mode,
@@ -362,53 +318,16 @@ const App: React.FC = () => {
       action: actionId,
       commitment,
     });
-
-    await writeFirestoreDoc("reset_events", {
-      sessionId,
-      eventName: "action_selected",
-      mode,
-      state: context,
-      actionId,
-      actionLabel: label,
-      commitment,
-    });
-
-    await writeFirestoreDoc("reset_history", {
-      sessionId,
-      localId: entry.id,
-      mode,
-      modeLabel: MODE_LABEL[mode],
-      state: context,
-      stateLabel: CONTEXT_LABEL[context],
-      issue: entry.issue,
-      actionId,
-      actionLabel: label,
-      commitment,
-      status: entry.status,
-      source: "web_anonymous",
-    });
-
-    await writeFirestoreDoc("reset_events", {
-      sessionId,
-      eventName: "reset_completed",
-      mode,
-      state: context,
-      actionId,
-      actionLabel: label,
-      commitment,
-      localId: entry.id,
-    });
   }
 
-  async function updateStatus(id: string, status: Status) {
+  function updateStatus(id: string, status: Status) {
     const nextHistory = history.map((item) => (item.id === id ? { ...item, status } : item));
     setHistory(nextHistory);
     persistHistory(nextHistory);
 
-    await writeFirestoreDoc("reset_events", {
-      sessionId,
-      eventName: "status_changed",
-      localId: id,
+    fireEvent("status_changed", {
+      session_id: sessionId,
+      local_id: id,
       status,
     });
   }
@@ -969,4 +888,138 @@ const App: React.FC = () => {
                         Now
                       </button>
                       <button
-                        className={`pill ${commitment === "later" ? "active" : ""
+                        className={`pill ${commitment === "later" ? "active" : ""}`}
+                        onClick={() => setCommitment("later")}
+                      >
+                        In 10 minutes
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    className="cta"
+                    onClick={handleSaveReset}
+                    disabled={
+                      !mode ||
+                      !context ||
+                      !issue.trim() ||
+                      !actionId ||
+                      (actionId === "custom" && !customAction.trim())
+                    }
+                  >
+                    Commit to this
+                  </button>
+                </>
+              )}
+
+              {step === 5 && latestEntry && (
+                <>
+                  <div className="eyebrow">Your next move</div>
+                  <h2>{latestEntry.actionLabel}</h2>
+
+                  <p className="lede">
+                    {latestEntry.commitment === "now"
+                      ? "Do it now — before your brain escapes."
+                      : "Good. Keep it alive. Come back and do exactly this."}
+                  </p>
+
+                  <div className="summary-card">
+                    <div className="summary-label">What you named</div>
+                    <div className="summary-value">{latestEntry.issue}</div>
+                    <p className="tiny" style={{ marginTop: 14 }}>
+                      {MODE_LABEL[latestEntry.mode]} · {CONTEXT_LABEL[latestEntry.context]}
+                    </p>
+                  </div>
+
+                  <div className="status-row">
+                    <button className="pill" onClick={() => updateStatus(latestEntry.id, "done")}>
+                      Mark done
+                    </button>
+                    <button
+                      className="pill"
+                      onClick={() => updateStatus(latestEntry.id, "not_yet")}
+                    >
+                      Not yet
+                    </button>
+                    <button className="pill" onClick={resetFlow}>
+                      Do another reset
+                    </button>
+                  </div>
+                </>
+              )}
+            </section>
+          )}
+
+          {view === "history" && (
+            <section className="panel">
+              <div className="history-top">
+                <div>
+                  <div className="eyebrow">History</div>
+                  <h2>Previous resets</h2>
+                </div>
+                <button className="pill" onClick={() => setView("reset")}>
+                  New reset
+                </button>
+              </div>
+
+              {history.length === 0 ? (
+                <div className="empty">
+                  No resets saved yet. Your completed resets will appear here.
+                </div>
+              ) : (
+                <div className="history-list">
+                  {history.map((entry) => (
+                    <article key={entry.id} className="history-card">
+                      <div className="history-top" style={{ marginBottom: 10 }}>
+                        <div className="summary-label" style={{ marginBottom: 0 }}>
+                          {formatDate(entry.createdAt)}
+                        </div>
+                        <div className={`status-tag ${entry.status}`}>
+                          {entry.status === "pending"
+                            ? "pending"
+                            : entry.status === "done"
+                            ? "done"
+                            : "not yet"}
+                        </div>
+                      </div>
+
+                      <div className="summary-value" style={{ fontSize: "1.2rem" }}>
+                        {entry.issue}
+                      </div>
+
+                      <p className="tiny" style={{ marginTop: 10 }}>
+                        {MODE_LABEL[entry.mode]} · {CONTEXT_LABEL[entry.context]}
+                      </p>
+
+                      <div className="summary-card" style={{ marginTop: 14 }}>
+                        <div className="summary-label">Smallest move</div>
+                        <div style={{ fontWeight: 700 }}>{entry.actionLabel}</div>
+                        <p className="tiny" style={{ marginTop: 8 }}>
+                          Commitment: {entry.commitment === "now" ? "Now" : "In 10 minutes"}
+                        </p>
+                      </div>
+
+                      <div className="status-row">
+                        <button className="pill" onClick={() => updateStatus(entry.id, "done")}>
+                          Done
+                        </button>
+                        <button
+                          className="pill"
+                          onClick={() => updateStatus(entry.id, "not_yet")}
+                        >
+                          Not yet
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+        </div>
+      </div>
+    </>
+  );
+};
+
+export default App;
