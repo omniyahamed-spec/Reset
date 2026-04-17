@@ -59,6 +59,7 @@ interface HistoryEntry {
 const HISTORY_KEY = "ritual_reset_history";
 const HISTORY_MIGRATION_KEYS = [HISTORY_KEY, "reset_history", "past_resets", "entries"];
 const SESSION_KEY = "ritual_reset_session_id";
+const SPARKS_KEY = "ritual_reset_sparks";
 
 const MODE_OPTIONS: ChoiceOption<ModeId>[] = [
   { id: "clarity", label: "I need clarity", hint: "Name the knot." },
@@ -143,6 +144,18 @@ function getOrCreateSessionId(): string {
   return created;
 }
 
+function readSparks(): number {
+  if (typeof window === "undefined") return 0;
+  const raw = window.localStorage.getItem(SPARKS_KEY);
+  const parsed = raw ? Number(raw) : 0;
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function persistSparks(value: number) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(SPARKS_KEY, String(value));
+}
+
 function readHistory(): HistoryEntry[] {
   if (typeof window === "undefined") return [];
 
@@ -203,6 +216,13 @@ function formatDate(iso: string) {
   }).format(date);
 }
 
+function sparkMessage(sparks: number): string {
+  if (sparks >= 7) return "You came back to yourself.";
+  if (sparks >= 3) return "You broke the loop.";
+  if (sparks >= 1) return "Loop interrupted.";
+  return "One honest move at a time.";
+}
+
 const App: React.FC = () => {
   const [view, setView] = useState<View>("reset");
   const [step, setStep] = useState<Step>(1);
@@ -217,11 +237,13 @@ const App: React.FC = () => {
 
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [latestId, setLatestId] = useState<string | null>(null);
+  const [sparks, setSparks] = useState<number>(0);
 
   useEffect(() => {
     const sid = getOrCreateSessionId();
     setSessionId(sid);
     setHistory(readHistory());
+    setSparks(readSparks());
   }, []);
 
   const contextOptions = useMemo(() => (mode ? CONTEXT_OPTIONS[mode] : []), [mode]);
@@ -321,9 +343,22 @@ const App: React.FC = () => {
   }
 
   function updateStatus(id: string, status: Status) {
+    const previous = history.find((item) => item.id === id);
     const nextHistory = history.map((item) => (item.id === id ? { ...item, status } : item));
     setHistory(nextHistory);
     persistHistory(nextHistory);
+
+    if (status === "done" && previous?.status !== "done") {
+      const nextSparks = sparks + 1;
+      setSparks(nextSparks);
+      persistSparks(nextSparks);
+
+      fireEvent("beat_the_scroll", {
+        session_id: sessionId,
+        local_id: id,
+        sparks: nextSparks,
+      });
+    }
 
     fireEvent("status_changed", {
       session_id: sessionId,
@@ -455,6 +490,54 @@ const App: React.FC = () => {
           margin-bottom: 8px;
         }
 
+        .spark-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 18px;
+          padding: 12px 14px;
+          border-radius: 18px;
+          border: 1px solid var(--line);
+          background: rgba(255,255,255,0.03);
+        }
+
+        .spark-left {
+          display: grid;
+          gap: 4px;
+        }
+
+        .spark-count {
+          font-size: 13px;
+          color: var(--muted);
+          letter-spacing: 0.04em;
+        }
+
+        .spark-message {
+          font-size: 13px;
+          color: var(--text);
+        }
+
+        .spark-icons {
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+
+        .spark-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 999px;
+          background: rgba(255,255,255,0.12);
+          border: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .spark-dot.active {
+          background: linear-gradient(180deg, #d7bf95, #b29062);
+          box-shadow: 0 0 16px rgba(178,144,98,0.45);
+        }
+
         h1, h2 {
           font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
           font-weight: 600;
@@ -515,9 +598,14 @@ const App: React.FC = () => {
           border-color: rgba(178, 144, 98, 0.4);
         }
 
+        .choice:active {
+          transform: scale(0.985);
+        }
+
         .choice.active {
           border-color: rgba(178, 144, 98, 0.55);
           background: var(--gold-soft);
+          box-shadow: 0 0 0 1px rgba(178,144,98,0.15) inset;
         }
 
         .choice-title {
@@ -626,7 +714,7 @@ const App: React.FC = () => {
           background: var(--gold-soft);
         }
 
-        .summary-card, .history-card {
+        .summary-card, .history-card, .fun-card {
           border-radius: 22px;
           border: 1px solid var(--line);
           background: rgba(255,255,255,0.04);
@@ -635,6 +723,11 @@ const App: React.FC = () => {
 
         .summary-card {
           margin-top: 20px;
+        }
+
+        .fun-card {
+          margin-top: 16px;
+          background: linear-gradient(180deg, rgba(178,144,98,0.12), rgba(255,255,255,0.03));
         }
 
         .summary-label {
@@ -726,6 +819,15 @@ const App: React.FC = () => {
           .grid.two {
             grid-template-columns: 1fr;
           }
+
+          .spark-bar {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .spark-icons {
+            justify-content: flex-start;
+          }
         }
       `}</style>
 
@@ -752,6 +854,21 @@ const App: React.FC = () => {
             </div>
           </div>
 
+          <div className="spark-bar">
+            <div className="spark-left">
+              <div className="spark-count">{sparks} spark{sparks === 1 ? "" : "s"}</div>
+              <div className="spark-message">{sparkMessage(sparks)}</div>
+            </div>
+            <div className="spark-icons">
+              {[0, 1, 2, 3, 4, 5, 6].map((index) => (
+                <div
+                  key={index}
+                  className={`spark-dot ${index < Math.min(sparks, 7) ? "active" : ""}`}
+                />
+              ))}
+            </div>
+          </div>
+
           {view === "reset" && (
             <section className="panel">
               {step === 1 && (
@@ -759,9 +876,7 @@ const App: React.FC = () => {
                   <div className="eyebrow">30 second reset</div>
                   <div className="date-line">{todayLabel}</div>
                   <h1>Pause. Choose the kind of reset you need.</h1>
-                  <p className="lede">
-                    One honest minute. One next move. No journaling marathon. No perfect answer.
-                  </p>
+                  <p className="lede">One honest minute. One next move.</p>
 
                   <div className="grid two">
                     {MODE_OPTIONS.map((option) => (
@@ -847,8 +962,8 @@ const App: React.FC = () => {
                     </button>
                   </div>
 
-                  <h2>Choose the smallest right move.</h2>
-                  <p className="lede">Small is the point. Movement first, meaning second.</p>
+                  <h2>Choose your move.</h2>
+                  <p className="lede">Small is the point. Movement first.</p>
 
                   <div className="grid two">
                     {ACTION_OPTIONS.map((option) => (
@@ -931,19 +1046,25 @@ const App: React.FC = () => {
                     </p>
                   </div>
 
-                  <div className="status-row">
-                    <button className="pill" onClick={() => updateStatus(latestEntry.id, "done")}>
-                      Mark done
-                    </button>
-                    <button
-                      className="pill"
-                      onClick={() => updateStatus(latestEntry.id, "not_yet")}
-                    >
-                      Not yet
-                    </button>
-                    <button className="pill" onClick={resetFlow}>
-                      Do another reset
-                    </button>
+                  <div className="fun-card">
+                    <div className="summary-label">Beat the scroll?</div>
+                    <div className="tiny" style={{ marginBottom: 12 }}>
+                      Mark it honestly. Done earns 1 spark.
+                    </div>
+                    <div className="status-row" style={{ marginTop: 0 }}>
+                      <button className="pill" onClick={() => updateStatus(latestEntry.id, "done")}>
+                        Yes, I did it
+                      </button>
+                      <button
+                        className="pill"
+                        onClick={() => updateStatus(latestEntry.id, "not_yet")}
+                      >
+                        Not yet
+                      </button>
+                      <button className="pill" onClick={resetFlow}>
+                        Do another reset
+                      </button>
+                    </div>
                   </div>
                 </>
               )}
