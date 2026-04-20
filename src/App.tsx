@@ -1,1146 +1,591 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { CSSProperties, useEffect, useMemo, useState } from "react";
 
-declare global {
-  interface Window {
-    gtag?: (...args: any[]) => void;
-  }
-}
+const STORAGE_KEY = "reset90_entries_v1";
 
-type View = "reset" | "history";
-type Step = 1 | 2 | 3 | 4 | 5;
-type Commitment = "now" | "later";
-type Status = "pending" | "done" | "not_yet";
+type ViewMode = "reset" | "past";
 
-type ModeId = "clarity" | "steadiness" | "courage" | "reentry";
-type ContextId =
-  | "overthinking"
-  | "scattered"
-  | "cant_start"
-  | "stuck_between"
-  | "heavy"
-  | "pulled_to_phone"
-  | "need_calm"
-  | "avoiding_message"
-  | "avoiding_task"
-  | "fear_of_wrong"
-  | "waiting_ready"
-  | "lost_thread"
-  | "interrupted"
-  | "drifted_scroll";
-
-type ActionId =
-  | "two_min"
-  | "open_file"
-  | "reply_line"
-  | "five_breaths"
-  | "wudu_return"
-  | "close_tabs"
-  | "custom";
-
-interface ChoiceOption<T extends string> {
-  id: T;
-  label: string;
-  hint?: string;
-}
-
-interface HistoryEntry {
-  id: string;
-  sessionId: string;
+interface ResetEntry {
+  id: number;
   createdAt: string;
-  mode: ModeId;
-  context: ContextId;
-  issue: string;
-  actionId: ActionId;
-  actionLabel: string;
-  commitment: Commitment;
-  status: Status;
+  displayDate: string;
+  displayTime: string;
+  bothering: string;
+  avoiding: string;
+  nextMove: string;
+  actionTime: string;
+  deadline: string;
 }
 
-const HISTORY_KEY = "ritual_reset_history";
-const HISTORY_MIGRATION_KEYS = [HISTORY_KEY, "reset_history", "past_resets", "entries"];
-const SESSION_KEY = "ritual_reset_session_id";
-const SPARKS_KEY = "ritual_reset_sparks";
-
-const MODE_OPTIONS: ChoiceOption<ModeId>[] = [
-  { id: "clarity", label: "I need clarity", hint: "Name the knot." },
-  { id: "steadiness", label: "I need steadiness", hint: "Get my footing back." },
-  { id: "courage", label: "I need courage", hint: "Face the avoided thing." },
-  { id: "reentry", label: "I need to re-enter", hint: "Come back from the scroll." },
-];
-
-const CONTEXT_OPTIONS: Record<ModeId, ChoiceOption<ContextId>[]> = {
-  clarity: [
-    { id: "overthinking", label: "I’m overthinking" },
-    { id: "cant_start", label: "I don’t know where to start" },
-    { id: "scattered", label: "My mind feels noisy" },
-    { id: "stuck_between", label: "I’m stuck between options" },
-  ],
-  steadiness: [
-    { id: "scattered", label: "I feel scattered" },
-    { id: "heavy", label: "I feel heavy / drained" },
-    { id: "pulled_to_phone", label: "My phone keeps pulling me" },
-    { id: "need_calm", label: "I need to calm down first" },
-  ],
-  courage: [
-    { id: "avoiding_message", label: "I’m avoiding a message" },
-    { id: "avoiding_task", label: "I’m avoiding a task" },
-    { id: "fear_of_wrong", label: "I’m afraid of getting it wrong" },
-    { id: "waiting_ready", label: "I’m waiting to feel ready" },
-  ],
-  reentry: [
-    { id: "drifted_scroll", label: "I drifted into scrolling" },
-    { id: "lost_thread", label: "I lost the thread" },
-    { id: "interrupted", label: "I got interrupted" },
-    { id: "cant_start", label: "I still can’t restart" },
-  ],
-};
-
-const ACTION_OPTIONS: ChoiceOption<ActionId>[] = [
-  { id: "two_min", label: "I don’t know — just start 2 minutes" },
-  { id: "open_file", label: "Open the file / notes" },
-  { id: "reply_line", label: "Reply with one clear line" },
-  { id: "five_breaths", label: "Stand up and take 5 breaths" },
-  { id: "wudu_return", label: "Make wudu and return" },
-  { id: "close_tabs", label: "Close extra tabs and start" },
-  { id: "custom", label: "Write my own" },
-];
-
-const ISSUE_PLACEHOLDERS: Record<ModeId, string> = {
-  clarity: "…I’m avoiding starting because it might go wrong.",
-  steadiness: "…I feel pulled in too many directions and need one stable move.",
-  courage: "…I know what to do, but I’m avoiding the discomfort.",
-  reentry: "…I slipped into noise and now I need to restart simply.",
-};
-
-const MODE_LABEL: Record<ModeId, string> = Object.fromEntries(
-  MODE_OPTIONS.map((m) => [m.id, m.label])
-) as Record<ModeId, string>;
-
-const CONTEXT_LABEL: Record<ContextId, string> = Object.fromEntries(
-  Object.values(CONTEXT_OPTIONS)
-    .flat()
-    .map((c) => [c.id, c.label])
-) as Record<ContextId, string>;
-
-const ACTION_LABEL: Record<ActionId, string> = Object.fromEntries(
-  ACTION_OPTIONS.map((a) => [a.id, a.label])
-) as Record<ActionId, string>;
-
-function safeJsonParse(value: string | null) {
-  try {
-    return value ? JSON.parse(value) : null;
-  } catch {
-    return null;
-  }
-}
-
-function getOrCreateSessionId(): string {
-  if (typeof window === "undefined") return "server";
-  const found = window.localStorage.getItem(SESSION_KEY);
-  if (found) return found;
-
-  const created = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  window.localStorage.setItem(SESSION_KEY, created);
-  return created;
-}
-
-function readSparks(): number {
-  if (typeof window === "undefined") return 0;
-  const raw = window.localStorage.getItem(SPARKS_KEY);
-  const parsed = raw ? Number(raw) : 0;
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function persistSparks(value: number) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(SPARKS_KEY, String(value));
-}
-
-function readHistory(): HistoryEntry[] {
-  if (typeof window === "undefined") return [];
-
-  for (const key of HISTORY_MIGRATION_KEYS) {
-    const raw = safeJsonParse(window.localStorage.getItem(key));
-    if (Array.isArray(raw)) {
-      const normalized = raw
-        .map((item: any): HistoryEntry | null => {
-          if (!item) return null;
-
-          const mode = item.mode as ModeId;
-          const context = item.context as ContextId;
-          const actionId = (item.actionId || item.action || "custom") as ActionId;
-
-          return {
-            id: String(item.id || `${Date.now()}-${Math.random()}`),
-            sessionId: String(item.sessionId || getOrCreateSessionId()),
-            createdAt: String(item.createdAt || new Date().toISOString()),
-            mode,
-            context,
-            issue: String(item.issue || item.answer || item.problem || ""),
-            actionId,
-            actionLabel: String(
-              item.actionLabel || ACTION_LABEL[actionId] || item.action || "Custom action"
-            ),
-            commitment: item.commitment === "later" ? "later" : "now",
-            status:
-              item.status === "done" || item.status === "not_yet" ? item.status : "pending",
-          };
-        })
-        .filter(Boolean) as HistoryEntry[];
-
-      return normalized;
-    }
-  }
-
-  return [];
-}
-
-function persistHistory(entries: HistoryEntry[]) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(HISTORY_KEY, JSON.stringify(entries));
-}
-
-function fireEvent(eventName: string, params: Record<string, any> = {}) {
-  if (typeof window !== "undefined" && typeof window.gtag === "function") {
-    window.gtag("event", eventName, params);
-  }
-}
-
-function formatDate(iso: string) {
-  const date = new Date(iso);
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
-}
-
-function sparkMessage(sparks: number): string {
-  if (sparks >= 7) return "You came back to yourself.";
-  if (sparks >= 3) return "You broke the loop.";
-  if (sparks >= 1) return "Loop interrupted.";
-  return "One honest move at a time.";
-}
-
-const App: React.FC = () => {
-  const [view, setView] = useState<View>("reset");
-  const [step, setStep] = useState<Step>(1);
-  const [sessionId, setSessionId] = useState<string>("server");
-
-  const [mode, setMode] = useState<ModeId | null>(null);
-  const [context, setContext] = useState<ContextId | null>(null);
-  const [issue, setIssue] = useState("");
-  const [actionId, setActionId] = useState<ActionId | null>(null);
-  const [customAction, setCustomAction] = useState("");
-  const [commitment, setCommitment] = useState<Commitment>("now");
-
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [latestId, setLatestId] = useState<string | null>(null);
-  const [sparks, setSparks] = useState<number>(0);
-
-  useEffect(() => {
-    const sid = getOrCreateSessionId();
-    setSessionId(sid);
-    setHistory(readHistory());
-    setSparks(readSparks());
-  }, []);
-
-  const contextOptions = useMemo(() => (mode ? CONTEXT_OPTIONS[mode] : []), [mode]);
-
-  const activeActionLabel =
-    actionId === "custom" ? customAction.trim() : actionId ? ACTION_LABEL[actionId] : "";
-
-  const latestEntry = useMemo(
-    () => history.find((entry) => entry.id === latestId) || null,
-    [history, latestId]
-  );
-
-  function resetFlow() {
-    setStep(1);
-    setMode(null);
-    setContext(null);
-    setIssue("");
-    setActionId(null);
-    setCustomAction("");
-    setCommitment("now");
-    setLatestId(null);
-  }
-
-  function handleModeSelect(selected: ModeId) {
-    setMode(selected);
-
-    fireEvent("quick_reset_used", {
-      session_id: sessionId,
-      mode: selected,
-    });
-
-    fireEvent("mode_selected", {
-      session_id: sessionId,
-      mode: selected,
-    });
-
-    setTimeout(() => setStep(2), 120);
-  }
-
-  function handleContextSelect(selected: ContextId) {
-    setContext(selected);
-
-    fireEvent("state_selected", {
-      session_id: sessionId,
-      mode,
-      state: selected,
-    });
-
-    setTimeout(() => setStep(3), 120);
-  }
-
-  function handleIssueContinue() {
-    if (!issue.trim()) return;
-    setStep(4);
-  }
-
-  function handleSaveReset() {
-    if (!mode || !context || !issue.trim() || !actionId) return;
-
-    const label = activeActionLabel.trim();
-    if (!label) return;
-
-    fireEvent("action_selected", {
-      session_id: sessionId,
-      mode,
-      state: context,
-      action: actionId,
-      commitment,
-    });
-
-    const entry: HistoryEntry = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-      sessionId,
-      createdAt: new Date().toISOString(),
-      mode,
-      context,
-      issue: issue.trim(),
-      actionId,
-      actionLabel: label,
-      commitment,
-      status: "pending",
-    };
-
-    const nextHistory = [entry, ...history].slice(0, 100);
-    setHistory(nextHistory);
-    persistHistory(nextHistory);
-    setLatestId(entry.id);
-    setStep(5);
-
-    fireEvent("reset_completed", {
-      session_id: sessionId,
-      mode,
-      state: context,
-      action: actionId,
-      commitment,
-    });
-  }
-
-  function updateStatus(id: string, status: Status) {
-    const previous = history.find((item) => item.id === id);
-    const nextHistory = history.map((item) => (item.id === id ? { ...item, status } : item));
-    setHistory(nextHistory);
-    persistHistory(nextHistory);
-
-    if (status === "done" && previous?.status !== "done") {
-      const nextSparks = sparks + 1;
-      setSparks(nextSparks);
-      persistSparks(nextSparks);
-
-      fireEvent("beat_the_scroll", {
-        session_id: sessionId,
-        local_id: id,
-        sparks: nextSparks,
-      });
-    }
-
-    fireEvent("status_changed", {
-      session_id: sessionId,
-      local_id: id,
-      status,
-    });
-  }
-
-  function openHistory() {
-    setView("history");
-    fireEvent("past_resets_viewed", { session_id: sessionId });
-  }
-
-  const todayLabel = new Intl.DateTimeFormat("en-US", {
+export default function Reset90App() {
+  const now = useMemo(() => new Date(), []);
+  const formattedDate = now.toLocaleDateString(undefined, {
     weekday: "long",
+    year: "numeric",
     month: "long",
     day: "numeric",
-  }).format(new Date());
+  });
+  const formattedTime = now.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  const [bothering, setBothering] = useState<string>("");
+  const [avoiding, setAvoiding] = useState<string>("");
+  const [nextMove, setNextMove] = useState<string>("");
+  const [time, setTime] = useState<string>("");
+  const [deadline, setDeadline] = useState<string>("");
+  const [done, setDone] = useState<boolean>(false);
+  const [entries, setEntries] = useState<ResetEntry[]>([]);
+  const [activeView, setActiveView] = useState<ViewMode>("reset");
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) setEntries(JSON.parse(raw) as ResetEntry[]);
+    } catch (error) {
+      console.error("Failed to load entries", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    } catch (error) {
+      console.error("Failed to save entries", error);
+    }
+  }, [entries]);
+
+  const canComplete = Boolean(bothering.trim() && avoiding.trim() && nextMove.trim());
+
+  function handleCompleteReset(): void {
+    if (!canComplete) return;
+
+    const entry: ResetEntry = {
+      id: Date.now(),
+      createdAt: new Date().toISOString(),
+      displayDate: new Date().toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }),
+      displayTime: new Date().toLocaleTimeString(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+      }),
+      bothering: bothering.trim(),
+      avoiding: avoiding.trim(),
+      nextMove: nextMove.trim(),
+      actionTime: time,
+      deadline,
+    };
+
+    setEntries((prev) => [entry, ...prev]);
+    setDone(true);
+    setActiveView("reset");
+
+    if (typeof window !== "undefined" && (window as any).gtag) {
+      (window as any).gtag("event", "reset_completed");
+    }
+  }
+
+  function handleNewReset(): void {
+    setBothering("");
+    setAvoiding("");
+    setNextMove("");
+    setTime("");
+    setDeadline("");
+    setDone(false);
+    setActiveView("reset");
+  }
+
+  function handleDeleteEntry(id: number): void {
+    setEntries((prev) => prev.filter((entry) => entry.id !== id));
+  }
+
+  function trackPastResets(): void {
+    setActiveView("past");
+    if (typeof window !== "undefined" && (window as any).gtag) {
+      (window as any).gtag("event", "past_resets_viewed");
+    }
+  }
+
+  const styles: Record<string, CSSProperties> = {
+    page: {
+      minHeight: "100vh",
+      background:
+        "radial-gradient(circle at top, rgba(47,38,31,0.55) 0%, rgba(18,16,14,1) 32%, rgba(11,10,9,1) 100%)",
+      color: "#f3ece3",
+      fontFamily: "Inter, system-ui, sans-serif",
+      padding: "28px 16px 56px",
+      boxSizing: "border-box",
+    },
+    shell: {
+      maxWidth: 920,
+      margin: "0 auto",
+    },
+    topBar: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 16,
+      flexWrap: "wrap",
+      marginBottom: 26,
+    },
+    brand: {
+      fontSize: 12,
+      letterSpacing: "0.32em",
+      textTransform: "uppercase",
+      color: "rgba(243,236,227,0.64)",
+    },
+    nav: {
+      display: "flex",
+      gap: 10,
+      flexWrap: "wrap",
+    },
+    navButton: {
+      padding: "10px 14px",
+      borderRadius: 999,
+      border: "1px solid rgba(243,236,227,0.12)",
+      background: "rgba(255,255,255,0.04)",
+      color: "rgba(243,236,227,0.86)",
+      fontWeight: 600,
+      fontSize: 13,
+      cursor: "pointer",
+      backdropFilter: "blur(8px)",
+    },
+    hero: {
+      display: "grid",
+      gap: 18,
+      marginBottom: 30,
+    },
+    dateRow: {
+      display: "flex",
+      justifyContent: "space-between",
+      gap: 12,
+      flexWrap: "wrap",
+      alignItems: "center",
+    },
+    dateText: {
+      fontSize: 13,
+      color: "rgba(243,236,227,0.62)",
+      letterSpacing: "0.03em",
+    },
+    h1: {
+      margin: 0,
+      fontSize: "clamp(42px, 9vw, 78px)",
+      lineHeight: 0.94,
+      letterSpacing: "-0.06em",
+      fontWeight: 700,
+      maxWidth: 720,
+      color: "#f7f1ea",
+    },
+    sub: {
+      margin: 0,
+      fontSize: 18,
+      lineHeight: 1.7,
+      color: "rgba(243,236,227,0.72)",
+      maxWidth: 540,
+    },
+    panel: {
+      border: "1px solid rgba(243,236,227,0.08)",
+      background: "linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)",
+      borderRadius: 32,
+      backdropFilter: "blur(18px)",
+      boxShadow: "0 24px 70px rgba(0,0,0,0.28)",
+      overflow: "hidden",
+    },
+    panelInner: {
+      padding: "28px 22px 22px",
+    },
+    panelTop: {
+      display: "flex",
+      justifyContent: "space-between",
+      gap: 16,
+      alignItems: "flex-start",
+      flexWrap: "wrap",
+      marginBottom: 24,
+    },
+    panelMeta: {
+      fontSize: 12,
+      textTransform: "uppercase",
+      letterSpacing: "0.16em",
+      color: "rgba(243,236,227,0.46)",
+      marginBottom: 10,
+    },
+    panelHint: {
+      maxWidth: 330,
+      fontSize: 13,
+      lineHeight: 1.7,
+      color: "rgba(243,236,227,0.64)",
+      padding: "14px 16px",
+      borderRadius: 20,
+      background: "rgba(255,255,255,0.04)",
+      border: "1px solid rgba(243,236,227,0.08)",
+    },
+    fieldSection: {
+      marginBottom: 22,
+    },
+    fieldLabel: {
+      display: "block",
+      fontSize: 13,
+      textTransform: "uppercase",
+      letterSpacing: "0.14em",
+      color: "rgba(243,236,227,0.54)",
+      marginBottom: 12,
+      fontWeight: 700,
+    },
+    textarea: {
+      width: "100%",
+      minHeight: 110,
+      resize: "vertical",
+      border: "none",
+      borderBottom: "1px solid rgba(243,236,227,0.12)",
+      background: "transparent",
+      color: "#f6efe7",
+      fontSize: 22,
+      lineHeight: 1.55,
+      padding: "0 0 16px 0",
+      outline: "none",
+      boxSizing: "border-box",
+    },
+    helper: {
+      marginTop: 10,
+      fontSize: 12,
+      lineHeight: 1.65,
+      color: "rgba(243,236,227,0.42)",
+    },
+    accountability: {
+      marginTop: 10,
+      marginBottom: 24,
+      padding: 18,
+      borderRadius: 24,
+      background: "rgba(255,255,255,0.03)",
+      border: "1px solid rgba(243,236,227,0.08)",
+    },
+    accountabilityTitle: {
+      fontSize: 13,
+      textTransform: "uppercase",
+      letterSpacing: "0.14em",
+      color: "rgba(243,236,227,0.54)",
+      marginBottom: 8,
+      fontWeight: 700,
+    },
+    accountabilityText: {
+      marginBottom: 14,
+      fontSize: 13,
+      lineHeight: 1.65,
+      color: "rgba(243,236,227,0.58)",
+    },
+    inputs: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+      gap: 12,
+    },
+    inputWrap: {
+      display: "grid",
+      gap: 6,
+    },
+    inputLabel: {
+      fontSize: 12,
+      color: "rgba(243,236,227,0.46)",
+      fontWeight: 700,
+      letterSpacing: "0.04em",
+    },
+    input: {
+      width: "100%",
+      padding: "13px 14px",
+      borderRadius: 16,
+      border: "1px solid rgba(243,236,227,0.1)",
+      background: "rgba(255,255,255,0.04)",
+      color: "#f6efe7",
+      fontSize: 14,
+      boxSizing: "border-box",
+      outline: "none",
+    },
+    buttonRow: {
+      display: "flex",
+      gap: 12,
+      flexWrap: "wrap",
+      alignItems: "center",
+    },
+    primaryButton: {
+      padding: "15px 24px",
+      borderRadius: 999,
+      border: "none",
+      background: "linear-gradient(135deg, #f4ede2 0%, #cbb79d 100%)",
+      color: "#171412",
+      fontWeight: 800,
+      fontSize: 14,
+      cursor: "pointer",
+      boxShadow: "0 16px 34px rgba(203,183,157,0.2)",
+    },
+    secondaryButton: {
+      padding: "15px 18px",
+      borderRadius: 999,
+      border: "1px solid rgba(243,236,227,0.12)",
+      background: "rgba(255,255,255,0.04)",
+      color: "rgba(243,236,227,0.86)",
+      fontWeight: 700,
+      fontSize: 14,
+      cursor: "pointer",
+    },
+    disabledButton: {
+      opacity: 0.44,
+      cursor: "not-allowed",
+    },
+    result: {
+      marginTop: 24,
+      padding: 22,
+      borderRadius: 24,
+      background: "linear-gradient(135deg, rgba(244,237,226,0.12) 0%, rgba(203,183,157,0.08) 100%)",
+      border: "1px solid rgba(243,236,227,0.12)",
+    },
+    resultLabel: {
+      fontSize: 12,
+      textTransform: "uppercase",
+      letterSpacing: "0.14em",
+      color: "rgba(243,236,227,0.5)",
+      marginBottom: 8,
+      fontWeight: 700,
+    },
+    resultMove: {
+      fontSize: 28,
+      lineHeight: 1.35,
+      letterSpacing: "-0.04em",
+      fontWeight: 700,
+      color: "#f8f2eb",
+      marginBottom: 10,
+    },
+    resultText: {
+      fontSize: 14,
+      lineHeight: 1.7,
+      color: "rgba(243,236,227,0.7)",
+    },
+    historyWrap: {
+      display: "grid",
+      gap: 14,
+    },
+    emptyState: {
+      borderRadius: 26,
+      padding: 28,
+      border: "1px solid rgba(243,236,227,0.08)",
+      background: "rgba(255,255,255,0.03)",
+      color: "rgba(243,236,227,0.64)",
+      lineHeight: 1.75,
+      fontSize: 15,
+    },
+    entryCard: {
+      borderRadius: 26,
+      padding: 20,
+      border: "1px solid rgba(243,236,227,0.08)",
+      background: "rgba(255,255,255,0.03)",
+      backdropFilter: "blur(14px)",
+    },
+    entryTop: {
+      display: "flex",
+      justifyContent: "space-between",
+      gap: 12,
+      alignItems: "flex-start",
+      marginBottom: 14,
+      flexWrap: "wrap",
+    },
+    entryMeta: {
+      fontSize: 12,
+      lineHeight: 1.6,
+      color: "rgba(243,236,227,0.52)",
+    },
+    entryBlock: {
+      marginBottom: 14,
+    },
+    entryLabel: {
+      fontSize: 11,
+      textTransform: "uppercase",
+      letterSpacing: "0.12em",
+      color: "rgba(243,236,227,0.44)",
+      fontWeight: 700,
+      marginBottom: 6,
+    },
+    entryText: {
+      fontSize: 16,
+      lineHeight: 1.7,
+      color: "#f1e9df",
+      whiteSpace: "pre-wrap",
+    },
+    deleteButton: {
+      border: "1px solid rgba(243,236,227,0.1)",
+      background: "rgba(255,255,255,0.04)",
+      color: "rgba(243,236,227,0.82)",
+      borderRadius: 999,
+      padding: "10px 12px",
+      fontSize: 12,
+      cursor: "pointer",
+      fontWeight: 700,
+    },
+    footer: {
+      marginTop: 20,
+      textAlign: "center",
+      fontSize: 12,
+      lineHeight: 1.7,
+      color: "rgba(243,236,227,0.36)",
+      letterSpacing: "0.03em",
+    },
+  };
 
   return (
-    <>
-      <style>{`
-        :root {
-          --bg: #0a0a0c;
-          --card: rgba(255,255,255,0.05);
-          --card-strong: rgba(255,255,255,0.08);
-          --line: rgba(234, 227, 214, 0.12);
-          --text: #ebe4d8;
-          --muted: #b9b0a2;
-          --gold: #b29062;
-          --gold-soft: rgba(178, 144, 98, 0.17);
-          --success: #7fb58b;
-          --warning: #c39d5e;
-          --shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
-        }
-
-        * { box-sizing: border-box; }
-
-        body {
-          margin: 0;
-          font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-          background:
-            radial-gradient(circle at top left, rgba(178, 144, 98, 0.18), transparent 34%),
-            radial-gradient(circle at bottom right, rgba(123, 181, 139, 0.08), transparent 28%),
-            linear-gradient(180deg, #09090b 0%, #0d0d10 52%, #09090b 100%);
-          color: var(--text);
-        }
-
-        .app-shell {
-          min-height: 100vh;
-          padding: 24px 16px 72px;
-        }
-
-        .app-frame {
-          width: min(100%, 720px);
-          margin: 0 auto;
-        }
-
-        .topbar {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          margin-bottom: 18px;
-        }
-
-        .mark {
-          letter-spacing: 0.24em;
-          font-size: 11px;
-          text-transform: uppercase;
-          color: var(--muted);
-        }
-
-        .nav {
-          display: inline-flex;
-          gap: 8px;
-          padding: 6px;
-          border-radius: 999px;
-          border: 1px solid var(--line);
-          background: rgba(255,255,255,0.03);
-          backdrop-filter: blur(14px);
-        }
-
-        .nav button {
-          border: 0;
-          background: transparent;
-          color: var(--muted);
-          padding: 10px 14px;
-          border-radius: 999px;
-          font-weight: 600;
-          cursor: pointer;
-        }
-
-        .nav button.active {
-          background: var(--card-strong);
-          color: var(--text);
-        }
-
-        .panel {
-          position: relative;
-          border: 1px solid var(--line);
-          background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
-          border-radius: 32px;
-          padding: 28px;
-          box-shadow: var(--shadow);
-          backdrop-filter: blur(22px);
-          overflow: hidden;
-        }
-
-        .panel::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(135deg, rgba(178, 144, 98, 0.06), transparent 38%);
-          pointer-events: none;
-        }
-
-        .eyebrow {
-          color: var(--muted);
-          font-size: 12px;
-          letter-spacing: 0.16em;
-          text-transform: uppercase;
-          margin-bottom: 18px;
-        }
-
-        .date-line {
-          color: var(--muted);
-          font-size: 13px;
-          margin-bottom: 8px;
-        }
-
-        .spark-bar {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          margin-bottom: 18px;
-          padding: 12px 14px;
-          border-radius: 18px;
-          border: 1px solid var(--line);
-          background: rgba(255,255,255,0.03);
-        }
-
-        .spark-left {
-          display: grid;
-          gap: 4px;
-        }
-
-        .spark-count {
-          font-size: 13px;
-          color: var(--muted);
-          letter-spacing: 0.04em;
-        }
-
-        .spark-message {
-          font-size: 13px;
-          color: var(--text);
-        }
-
-        .spark-icons {
-          display: flex;
-          gap: 6px;
-          flex-wrap: wrap;
-          justify-content: flex-end;
-        }
-
-        .spark-dot {
-          width: 10px;
-          height: 10px;
-          border-radius: 999px;
-          background: rgba(255,255,255,0.12);
-          border: 1px solid rgba(255,255,255,0.06);
-        }
-
-        .spark-dot.active {
-          background: linear-gradient(180deg, #d7bf95, #b29062);
-          box-shadow: 0 0 16px rgba(178,144,98,0.45);
-        }
-
-        h1, h2 {
-          font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
-          font-weight: 600;
-          line-height: 1.02;
-          margin: 0;
-          letter-spacing: -0.02em;
-        }
-
-        h1 {
-          font-size: clamp(2.2rem, 8vw, 4rem);
-          margin-bottom: 14px;
-        }
-
-        h2 {
-          font-size: clamp(1.6rem, 5vw, 2.5rem);
-          margin-bottom: 12px;
-        }
-
-        .lede, .helper, .muted {
-          color: var(--muted);
-          line-height: 1.6;
-          max-width: 58ch;
-        }
-
-        .lede {
-          font-size: 1rem;
-          margin-bottom: 22px;
-        }
-
-        .helper {
-          font-size: 0.95rem;
-          margin-top: 12px;
-        }
-
-        .grid {
-          display: grid;
-          gap: 12px;
-        }
-
-        .grid.two {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .choice {
-          width: 100%;
-          text-align: left;
-          border-radius: 20px;
-          border: 1px solid var(--line);
-          background: rgba(255,255,255,0.03);
-          color: var(--text);
-          padding: 16px 16px 15px;
-          cursor: pointer;
-          transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
-        }
-
-        .choice:hover {
-          transform: translateY(-1px);
-          border-color: rgba(178, 144, 98, 0.4);
-        }
-
-        .choice:active {
-          transform: scale(0.985);
-        }
-
-        .choice.active {
-          border-color: rgba(178, 144, 98, 0.55);
-          background: var(--gold-soft);
-          box-shadow: 0 0 0 1px rgba(178,144,98,0.15) inset;
-        }
-
-        .choice-title {
-          font-weight: 600;
-        }
-
-        .choice-hint {
-          margin-top: 6px;
-          font-size: 0.88rem;
-          color: var(--muted);
-        }
-
-        .field-wrap {
-          margin-top: 8px;
-          padding: 18px 18px 12px;
-          border-radius: 22px;
-          border: 1px solid var(--line);
-          background: rgba(255,255,255,0.03);
-        }
-
-        .field-label {
-          display: block;
-          color: var(--muted);
-          font-size: 0.84rem;
-          margin-bottom: 10px;
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-        }
-
-        .text-input {
-          width: 100%;
-          background: transparent;
-          border: 0;
-          border-bottom: 1px solid rgba(234, 227, 214, 0.14);
-          color: var(--text);
-          font-size: 1.06rem;
-          padding: 8px 0 12px;
-          outline: none;
-        }
-
-        .text-input::placeholder {
-          color: rgba(185, 176, 162, 0.55);
-        }
-
-        .step-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          margin-bottom: 20px;
-        }
-
-        .step-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          border-radius: 999px;
-          border: 1px solid var(--line);
-          padding: 8px 12px;
-          font-size: 0.82rem;
-          color: var(--muted);
-          background: rgba(255,255,255,0.03);
-        }
-
-        .cta {
-          margin-top: 24px;
-          width: 100%;
-          border: 0;
-          border-radius: 18px;
-          padding: 15px 18px;
-          font-size: 0.98rem;
-          font-weight: 700;
-          letter-spacing: 0.01em;
-          color: #0b0b0d;
-          background: linear-gradient(180deg, #d7bf95, #b29062);
-          cursor: pointer;
-          box-shadow: 0 18px 40px rgba(178, 144, 98, 0.18);
-        }
-
-        .cta:disabled {
-          cursor: not-allowed;
-          opacity: 0.45;
-          box-shadow: none;
-        }
-
-        .sub-actions {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 10px;
-          margin-top: 14px;
-        }
-
-        .pill {
-          border: 1px solid var(--line);
-          background: rgba(255,255,255,0.03);
-          color: var(--muted);
-          border-radius: 999px;
-          padding: 10px 14px;
-          font-size: 0.92rem;
-          cursor: pointer;
-        }
-
-        .pill.active {
-          color: var(--text);
-          border-color: rgba(178, 144, 98, 0.55);
-          background: var(--gold-soft);
-        }
-
-        .summary-card, .history-card, .fun-card {
-          border-radius: 22px;
-          border: 1px solid var(--line);
-          background: rgba(255,255,255,0.04);
-          padding: 18px;
-        }
-
-        .summary-card {
-          margin-top: 20px;
-        }
-
-        .fun-card {
-          margin-top: 16px;
-          background: linear-gradient(180deg, rgba(178,144,98,0.12), rgba(255,255,255,0.03));
-        }
-
-        .summary-label {
-          color: var(--muted);
-          font-size: 0.8rem;
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-          margin-bottom: 10px;
-        }
-
-        .summary-value {
-          font-family: "Iowan Old Style", Georgia, serif;
-          font-size: 1.35rem;
-          line-height: 1.25;
-        }
-
-        .tiny {
-          font-size: 0.86rem;
-          color: var(--muted);
-          line-height: 1.55;
-        }
-
-        .history-list {
-          display: grid;
-          gap: 14px;
-        }
-
-        .history-top {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 12px;
-          margin-bottom: 12px;
-        }
-
-        .status-row {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-          margin-top: 14px;
-        }
-
-        .status-tag {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          border-radius: 999px;
-          padding: 7px 10px;
-          font-size: 0.82rem;
-          border: 1px solid var(--line);
-          background: rgba(255,255,255,0.03);
-          color: var(--muted);
-        }
-
-        .status-tag.done {
-          color: var(--success);
-          border-color: rgba(127,181,139,0.3);
-        }
-
-        .status-tag.not_yet {
-          color: var(--warning);
-          border-color: rgba(195,157,94,0.28);
-        }
-
-        .linkish {
-          border: 0;
-          background: transparent;
-          color: var(--muted);
-          text-decoration: underline;
-          cursor: pointer;
-          padding: 0;
-          font-size: 0.92rem;
-        }
-
-        .empty {
-          padding: 30px 18px;
-          border-radius: 22px;
-          border: 1px dashed var(--line);
-          color: var(--muted);
-          text-align: center;
-        }
-
-        @media (max-width: 640px) {
-          .panel {
-            padding: 22px;
-            border-radius: 28px;
-          }
-
-          .grid.two {
-            grid-template-columns: 1fr;
-          }
-
-          .spark-bar {
-            align-items: flex-start;
-            flex-direction: column;
-          }
-
-          .spark-icons {
-            justify-content: flex-start;
-          }
-        }
-      `}</style>
-
-      <div className="app-shell">
-        <div className="app-frame">
-          <div className="topbar">
-            <div>
-              <div className="mark">Reset</div>
-            </div>
-
-            <div className="nav" aria-label="Main navigation">
-              <button
-                className={view === "reset" ? "active" : ""}
-                onClick={() => setView("reset")}
-              >
-                Reset
-              </button>
-              <button
-                className={view === "history" ? "active" : ""}
-                onClick={openHistory}
-              >
-                History
-              </button>
-            </div>
+    <div style={styles.page}>
+      <div style={styles.shell}>
+        <div style={styles.topBar}>
+          <div style={styles.brand}>Reset</div>
+          <div style={styles.nav}>
+            <button style={styles.navButton} onClick={() => setActiveView("reset")}>Today&apos;s Reset</button>
+            <button style={styles.navButton} onClick={trackPastResets}>History</button>
+            <button style={styles.navButton} onClick={handleNewReset}>New</button>
           </div>
+        </div>
 
-          <div className="spark-bar">
-            <div className="spark-left">
-              <div className="spark-count">{sparks} spark{sparks === 1 ? "" : "s"}</div>
-              <div className="spark-message">{sparkMessage(sparks)}</div>
-            </div>
-            <div className="spark-icons">
-              {[0, 1, 2, 3, 4, 5, 6].map((index) => (
-                <div
-                  key={index}
-                  className={`spark-dot ${index < Math.min(sparks, 7) ? "active" : ""}`}
+        <div style={styles.hero}>
+          <div style={styles.dateRow}>
+            <div style={styles.dateText}>{formattedDate} · {formattedTime}</div>
+          </div>
+          <h1 style={styles.h1}>Clear your mind. Make one move.</h1>
+          <p style={styles.sub}>Stop looping. Name it. Face it. Move.</p>
+        </div>
+
+        {activeView === "reset" ? (
+          <div style={styles.panel}>
+            <div style={styles.panelInner}>
+              <div style={styles.panelTop}>
+                <div>
+                  <div style={styles.panelMeta}>Today&apos;s reset</div>
+                </div>
+                <div style={styles.panelHint}>
+                  Be honest with today. Name the real issue, catch the avoidance, and choose one move before you open something else.
+                </div>
+              </div>
+
+              <div style={styles.fieldSection}>
+                <label style={styles.fieldLabel}>What is actually bothering me?</label>
+                <textarea
+                  style={styles.textarea}
+                  placeholder="Name the real issue, not the polished version."
+                  value={bothering}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setBothering(e.target.value)}
                 />
-              ))}
-            </div>
-          </div>
+              </div>
 
-          {view === "reset" && (
-            <section className="panel">
-              {step === 1 && (
-                <>
-                  <div className="eyebrow">30 second reset</div>
-                  <div className="date-line">{todayLabel}</div>
-                  <h1>Pause. Choose the kind of reset you need.</h1>
-                  <p className="lede">One honest minute. One next move.</p>
+              <div style={styles.fieldSection}>
+                <label style={styles.fieldLabel}>What am I avoiding?</label>
+                <textarea
+                  style={styles.textarea}
+                  placeholder="What are you postponing, softening, or dodging?"
+                  value={avoiding}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setAvoiding(e.target.value)}
+                />
+              </div>
 
-                  <div className="grid two">
-                    {MODE_OPTIONS.map((option) => (
-                      <button
-                        key={option.id}
-                        className={`choice ${mode === option.id ? "active" : ""}`}
-                        onClick={() => handleModeSelect(option.id)}
-                      >
-                        <div className="choice-title">{option.label}</div>
-                        {option.hint ? <div className="choice-hint">{option.hint}</div> : null}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
+              <div style={styles.fieldSection}>
+                <label style={styles.fieldLabel}>What is the smallest next move?</label>
+                <textarea
+                  style={{ ...styles.textarea, minHeight: 92 }}
+                  placeholder="Write one move you can start in under 2 minutes."
+                  value={nextMove}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNextMove(e.target.value)}
+                />
+                <div style={styles.helper}>Keep it specific. Not a plan. Not a promise. One visible action.</div>
+              </div>
 
-              {step === 2 && mode && (
-                <>
-                  <div className="step-row">
-                    <div className="step-badge">Step 2 / 4</div>
-                    <button className="linkish" onClick={resetFlow}>
-                      Start over
-                    </button>
-                  </div>
-
-                  <h2>What feels most true right now?</h2>
-                  <p className="lede">Pick what fits.</p>
-
-                  <div className="grid two">
-                    {contextOptions.map((option) => (
-                      <button
-                        key={option.id}
-                        className={`choice ${context === option.id ? "active" : ""}`}
-                        onClick={() => handleContextSelect(option.id)}
-                      >
-                        <div className="choice-title">{option.label}</div>
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {step === 3 && mode && context && (
-                <>
-                  <div className="step-row">
-                    <div className="step-badge">Step 3 / 4</div>
-                    <button className="linkish" onClick={() => setStep(2)}>
-                      Back
-                    </button>
-                  </div>
-
-                  <h2>Finish this sentence.</h2>
-                  <p className="lede">If I’m honest, this is about…</p>
-
-                  <div className="field-wrap">
-                    <label className="field-label" htmlFor="issue-input">
-                      One line only
-                    </label>
+              <div style={styles.accountability}>
+                <div style={styles.accountabilityTitle}>Accountability</div>
+                <div style={styles.accountabilityText}>Decide when you will do it. A move with no time attached is usually just another thought.</div>
+                <div style={styles.inputs}>
+                  <div style={styles.inputWrap}>
+                    <label style={styles.inputLabel}>I will do it at</label>
                     <input
-                      id="issue-input"
-                      className="text-input"
-                      value={issue}
-                      onChange={(e) => setIssue(e.target.value)}
-                      placeholder={ISSUE_PLACEHOLDERS[mode]}
-                      maxLength={160}
+                      type="time"
+                      style={styles.input}
+                      value={time}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTime(e.target.value)}
                     />
                   </div>
-
-                  <p className="helper">Plain language beats smart language.</p>
-
-                  <button className="cta" onClick={handleIssueContinue} disabled={!issue.trim()}>
-                    Continue
-                  </button>
-                </>
-              )}
-
-              {step === 4 && mode && context && (
-                <>
-                  <div className="step-row">
-                    <div className="step-badge">Step 4 / 4</div>
-                    <button className="linkish" onClick={() => setStep(3)}>
-                      Back
-                    </button>
+                  <div style={styles.inputWrap}>
+                    <label style={styles.inputLabel}>Deadline</label>
+                    <input
+                      type="date"
+                      style={styles.input}
+                      value={deadline}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDeadline(e.target.value)}
+                    />
                   </div>
-
-                  <h2>Choose your move.</h2>
-                  <p className="lede">Small is the point. Movement first.</p>
-
-                  <div className="grid two">
-                    {ACTION_OPTIONS.map((option) => (
-                      <button
-                        key={option.id}
-                        className={`choice ${actionId === option.id ? "active" : ""}`}
-                        onClick={() => setActionId(option.id)}
-                      >
-                        <div className="choice-title">{option.label}</div>
-                      </button>
-                    ))}
-                  </div>
-
-                  {actionId === "custom" && (
-                    <div className="field-wrap" style={{ marginTop: 16 }}>
-                      <label className="field-label" htmlFor="custom-action">
-                        Write your own next move
-                      </label>
-                      <input
-                        id="custom-action"
-                        className="text-input"
-                        value={customAction}
-                        onChange={(e) => setCustomAction(e.target.value)}
-                        placeholder="…open the draft and write the first ugly sentence."
-                        maxLength={120}
-                      />
-                    </div>
-                  )}
-
-                  <div style={{ marginTop: 20 }}>
-                    <div className="field-label">When?</div>
-                    <div className="sub-actions">
-                      <button
-                        className={`pill ${commitment === "now" ? "active" : ""}`}
-                        onClick={() => setCommitment("now")}
-                      >
-                        Now
-                      </button>
-                      <button
-                        className={`pill ${commitment === "later" ? "active" : ""}`}
-                        onClick={() => setCommitment("later")}
-                      >
-                        In 10 minutes
-                      </button>
-                    </div>
-                  </div>
-
-                  <button
-                    className="cta"
-                    onClick={handleSaveReset}
-                    disabled={
-                      !mode ||
-                      !context ||
-                      !issue.trim() ||
-                      !actionId ||
-                      (actionId === "custom" && !customAction.trim())
-                    }
-                  >
-                    Commit to this
-                  </button>
-                </>
-              )}
-
-              {step === 5 && latestEntry && (
-                <>
-                  <div className="eyebrow">Your next move</div>
-                  <h2>{latestEntry.actionLabel}</h2>
-
-                  <p className="lede">
-                    {latestEntry.commitment === "now"
-                      ? "Do it now — before your brain escapes."
-                      : "Good. Keep it alive. Come back and do exactly this."}
-                  </p>
-
-                  <div className="summary-card">
-                    <div className="summary-label">What you named</div>
-                    <div className="summary-value">{latestEntry.issue}</div>
-                    <p className="tiny" style={{ marginTop: 14 }}>
-                      {MODE_LABEL[latestEntry.mode]} · {CONTEXT_LABEL[latestEntry.context]}
-                    </p>
-                  </div>
-
-                  <div className="fun-card">
-                    <div className="summary-label">Beat the scroll?</div>
-                    <div className="tiny" style={{ marginBottom: 12 }}>
-                      Mark it honestly. Done earns 1 spark.
-                    </div>
-                    <div className="status-row" style={{ marginTop: 0 }}>
-                      <button className="pill" onClick={() => updateStatus(latestEntry.id, "done")}>
-                        Yes, I did it
-                      </button>
-                      <button
-                        className="pill"
-                        onClick={() => updateStatus(latestEntry.id, "not_yet")}
-                      >
-                        Not yet
-                      </button>
-                      <button className="pill" onClick={resetFlow}>
-                        Do another reset
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
-            </section>
-          )}
-
-          {view === "history" && (
-            <section className="panel">
-              <div className="history-top">
-                <div>
-                  <div className="eyebrow">History</div>
-                  <h2>Previous resets</h2>
                 </div>
-                <button className="pill" onClick={() => setView("reset")}>
-                  New reset
+              </div>
+
+              <div style={styles.buttonRow}>
+                <button
+                  style={{ ...styles.primaryButton, ...(canComplete ? {} : styles.disabledButton) }}
+                  onClick={handleCompleteReset}
+                  disabled={!canComplete}
+                >
+                  Do it
+                </button>
+                <button style={styles.secondaryButton} onClick={trackPastResets}>
+                  View Past Resets
                 </button>
               </div>
 
-              {history.length === 0 ? (
-                <div className="empty">
-                  No resets saved yet. Your completed resets will appear here.
-                </div>
-              ) : (
-                <div className="history-list">
-                  {history.map((entry) => (
-                    <article key={entry.id} className="history-card">
-                      <div className="history-top" style={{ marginBottom: 10 }}>
-                        <div className="summary-label" style={{ marginBottom: 0 }}>
-                          {formatDate(entry.createdAt)}
-                        </div>
-                        <div className={`status-tag ${entry.status}`}>
-                          {entry.status === "pending"
-                            ? "pending"
-                            : entry.status === "done"
-                            ? "done"
-                            : "not yet"}
-                        </div>
-                      </div>
-
-                      <div className="summary-value" style={{ fontSize: "1.2rem" }}>
-                        {entry.issue}
-                      </div>
-
-                      <p className="tiny" style={{ marginTop: 10 }}>
-                        {MODE_LABEL[entry.mode]} · {CONTEXT_LABEL[entry.context]}
-                      </p>
-
-                      <div className="summary-card" style={{ marginTop: 14 }}>
-                        <div className="summary-label">Smallest move</div>
-                        <div style={{ fontWeight: 700 }}>{entry.actionLabel}</div>
-                        <p className="tiny" style={{ marginTop: 8 }}>
-                          Commitment: {entry.commitment === "now" ? "Now" : "In 10 minutes"}
-                        </p>
-                      </div>
-
-                      <div className="status-row">
-                        <button className="pill" onClick={() => updateStatus(entry.id, "done")}>
-                          Done
-                        </button>
-                        <button
-                          className="pill"
-                          onClick={() => updateStatus(entry.id, "not_yet")}
-                        >
-                          Not yet
-                        </button>
-                      </div>
-                    </article>
-                  ))}
+              {done && (
+                <div style={styles.result}>
+                  <div style={styles.resultLabel}>Your move</div>
+                  <div style={styles.resultMove}>{nextMove}</div>
+                  <div style={styles.resultText}>
+                    Close this. Do it now. Then come back.
+                    {time ? ` Start at ${time}.` : ""}
+                    {deadline ? ` Finish by ${deadline}.` : ""}
+                  </div>
                 </div>
               )}
-            </section>
-          )}
-        </div>
-      </div>
-    </>
-  );
-};
+            </div>
+          </div>
+        ) : (
+          <div style={styles.historyWrap}>
+            {entries.length === 0 ? (
+              <div style={styles.emptyState}>No resets saved yet. Do one honest reset first.</div>
+            ) : (
+              entries.map((entry) => (
+                <div key={entry.id} style={styles.entryCard}>
+                  <div style={styles.entryTop}>
+                    <div style={styles.entryMeta}>
+                      <div>{entry.displayDate}</div>
+                      <div>{entry.displayTime}</div>
+                      {entry.actionTime ? <div>Action time: {entry.actionTime}</div> : null}
+                      {entry.deadline ? <div>Deadline: {entry.deadline}</div> : null}
+                    </div>
+                    <button style={styles.deleteButton} onClick={() => handleDeleteEntry(entry.id)}>
+                      Delete
+                    </button>
+                  </div>
 
-export default App;
+                  <div style={styles.entryBlock}>
+                    <div style={styles.entryLabel}>Bothering me</div>
+                    <div style={styles.entryText}>{entry.bothering}</div>
+                  </div>
+
+                  <div style={styles.entryBlock}>
+                    <div style={styles.entryLabel}>Avoiding</div>
+                    <div style={styles.entryText}>{entry.avoiding}</div>
+                  </div>
+
+                  <div style={{ ...styles.entryBlock, marginBottom: 0 }}>
+                    <div style={styles.entryLabel}>Next move</div>
+                    <div style={styles.entryText}>{entry.nextMove}</div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        <div style={styles.footer}>For people who think too much and act too little.</div>
+      </div>
+    </div>
+  );
+}
