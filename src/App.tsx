@@ -235,7 +235,7 @@ export default function App() {
       overflow: "hidden",
       backgroundColor: "#EDE7DE",
       backgroundImage:
-        "linear-gradient(rgba(245,241,234,0.30), rgba(245,241,234,0.64)), url('/garden.jpg')",
+        "linear-gradient(rgba(245,241,234,0.45), rgba(245,241,234,0.75)), url('/garden.png')",
       backgroundSize: "cover",
       backgroundPosition: "center",
       border: "1px solid #DDD5CA",
@@ -371,10 +371,6 @@ export default function App() {
       boxSizing: "border-box",
       outline: "none",
       borderRadius: 0,
-    },
-    inputDark: {
-      borderBottom: "1px solid #3A3530",
-      color: "#F3ECE3",
     },
     helper: {
       fontSize: 12,
