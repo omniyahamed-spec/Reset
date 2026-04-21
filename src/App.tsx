@@ -1,20 +1,18 @@
 import React, { CSSProperties, useEffect, useMemo, useState } from "react";
 
-type Screen = "home" | "mind" | "avoid" | "move" | "commit" | "result" | "wrap";
+type Screen = "start" | "mind" | "avoid" | "move" | "commit" | "result" | "history";
 type EntryStatus = "done" | "not_yet";
 
 interface Entry {
   id: number;
   createdAt: string;
-  weekKey: string;
   mind: string;
   avoiding: string;
   move: string;
   status: EntryStatus;
 }
 
-const STORAGE_KEY = "reset_app_v6_entries";
-const FREE_WEEKLY_LIMIT = 7;
+const STORAGE_KEY = "reset_app_v8_entries";
 
 const MIND_SUGGESTIONS = ["Too much in my head", "I feel off", "I keep circling this"];
 const AVOIDING_SUGGESTIONS = ["Starting", "A message", "A decision"];
@@ -26,16 +24,7 @@ function startOfDay(date: Date): Date {
   return d;
 }
 
-function getWeekKey(date: Date): string {
-  const d = new Date(date);
-  const first = new Date(d.getFullYear(), 0, 1);
-  const dayOfYear =
-    Math.floor((startOfDay(d).getTime() - startOfDay(first).getTime()) / 86400000) + 1;
-  const week = Math.ceil(dayOfYear / 7);
-  return `${d.getFullYear()}-W${String(week).padStart(2, "0")}`;
-}
-
-function formatFullDate(iso: string): string {
+function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
     weekday: "short",
     month: "short",
@@ -43,61 +32,15 @@ function formatFullDate(iso: string): string {
   });
 }
 
-function getIdentity(sparks: number): { title: string; nextTitle: string; progress: number } {
-  if (sparks < 5) {
-    return {
-      title: "Starter",
-      nextTitle: "Loop Breaker",
-      progress: Math.min(100, (sparks / 5) * 100),
-    };
-  }
-  if (sparks < 20) {
-    return {
-      title: "Loop Breaker",
-      nextTitle: "Clarity Runner",
-      progress: Math.min(100, ((sparks - 5) / 15) * 100),
-    };
-  }
-  return {
-    title: "Clarity Runner",
-    nextTitle: "Reset Pro",
-    progress: Math.min(100, ((sparks - 20) / 20) * 100),
-  };
-}
-
-function getInsight(entries: Entry[]): string {
-  if (entries.length === 0) return "Nothing clear yet.";
-  const counts: Record<string, number> = {};
-  entries.forEach((e) => {
-    counts[e.avoiding] = (counts[e.avoiding] || 0) + 1;
-  });
-  const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
-  if (!top) return "You are still circling.";
-  if (top.toLowerCase().includes("decision")) return "You avoid decisions more than work.";
-  if (top.toLowerCase().includes("message")) return "It is not the task. It is the contact.";
-  if (top.toLowerCase().includes("starting")) return "Your problem is the first move.";
-  return `You keep coming back to: ${top}.`;
-}
-
-function getResultCopy(status: EntryStatus, indexSeed: number): string {
-  const doneLines = [
-    "Good.",
-    "You moved. That matters.",
-    "Small, but real.",
-    "That was enough for now.",
-  ];
-  const notYetLines = [
-    "Then make it smaller.",
-    "You're still avoiding.",
-    "Cut it in half.",
-    "Try again. Smaller.",
-  ];
-  const source = status === "done" ? doneLines : notYetLines;
-  return source[indexSeed % source.length];
+function getResultLine(status: EntryStatus, seed: number): string {
+  const yes = ["Good.", "That counts.", "You moved.", "Keep going."];
+  const no = ["Then make it smaller.", "You're still avoiding.", "Cut it in half.", "Try again."];
+  const source = status === "done" ? yes : no;
+  return source[seed % source.length];
 }
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>("home");
+  const [screen, setScreen] = useState<Screen>("start");
   const [mind, setMind] = useState("");
   const [avoiding, setAvoiding] = useState("");
   const [move, setMove] = useState("");
@@ -129,62 +72,30 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [screen, countdown]);
 
-  const currentWeekKey = getWeekKey(new Date());
-
-  const weeklyEntries = useMemo(
-    () => entries.filter((entry) => entry.weekKey === currentWeekKey),
-    [entries, currentWeekKey]
-  );
-
-  const weeklyRemaining = Math.max(0, FREE_WEEKLY_LIMIT - weeklyEntries.length);
-  const sparks = useMemo(
-    () => entries.filter((entry) => entry.status === "done").length,
-    [entries]
-  );
-  const identity = useMemo(() => getIdentity(sparks), [sparks]);
-
   const latestEntry = useMemo(
     () => entries.find((entry) => entry.id === latestId) ?? null,
     [entries, latestId]
   );
 
+  const doneCount = useMemo(
+    () => entries.filter((entry) => entry.status === "done").length,
+    [entries]
+  );
+
   const trackerDays = useMemo(() => {
-    const days: { label: string; active: boolean; cracked: boolean }[] = [];
+    const days: { label: string; active: boolean }[] = [];
     for (let i = 6; i >= 0; i -= 1) {
       const day = new Date();
       day.setDate(day.getDate() - i);
       const label = day.toLocaleDateString(undefined, { weekday: "short" });
-      const dayEntries = entries.filter((entry) => {
-        const entryDate = new Date(entry.createdAt);
-        return startOfDay(entryDate).getTime() === startOfDay(day).getTime();
+      const active = entries.some((entry) => {
+        if (entry.status !== "done") return false;
+        return startOfDay(new Date(entry.createdAt)).getTime() === startOfDay(day).getTime();
       });
-      const active = dayEntries.some((e) => e.status === "done");
-      const cracked = !active && i < 2 && entries.length > 0;
-      days.push({ label, active, cracked });
+      days.push({ label, active });
     }
     return days;
   }, [entries]);
-
-  const weeklyWrapData = useMemo(() => {
-    const attempted = weeklyEntries.length;
-    const done = weeklyEntries.filter((e) => e.status === "done").length;
-    const notYet = weeklyEntries.filter((e) => e.status === "not_yet").length;
-
-    const avoidCounts: Record<string, number> = {};
-    weeklyEntries.forEach((entry) => {
-      avoidCounts[entry.avoiding] = (avoidCounts[entry.avoiding] || 0) + 1;
-    });
-
-    const mostAvoided = Object.entries(avoidCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "—";
-
-    return {
-      attempted,
-      done,
-      notYet,
-      mostAvoided,
-      insight: getInsight(weeklyEntries),
-    };
-  }, [weeklyEntries]);
 
   function resetFlow() {
     setMind("");
@@ -193,7 +104,7 @@ export default function App() {
     setCountdown(8);
     setLatestId(null);
     setShareCopied(false);
-    setScreen("home");
+    setScreen("start");
   }
 
   function beginCommit() {
@@ -206,14 +117,13 @@ export default function App() {
     const newEntry: Entry = {
       id: Date.now(),
       createdAt: new Date().toISOString(),
-      weekKey: getWeekKey(new Date()),
       mind: mind.trim(),
       avoiding: avoiding.trim(),
       move: move.trim(),
       status,
     };
 
-    setEntries((prev) => [newEntry, ...prev].slice(0, 100));
+    setEntries((prev) => [newEntry, ...prev].slice(0, 30));
     setLatestId(newEntry.id);
     setScreen("result");
   }
@@ -233,14 +143,13 @@ export default function App() {
     }
   }
 
-  const resultCopy = latestEntry ? getResultCopy(latestEntry.status, latestEntry.id) : "";
+  const resultCopy = latestEntry ? getResultLine(latestEntry.status, latestEntry.id) : "";
 
   const styles: Record<string, CSSProperties> = {
     page: {
       minHeight: "100vh",
-      background:
-        "radial-gradient(circle at top left, rgba(255,255,255,0.08), transparent 22%), linear-gradient(180deg, #0e0c0a 0%, #17120e 100%)",
-      color: "#f6ede4",
+      background: "#F5F1EA",
+      color: "#161413",
       fontFamily: "Inter, system-ui, sans-serif",
       padding: "20px 14px 40px",
       boxSizing: "border-box",
@@ -249,7 +158,7 @@ export default function App() {
       maxWidth: 560,
       margin: "0 auto",
     },
-    badgeRow: {
+    topRow: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
@@ -258,126 +167,141 @@ export default function App() {
     },
     badge: {
       display: "inline-block",
-      border: "1px solid rgba(255,255,255,0.12)",
-      background: "rgba(255,255,255,0.04)",
-      color: "rgba(255,255,255,0.68)",
+      border: "1px solid #DDD5CA",
+      background: "#FFFDF9",
+      color: "#6F6861",
       borderRadius: 999,
       padding: "7px 11px",
       fontSize: 11,
       letterSpacing: "0.22em",
       textTransform: "uppercase",
     },
-    today: {
+    date: {
       fontSize: 12,
-      color: "rgba(255,255,255,0.52)",
+      color: "#6F6861",
     },
-    topCard: {
-      background: "rgba(255,255,255,0.05)",
-      border: "1px solid rgba(255,255,255,0.08)",
+    trackerCard: {
+      background: "#FFFDF9",
+      border: "1px solid #DDD5CA",
       borderRadius: 22,
       padding: 16,
       marginBottom: 14,
-      boxShadow: "0 16px 50px rgba(0,0,0,0.22)",
+      boxShadow: "0 14px 40px rgba(35, 32, 29, 0.05)",
     },
-    topHead: {
+    trackerTop: {
       display: "flex",
       justifyContent: "space-between",
-      gap: 12,
-      alignItems: "flex-start",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 12,
       flexWrap: "wrap",
-      marginBottom: 14,
     },
     label: {
       fontSize: 11,
       letterSpacing: "0.12em",
       textTransform: "uppercase",
-      color: "rgba(255,255,255,0.48)",
+      color: "#6F6861",
       fontWeight: 700,
       marginBottom: 6,
     },
-    identityTitle: {
-      fontSize: 20,
-      fontWeight: 700,
-      letterSpacing: "-0.03em",
-    },
-    identitySub: {
+    trackerText: {
       fontSize: 13,
-      color: "rgba(255,255,255,0.62)",
-      marginTop: 4,
-    },
-    progressWrap: {
-      marginTop: 10,
-    },
-    progressBar: {
-      width: "100%",
-      height: 8,
-      borderRadius: 999,
-      background: "rgba(255,255,255,0.08)",
-      overflow: "hidden",
-    },
-    progressFill: {
-      height: "100%",
-      borderRadius: 999,
-      background: "linear-gradient(90deg, #e8824a 0%, #ffac79 100%)",
-    },
-    proBox: {
-      minWidth: 180,
-      background: "rgba(232,130,74,0.08)",
-      border: "1px solid rgba(232,130,74,0.18)",
-      borderRadius: 18,
-      padding: 12,
-    },
-    proTitle: {
-      fontSize: 13,
-      fontWeight: 700,
-      color: "#ffb07f",
-      marginBottom: 6,
-    },
-    proText: {
-      fontSize: 12,
-      color: "rgba(255,255,255,0.68)",
-      lineHeight: 1.5,
+      color: "#6F6861",
     },
     trackerRow: {
       display: "grid",
       gridTemplateColumns: "repeat(7, 1fr)",
       gap: 8,
-      marginTop: 4,
     },
     trackerDay: {
       textAlign: "center",
       fontSize: 11,
-      color: "rgba(255,255,255,0.5)",
+      color: "#6F6861",
     },
     dot: {
-      width: 14,
-      height: 14,
+      width: 12,
+      height: 12,
       borderRadius: 999,
+      background: "#DDD5CA",
       margin: "0 auto 7px",
-      background: "rgba(255,255,255,0.12)",
-      position: "relative",
-      boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.06)",
     },
     dotActive: {
-      background: "#e8824a",
-      boxShadow: "0 0 14px rgba(232,130,74,0.45)",
+      background: "#23201D",
     },
-    dotCracked: {
-      background: "rgba(255,255,255,0.1)",
-      border: "1px solid rgba(255,255,255,0.18)",
+    heroCard: {
+      position: "relative",
+      minHeight: 620,
+      borderRadius: 28,
+      overflow: "hidden",
+      backgroundColor: "#EDE7DE",
+      backgroundImage:
+        "linear-gradient(rgba(245,241,234,0.30), rgba(245,241,234,0.64)), url('/garden.jpg')",
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+      border: "1px solid #DDD5CA",
+      boxShadow: "0 18px 50px rgba(35, 32, 29, 0.06)",
+      display: "flex",
+      alignItems: "stretch",
     },
-    mainCard: {
-      background: "rgba(255,255,255,0.05)",
-      border: "1px solid rgba(255,255,255,0.08)",
+    heroOverlay: {
+      width: "100%",
+      padding: 28,
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "space-between",
+    },
+    heroTop: {},
+    heroTitle: {
+      fontSize: "clamp(44px, 10vw, 64px)",
+      lineHeight: 0.95,
+      letterSpacing: "-0.06em",
+      fontWeight: 500,
+      fontFamily:
+        'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
+      maxWidth: 340,
+      color: "#161413",
+      marginBottom: 18,
+    },
+    heroSub: {
+      fontSize: 16,
+      lineHeight: 1.55,
+      color: "#2B2723",
+      maxWidth: 260,
+    },
+    heroBottom: {
+      maxWidth: 320,
+    },
+    startButton: {
+      width: "100%",
+      padding: "18px 20px",
+      borderRadius: 999,
+      border: "none",
+      background: "#161413",
+      color: "#FFFDF9",
+      fontSize: 18,
+      fontWeight: 500,
+      fontFamily:
+        'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
+      cursor: "pointer",
+      marginBottom: 12,
+    },
+    heroFoot: {
+      fontSize: 13,
+      color: "#2B2723",
+      textAlign: "center",
+    },
+    card: {
+      background: "#FFFDF9",
+      border: "1px solid #DDD5CA",
       borderRadius: 28,
       padding: 22,
-      boxShadow: "0 18px 60px rgba(0,0,0,0.25)",
-      backdropFilter: "blur(12px)",
+      boxShadow: "0 18px 50px rgba(35, 32, 29, 0.06)",
     },
     commitCard: {
-      background: "linear-gradient(180deg, #e8824a 0%, #d66f35 100%)",
-      border: "1px solid rgba(255,255,255,0.12)",
-      color: "#fff7f1",
+      background: "#12110F",
+      color: "#F3ECE3",
+      border: "1px solid #2A2724",
+      boxShadow: "0 18px 50px rgba(18, 17, 15, 0.22)",
     },
     stepPill: {
       display: "inline-block",
@@ -387,23 +311,32 @@ export default function App() {
       fontWeight: 700,
       letterSpacing: "0.1em",
       textTransform: "uppercase",
-      background: "rgba(255,255,255,0.06)",
-      color: "rgba(255,255,255,0.65)",
+      background: "#F1ECE4",
+      color: "#6F6861",
       marginBottom: 14,
+    },
+    stepPillDark: {
+      background: "rgba(255,255,255,0.08)",
+      color: "#A79E93",
     },
     title: {
       fontSize: "clamp(30px, 7vw, 42px)",
       lineHeight: 0.98,
       letterSpacing: "-0.05em",
-      fontWeight: 800,
+      fontWeight: 500,
+      fontFamily:
+        'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
       marginBottom: 10,
     },
     sub: {
       fontSize: 15,
-      color: "rgba(255,255,255,0.7)",
+      color: "#6F6861",
       lineHeight: 1.55,
       marginBottom: 18,
       maxWidth: 420,
+    },
+    subDark: {
+      color: "#A79E93",
     },
     chips: {
       display: "flex",
@@ -414,65 +347,78 @@ export default function App() {
     chip: {
       padding: "10px 12px",
       borderRadius: 999,
-      border: "1px solid rgba(255,255,255,0.1)",
-      background: "rgba(255,255,255,0.04)",
-      color: "#f6ede4",
+      border: "1px solid #DDD5CA",
+      background: "#F7F3EC",
+      color: "#23201D",
       fontSize: 13,
       fontWeight: 600,
       cursor: "pointer",
     },
     chipActive: {
-      background: "#f6ede4",
-      color: "#17120e",
-      border: "1px solid #f6ede4",
+      background: "#23201D",
+      color: "#FFFDF9",
+      border: "1px solid #23201D",
     },
     input: {
       width: "100%",
-      padding: "14px 15px",
-      borderRadius: 16,
-      border: "1px solid rgba(255,255,255,0.12)",
-      background: "rgba(255,255,255,0.06)",
-      color: "#f6ede4",
-      fontSize: 14,
+      padding: "16px 0 12px",
+      border: "none",
+      borderBottom: "1px solid #CFC5B7",
+      background: "transparent",
+      color: "#161413",
+      fontSize: 20,
+      lineHeight: 1.4,
       boxSizing: "border-box",
       outline: "none",
+      borderRadius: 0,
+    },
+    inputDark: {
+      borderBottom: "1px solid #3A3530",
+      color: "#F3ECE3",
     },
     helper: {
       fontSize: 12,
-      color: "rgba(255,255,255,0.48)",
-      marginTop: 8,
+      color: "#736C64",
+      marginTop: 10,
       marginBottom: 18,
+    },
+    helperDark: {
+      color: "#A79E93",
     },
     cta: {
       width: "100%",
       padding: "15px 18px",
       borderRadius: 18,
       border: "none",
-      background: "#f6ede4",
-      color: "#17120e",
+      background: "#23201D",
+      color: "#FFFDF9",
       fontSize: 15,
       fontWeight: 800,
       cursor: "pointer",
     },
     ctaDark: {
-      background: "#17120e",
-      color: "#fff7f1",
+      background: "#F3ECE3",
+      color: "#12110F",
     },
     ctaMuted: {
       width: "100%",
       padding: "14px 18px",
       borderRadius: 16,
-      border: "1px solid rgba(255,255,255,0.12)",
+      border: "1px solid #DDD5CA",
       background: "transparent",
-      color: "rgba(255,255,255,0.68)",
+      color: "#6F6861",
       fontSize: 14,
       fontWeight: 700,
       cursor: "pointer",
       marginTop: 10,
     },
+    ctaMutedDark: {
+      border: "1px solid #2A2724",
+      color: "#A79E93",
+    },
     moveBox: {
-      background: "rgba(255,255,255,0.12)",
-      border: "1px solid rgba(255,255,255,0.16)",
+      background: "rgba(255,255,255,0.06)",
+      border: "1px solid rgba(255,255,255,0.08)",
       borderRadius: 20,
       padding: 16,
       marginBottom: 18,
@@ -480,7 +426,9 @@ export default function App() {
     moveBig: {
       fontSize: 24,
       lineHeight: 1.18,
-      fontWeight: 800,
+      fontWeight: 500,
+      fontFamily:
+        'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
       letterSpacing: "-0.04em",
     },
     countdownWrap: {
@@ -512,8 +460,8 @@ export default function App() {
       padding: "14px 16px",
       borderRadius: 16,
       border: "none",
-      background: "#17120e",
-      color: "#fff7f1",
+      background: "#F3ECE3",
+      color: "#12110F",
       fontWeight: 800,
       cursor: "pointer",
     },
@@ -522,15 +470,15 @@ export default function App() {
       minWidth: 140,
       padding: "14px 16px",
       borderRadius: 16,
-      border: "1px solid rgba(255,255,255,0.14)",
+      border: "1px solid #2A2724",
       background: "transparent",
-      color: "#fff7f1",
+      color: "#F3ECE3",
       fontWeight: 800,
       cursor: "pointer",
     },
     resultBox: {
-      background: "rgba(255,255,255,0.06)",
-      border: "1px solid rgba(255,255,255,0.08)",
+      background: "#F7F3EC",
+      border: "1px solid #DDD5CA",
       borderRadius: 20,
       padding: 16,
       marginTop: 10,
@@ -539,21 +487,23 @@ export default function App() {
     resultMove: {
       fontSize: 22,
       lineHeight: 1.2,
-      fontWeight: 800,
+      fontWeight: 500,
+      fontFamily:
+        'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
       marginBottom: 8,
       letterSpacing: "-0.03em",
     },
     resultText: {
       fontSize: 14,
-      color: "rgba(255,255,255,0.72)",
+      color: "#6F6861",
       lineHeight: 1.55,
     },
     shareBox: {
       marginTop: 14,
       padding: 14,
       borderRadius: 18,
-      background: "rgba(255,255,255,0.04)",
-      border: "1px solid rgba(255,255,255,0.08)",
+      background: "#F7F3EC",
+      border: "1px solid #DDD5CA",
     },
     shareTitle: {
       fontSize: 13,
@@ -562,40 +512,51 @@ export default function App() {
     },
     shareText: {
       fontSize: 13,
-      color: "rgba(255,255,255,0.66)",
+      color: "#6F6861",
       lineHeight: 1.5,
       marginBottom: 12,
     },
-    wrapGrid: {
+    historyList: {
       display: "grid",
-      gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
       gap: 10,
-      marginBottom: 16,
     },
-    wrapStat: {
+    historyCard: {
       padding: 14,
       borderRadius: 18,
-      background: "rgba(255,255,255,0.04)",
-      border: "1px solid rgba(255,255,255,0.08)",
+      background: "#F7F3EC",
+      border: "1px solid #DDD5CA",
     },
-    wrapStatBig: {
-      fontSize: 24,
-      fontWeight: 800,
-      letterSpacing: "-0.04em",
+    historyTop: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 10,
+      flexWrap: "wrap",
     },
-    wrapInsight: {
-      padding: 16,
-      borderRadius: 18,
-      background: "rgba(232,130,74,0.08)",
-      border: "1px solid rgba(232,130,74,0.18)",
-      color: "#ffd4bb",
-      lineHeight: 1.55,
-      marginBottom: 14,
+    historyDate: {
+      fontSize: 12,
+      color: "#6F6861",
+    },
+    statusTag: {
+      display: "inline-block",
+      padding: "6px 10px",
+      borderRadius: 999,
+      fontSize: 11,
+      fontWeight: 700,
+      background: "#ECE7DE",
+      color: "#2B2723",
+    },
+    historyText: {
+      fontSize: 14,
+      lineHeight: 1.5,
+      color: "#161413",
+      marginBottom: 8,
     },
     footer: {
       textAlign: "center",
       fontSize: 12,
-      color: "rgba(255,255,255,0.4)",
+      color: "#736C64",
       marginTop: 12,
     },
   };
@@ -605,40 +566,22 @@ export default function App() {
   return (
     <div style={styles.page}>
       <div style={styles.wrap}>
-        <div style={styles.badgeRow}>
+        <div style={styles.topRow}>
           <div style={styles.badge}>Reset</div>
-          <div style={styles.today}>
+          <div style={styles.date}>
             {today.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
           </div>
         </div>
 
-        <div style={styles.topCard}>
-          <div style={styles.topHead}>
+        <div style={styles.trackerCard}>
+          <div style={styles.trackerTop}>
             <div>
-              <div style={styles.label}>Identity</div>
-              <div style={styles.identityTitle}>{identity.title}</div>
-              <div style={styles.identitySub}>
-                {sparks} sparks · next: {identity.nextTitle}
-              </div>
-
-              <div style={styles.progressWrap}>
-                <div style={styles.progressBar}>
-                  <div style={{ ...styles.progressFill, width: `${identity.progress}%` }} />
-                </div>
-              </div>
+              <div style={styles.label}>Momentum</div>
+              <div style={styles.trackerText}>{doneCount} times you actually moved.</div>
             </div>
-
-            <div style={styles.proBox}>
-              <div style={styles.proTitle}>Reset Pro</div>
-              <div style={styles.proText}>
-                {weeklyRemaining > 0
-                  ? `${weeklyRemaining} free reset${weeklyRemaining === 1 ? "" : "s"} left this week`
-                  : "Free weekly limit reached"}
-              </div>
-            </div>
+            <div style={styles.trackerText}>Last 7 days</div>
           </div>
 
-          <div style={styles.label}>Streak</div>
           <div style={styles.trackerRow}>
             {trackerDays.map((day, idx) => (
               <div key={`${day.label}-${idx}`} style={styles.trackerDay}>
@@ -646,310 +589,289 @@ export default function App() {
                   style={{
                     ...styles.dot,
                     ...(day.active ? styles.dotActive : {}),
-                    ...(day.cracked ? styles.dotCracked : {}),
                   }}
-                >
-                  {day.cracked ? (
-                    <div
-                      style={{
-                        position: "absolute",
-                        inset: 0,
-                        display: "grid",
-                        placeItems: "center",
-                        fontSize: 11,
-                        color: "rgba(255,255,255,0.62)",
-                      }}
-                    >
-                      /
-                    </div>
-                  ) : null}
-                </div>
+                />
                 {day.label}
               </div>
             ))}
           </div>
         </div>
 
-        <div
-          style={{
-            ...styles.mainCard,
-            ...(screen === "commit" ? styles.commitCard : {}),
-          }}
-        >
-          {screen === "home" && (
-            <>
-              <div style={styles.stepPill}>Reset</div>
-              <div style={styles.title}>You&apos;re here for a reason.</div>
-              <div style={styles.sub}>Empty your head. Then move.</div>
-
-              <button style={styles.cta} onClick={() => setScreen("mind")}>
-                Start
-              </button>
-
-              <button style={styles.ctaMuted} onClick={() => setScreen("wrap")}>
-                Weekly wrap
-              </button>
-            </>
-          )}
-
-          {screen === "mind" && (
-            <>
-              <div style={styles.stepPill}>Step 1 / 3</div>
-              <div style={styles.title}>What&apos;s on your mind?</div>
-              <div style={styles.sub}>Say it as it is.</div>
-
-              <div style={styles.chips}>
-                {MIND_SUGGESTIONS.map((option) => (
-                  <button
-                    key={option}
-                    style={{
-                      ...styles.chip,
-                      ...(mind === option ? styles.chipActive : {}),
-                    }}
-                    onClick={() => setMind(option)}
-                  >
-                    {option}
-                  </button>
-                ))}
+        {screen === "start" ? (
+          <div style={styles.heroCard}>
+            <div style={styles.heroOverlay}>
+              <div style={styles.heroTop}>
+                <div style={styles.heroTitle}>Empty your head. Take action.</div>
+                <div style={styles.heroSub}>Clarity comes when you stop running.</div>
               </div>
 
-              <input
-                style={styles.input}
-                placeholder="Don’t filter it."
-                value={mind}
-                maxLength={120}
-                onChange={(e) => setMind(e.target.value)}
-              />
-
-              <div style={styles.helper}>Short. Clear.</div>
-
-              <button
-                style={{
-                  ...styles.cta,
-                  opacity: mind.trim() ? 1 : 0.42,
-                  cursor: mind.trim() ? "pointer" : "not-allowed",
-                }}
-                disabled={!mind.trim()}
-                onClick={() => setScreen("avoid")}
-              >
-                Continue
-              </button>
-
-              <button style={styles.ctaMuted} onClick={resetFlow}>
-                Cancel
-              </button>
-            </>
-          )}
-
-          {screen === "avoid" && (
-            <>
-              <div style={styles.stepPill}>Step 2 / 3</div>
-              <div style={styles.title}>What are you actually avoiding?</div>
-              <div style={styles.sub}>The real thing. Not the excuse.</div>
-
-              <div style={styles.chips}>
-                {AVOIDING_SUGGESTIONS.map((option) => (
-                  <button
-                    key={option}
-                    style={{
-                      ...styles.chip,
-                      ...(avoiding === option ? styles.chipActive : {}),
-                    }}
-                    onClick={() => setAvoiding(option)}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-
-              <input
-                style={styles.input}
-                placeholder="Be honest. Not smart."
-                value={avoiding}
-                maxLength={120}
-                onChange={(e) => setAvoiding(e.target.value)}
-              />
-
-              <div style={styles.helper}>No polishing.</div>
-
-              <button
-                style={{
-                  ...styles.cta,
-                  opacity: avoiding.trim() ? 1 : 0.42,
-                  cursor: avoiding.trim() ? "pointer" : "not-allowed",
-                }}
-                disabled={!avoiding.trim()}
-                onClick={() => setScreen("move")}
-              >
-                Continue
-              </button>
-
-              <button style={styles.ctaMuted} onClick={() => setScreen("mind")}>
-                Back
-              </button>
-            </>
-          )}
-
-          {screen === "move" && (
-            <>
-              <div style={styles.stepPill}>Step 3 / 3</div>
-              <div style={styles.title}>What&apos;s the next move?</div>
-              <div style={styles.sub}>Not a plan. One action.</div>
-
-              <div style={styles.chips}>
-                {MOVE_SUGGESTIONS.map((option) => (
-                  <button
-                    key={option}
-                    style={{
-                      ...styles.chip,
-                      ...(move === option ? styles.chipActive : {}),
-                    }}
-                    onClick={() => setMove(option)}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-
-              <input
-                style={styles.input}
-                placeholder="Something small. Something real."
-                value={move}
-                maxLength={120}
-                onChange={(e) => setMove(e.target.value)}
-              />
-
-              <div style={styles.helper}>Visible. Immediate.</div>
-
-              <button
-                style={{
-                  ...styles.cta,
-                  opacity: move.trim() ? 1 : 0.42,
-                  cursor: move.trim() ? "pointer" : "not-allowed",
-                }}
-                disabled={!move.trim()}
-                onClick={beginCommit}
-              >
-                Commit
-              </button>
-
-              <button style={styles.ctaMuted} onClick={() => setScreen("avoid")}>
-                Back
-              </button>
-            </>
-          )}
-
-          {screen === "commit" && (
-            <>
-              <div
-                style={{
-                  ...styles.stepPill,
-                  background: "rgba(255,255,255,0.12)",
-                  color: "rgba(255,247,241,0.78)",
-                }}
-              >
-                Commit
-              </div>
-
-              <div style={styles.title}>Do it.</div>
-              <div style={{ ...styles.sub, color: "rgba(255,247,241,0.82)" }}>
-                No more thinking.
-              </div>
-
-              <div style={styles.moveBox}>
-                <div style={{ ...styles.label, color: "rgba(255,247,241,0.68)" }}>Your move</div>
-                <div style={styles.moveBig}>{move}</div>
-              </div>
-
-              <div style={styles.countdownWrap}>
-                <div style={styles.countdown}>{countdown}</div>
-                <div style={styles.countdownText}>Your streak is on the line.</div>
-              </div>
-
-              {countdown <= 0 && (
-                <div style={styles.statusRow}>
-                  <button style={styles.statusPrimary} onClick={() => saveResult("done")}>
-                    Yes
-                  </button>
-                  <button style={styles.statusSecondary} onClick={() => saveResult("not_yet")}>
-                    Not yet
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-
-          {screen === "result" && latestEntry && (
-            <>
-              <div style={styles.stepPill}>Result</div>
-              <div style={styles.title}>{resultCopy}</div>
-              <div style={styles.sub}>
-                {latestEntry.status === "done" ? "Keep it going." : "Try again. Smaller."}
-              </div>
-
-              <div style={styles.resultBox}>
-                <div style={styles.label}>Move</div>
-                <div style={styles.resultMove}>{latestEntry.move}</div>
-                <div style={styles.resultText}>
-                  {latestEntry.avoiding} · {formatFullDate(latestEntry.createdAt)}
-                </div>
-              </div>
-
-              <div style={styles.shareBox}>
-                <div style={styles.shareTitle}>Accountability</div>
-                <div style={styles.shareText}>
-                  Send it to one person. Make it harder to disappear.
-                </div>
-
-                <button style={{ ...styles.cta, ...styles.ctaDark }} onClick={shareMove}>
-                  {shareCopied ? "Copied" : "Share my move"}
+              <div style={styles.heroBottom}>
+                <button style={styles.startButton} onClick={() => setScreen("mind")}>
+                  Start
                 </button>
+                <div style={styles.heroFoot}>This is for you, not for anyone.</div>
               </div>
+            </div>
+          </div>
+        ) : (
+          <div
+            style={{
+              ...styles.card,
+              ...(screen === "commit" ? styles.commitCard : {}),
+            }}
+          >
+            {screen === "mind" && (
+              <>
+                <div style={styles.stepPill}>Step 1 / 3</div>
+                <div style={styles.title}>What&apos;s on your mind?</div>
+                <div style={styles.sub}>Say it as it is.</div>
 
-              <button style={styles.ctaMuted} onClick={resetFlow}>
-                Again
-              </button>
-            </>
-          )}
-
-          {screen === "wrap" && (
-            <>
-              <div style={styles.stepPill}>Weekly wrap</div>
-              <div style={styles.title}>Here&apos;s the week.</div>
-              <div style={styles.sub}>No story. Just the pattern.</div>
-
-              <div style={styles.wrapGrid}>
-                <div style={styles.wrapStat}>
-                  <div style={styles.label}>Tried</div>
-                  <div style={styles.wrapStatBig}>{weeklyWrapData.attempted}</div>
+                <div style={styles.chips}>
+                  {MIND_SUGGESTIONS.map((option) => (
+                    <button
+                      key={option}
+                      style={{
+                        ...styles.chip,
+                        ...(mind === option ? styles.chipActive : {}),
+                      }}
+                      onClick={() => setMind(option)}
+                    >
+                      {option}
+                    </button>
+                  ))}
                 </div>
 
-                <div style={styles.wrapStat}>
-                  <div style={styles.label}>Done</div>
-                  <div style={styles.wrapStatBig}>{weeklyWrapData.done}</div>
+                <input
+                  style={styles.input}
+                  placeholder="Don’t filter it."
+                  value={mind}
+                  maxLength={120}
+                  onChange={(e) => setMind(e.target.value)}
+                />
+
+                <div style={styles.helper}>Short. Clear.</div>
+
+                <button
+                  style={{
+                    ...styles.cta,
+                    opacity: mind.trim() ? 1 : 0.42,
+                    cursor: mind.trim() ? "pointer" : "not-allowed",
+                  }}
+                  disabled={!mind.trim()}
+                  onClick={() => setScreen("avoid")}
+                >
+                  Continue
+                </button>
+
+                <button style={styles.ctaMuted} onClick={resetFlow}>
+                  Cancel
+                </button>
+              </>
+            )}
+
+            {screen === "avoid" && (
+              <>
+                <div style={styles.stepPill}>Step 2 / 3</div>
+                <div style={styles.title}>What are you actually avoiding?</div>
+                <div style={styles.sub}>The real thing. Not the excuse.</div>
+
+                <div style={styles.chips}>
+                  {AVOIDING_SUGGESTIONS.map((option) => (
+                    <button
+                      key={option}
+                      style={{
+                        ...styles.chip,
+                        ...(avoiding === option ? styles.chipActive : {}),
+                      }}
+                      onClick={() => setAvoiding(option)}
+                    >
+                      {option}
+                    </button>
+                  ))}
                 </div>
 
-                <div style={styles.wrapStat}>
-                  <div style={styles.label}>Not yet</div>
-                  <div style={styles.wrapStatBig}>{weeklyWrapData.notYet}</div>
+                <input
+                  style={styles.input}
+                  placeholder="Be honest. Not smart."
+                  value={avoiding}
+                  maxLength={120}
+                  onChange={(e) => setAvoiding(e.target.value)}
+                />
+
+                <div style={styles.helper}>No polishing.</div>
+
+                <button
+                  style={{
+                    ...styles.cta,
+                    opacity: avoiding.trim() ? 1 : 0.42,
+                    cursor: avoiding.trim() ? "pointer" : "not-allowed",
+                  }}
+                  disabled={!avoiding.trim()}
+                  onClick={() => setScreen("move")}
+                >
+                  Continue
+                </button>
+
+                <button style={styles.ctaMuted} onClick={() => setScreen("mind")}>
+                  Back
+                </button>
+              </>
+            )}
+
+            {screen === "move" && (
+              <>
+                <div style={styles.stepPill}>Step 3 / 3</div>
+                <div style={styles.title}>What&apos;s the next move?</div>
+                <div style={styles.sub}>Not a plan. One action.</div>
+
+                <div style={styles.chips}>
+                  {MOVE_SUGGESTIONS.map((option) => (
+                    <button
+                      key={option}
+                      style={{
+                        ...styles.chip,
+                        ...(move === option ? styles.chipActive : {}),
+                      }}
+                      onClick={() => setMove(option)}
+                    >
+                      {option}
+                    </button>
+                  ))}
                 </div>
 
-                <div style={styles.wrapStat}>
-                  <div style={styles.label}>Most avoided</div>
-                  <div style={{ ...styles.wrapStatBig, fontSize: 18 }}>
-                    {weeklyWrapData.mostAvoided}
+                <input
+                  style={styles.input}
+                  placeholder="Something small. Something real."
+                  value={move}
+                  maxLength={120}
+                  onChange={(e) => setMove(e.target.value)}
+                />
+
+                <div style={styles.helper}>Visible. Immediate.</div>
+
+                <button
+                  style={{
+                    ...styles.cta,
+                    opacity: move.trim() ? 1 : 0.42,
+                    cursor: move.trim() ? "pointer" : "not-allowed",
+                  }}
+                  disabled={!move.trim()}
+                  onClick={beginCommit}
+                >
+                  Commit
+                </button>
+
+                <button style={styles.ctaMuted} onClick={() => setScreen("avoid")}>
+                  Back
+                </button>
+              </>
+            )}
+
+            {screen === "commit" && (
+              <>
+                <div style={{ ...styles.stepPill, ...styles.stepPillDark }}>Commit</div>
+                <div style={styles.title}>Do it.</div>
+                <div style={{ ...styles.sub, ...styles.subDark }}>No more thinking.</div>
+
+                <div style={styles.moveBox}>
+                  <div style={{ ...styles.label, color: "#A79E93" }}>Your move</div>
+                  <div style={styles.moveBig}>{move}</div>
+                </div>
+
+                <div style={styles.countdownWrap}>
+                  <div style={styles.countdown}>{countdown}</div>
+                  <div style={styles.countdownText}>Just start.</div>
+                </div>
+
+                {countdown <= 0 && (
+                  <div style={styles.statusRow}>
+                    <button style={styles.statusPrimary} onClick={() => saveResult("done")}>
+                      Yes
+                    </button>
+                    <button style={styles.statusSecondary} onClick={() => saveResult("not_yet")}>
+                      Not yet
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+
+            {screen === "result" && latestEntry && (
+              <>
+                <div style={styles.stepPill}>Result</div>
+                <div style={styles.title}>{resultCopy}</div>
+                <div style={styles.sub}>
+                  {latestEntry.status === "done" ? "Keep it going." : "Try again. Smaller."}
+                </div>
+
+                <div style={styles.resultBox}>
+                  <div style={styles.label}>Move</div>
+                  <div style={styles.resultMove}>{latestEntry.move}</div>
+                  <div style={styles.resultText}>
+                    {latestEntry.avoiding} · {formatDate(latestEntry.createdAt)}
                   </div>
                 </div>
-              </div>
 
-              <div style={styles.wrapInsight}>{weeklyWrapData.insight}</div>
+                <div style={styles.shareBox}>
+                  <div style={styles.shareTitle}>Accountability</div>
+                  <div style={styles.shareText}>Send it to one person. Make it harder to disappear.</div>
+                  <button style={styles.cta} onClick={shareMove}>
+                    {shareCopied ? "Copied" : "Share my move"}
+                  </button>
+                </div>
 
-              <button style={styles.cta} onClick={() => setScreen("home")}>
-                Back
-              </button>
-            </>
-          )}
-        </div>
+                <button style={styles.ctaMuted} onClick={() => setScreen("history")}>
+                  View history
+                </button>
+
+                <button style={styles.ctaMuted} onClick={resetFlow}>
+                  Again
+                </button>
+              </>
+            )}
+
+            {screen === "history" && (
+              <>
+                <div style={styles.stepPill}>History</div>
+                <div style={styles.title}>Here&apos;s what happened.</div>
+                <div style={styles.sub}>No story. Just the pattern.</div>
+
+                <div style={styles.historyList}>
+                  {entries.length === 0 ? (
+                    <div style={styles.historyCard}>
+                      <div style={styles.historyText}>Nothing yet.</div>
+                    </div>
+                  ) : (
+                    entries.map((entry) => (
+                      <div key={entry.id} style={styles.historyCard}>
+                        <div style={styles.historyTop}>
+                          <div style={styles.historyDate}>{formatDate(entry.createdAt)}</div>
+                          <div style={styles.statusTag}>
+                            {entry.status === "done" ? "Done" : "Not yet"}
+                          </div>
+                        </div>
+
+                        <div style={styles.historyText}>
+                          <strong>Mind:</strong> {entry.mind}
+                        </div>
+                        <div style={styles.historyText}>
+                          <strong>Avoiding:</strong> {entry.avoiding}
+                        </div>
+                        <div style={{ ...styles.historyText, marginBottom: 0 }}>
+                          <strong>Move:</strong> {entry.move}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <button style={styles.ctaMuted} onClick={resetFlow}>
+                  Back home
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         <div style={styles.footer}>For when your head is full and you still need to move.</div>
       </div>
