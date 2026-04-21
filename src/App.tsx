@@ -1,37 +1,24 @@
 import React, { CSSProperties, useEffect, useMemo, useState } from "react";
 
-type Screen = "home" | "avoid" | "move" | "commit" | "result" | "wrap";
+type Screen = "home" | "mind" | "avoid" | "move" | "commit" | "result" | "wrap";
 type EntryStatus = "done" | "not_yet";
 
 interface Entry {
   id: number;
   createdAt: string;
   weekKey: string;
+  mind: string;
   avoiding: string;
   move: string;
   status: EntryStatus;
 }
 
-const STORAGE_KEY = "reset_app_v5_entries";
+const STORAGE_KEY = "reset_app_v6_entries";
 const FREE_WEEKLY_LIMIT = 7;
 
-const AVOIDING_OPTIONS = [
-  "Starting",
-  "A message",
-  "A decision",
-  "A work task",
-  "Something uncomfortable",
-  "A hard truth",
-];
-
-const MOVE_OPTIONS = [
-  "Send it",
-  "Open it",
-  "Start 2 min",
-  "Reply now",
-  "Close tabs",
-  "Write 1 line",
-];
+const MIND_SUGGESTIONS = ["Too much in my head", "I feel off", "I keep circling this"];
+const AVOIDING_SUGGESTIONS = ["Starting", "A message", "A decision"];
+const MOVE_SUGGESTIONS = ["Send it", "Open it", "Start 2 min"];
 
 function startOfDay(date: Date): Date {
   const d = new Date(date);
@@ -39,26 +26,13 @@ function startOfDay(date: Date): Date {
   return d;
 }
 
-function daysBetween(a: Date, b: Date): number {
-  const ms = startOfDay(a).getTime() - startOfDay(b).getTime();
-  return Math.round(ms / (1000 * 60 * 60 * 24));
-}
-
 function getWeekKey(date: Date): string {
   const d = new Date(date);
   const first = new Date(d.getFullYear(), 0, 1);
-  const dayOfYear = Math.floor(
-    (startOfDay(d).getTime() - startOfDay(first).getTime()) / (1000 * 60 * 60 * 24)
-  ) + 1;
+  const dayOfYear =
+    Math.floor((startOfDay(d).getTime() - startOfDay(first).getTime()) / 86400000) + 1;
   const week = Math.ceil(dayOfYear / 7);
   return `${d.getFullYear()}-W${String(week).padStart(2, "0")}`;
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
 }
 
 function formatFullDate(iso: string): string {
@@ -92,31 +66,39 @@ function getIdentity(sparks: number): { title: string; nextTitle: string; progre
 }
 
 function getInsight(entries: Entry[]): string {
-  if (entries.length === 0) return "You haven't logged enough yet.";
-
+  if (entries.length === 0) return "Nothing clear yet.";
   const counts: Record<string, number> = {};
   entries.forEach((e) => {
     counts[e.avoiding] = (counts[e.avoiding] || 0) + 1;
   });
-
   const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
+  if (!top) return "You are still circling.";
+  if (top.toLowerCase().includes("decision")) return "You avoid decisions more than work.";
+  if (top.toLowerCase().includes("message")) return "It is not the task. It is the contact.";
+  if (top.toLowerCase().includes("starting")) return "Your problem is the first move.";
+  return `You keep coming back to: ${top}.`;
+}
 
-  if (!top) return "You are noticing the pattern. Keep going.";
-
-  if (top.toLowerCase().includes("decision")) {
-    return "You're not lazy. You avoid decisions, not work.";
-  }
-  if (top.toLowerCase().includes("message")) {
-    return "Your drag isn't effort. It's emotional friction.";
-  }
-  if (top.toLowerCase().includes("starting")) {
-    return "Your problem isn't ability. It's the first move.";
-  }
-  return `Your main friction this week was: ${top}.`;
+function getResultCopy(status: EntryStatus, indexSeed: number): string {
+  const doneLines = [
+    "Good.",
+    "You moved. That matters.",
+    "Small, but real.",
+    "That was enough for now.",
+  ];
+  const notYetLines = [
+    "Then make it smaller.",
+    "You're still avoiding.",
+    "Cut it in half.",
+    "Try again. Smaller.",
+  ];
+  const source = status === "done" ? doneLines : notYetLines;
+  return source[indexSeed % source.length];
 }
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home");
+  const [mind, setMind] = useState("");
   const [avoiding, setAvoiding] = useState("");
   const [move, setMove] = useState("");
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -127,9 +109,7 @@ export default function App() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        setEntries(JSON.parse(raw) as Entry[]);
-      }
+      if (raw) setEntries(JSON.parse(raw) as Entry[]);
     } catch (error) {
       console.error("Failed to load entries", error);
     }
@@ -144,17 +124,11 @@ export default function App() {
   }, [entries]);
 
   useEffect(() => {
-    if (screen !== "commit") return;
-    if (countdown <= 0) return;
-
-    const timer = window.setTimeout(() => {
-      setCountdown((prev) => prev - 1);
-    }, 1000);
-
+    if (screen !== "commit" || countdown <= 0) return;
+    const timer = window.setTimeout(() => setCountdown((prev) => prev - 1), 1000);
     return () => window.clearTimeout(timer);
   }, [screen, countdown]);
 
-  const today = useMemo(() => new Date(), []);
   const currentWeekKey = getWeekKey(new Date());
 
   const weeklyEntries = useMemo(
@@ -162,14 +136,11 @@ export default function App() {
     [entries, currentWeekKey]
   );
 
-  const weeklyUsed = weeklyEntries.length;
-  const weeklyRemaining = Math.max(0, FREE_WEEKLY_LIMIT - weeklyUsed);
-
+  const weeklyRemaining = Math.max(0, FREE_WEEKLY_LIMIT - weeklyEntries.length);
   const sparks = useMemo(
     () => entries.filter((entry) => entry.status === "done").length,
     [entries]
   );
-
   const identity = useMemo(() => getIdentity(sparks), [sparks]);
 
   const latestEntry = useMemo(
@@ -178,29 +149,19 @@ export default function App() {
   );
 
   const trackerDays = useMemo(() => {
-    const days: {
-      label: string;
-      active: boolean;
-      cracked: boolean;
-    }[] = [];
-
+    const days: { label: string; active: boolean; cracked: boolean }[] = [];
     for (let i = 6; i >= 0; i -= 1) {
       const day = new Date();
       day.setDate(day.getDate() - i);
-
       const label = day.toLocaleDateString(undefined, { weekday: "short" });
-
       const dayEntries = entries.filter((entry) => {
         const entryDate = new Date(entry.createdAt);
         return startOfDay(entryDate).getTime() === startOfDay(day).getTime();
       });
-
       const active = dayEntries.some((e) => e.status === "done");
       const cracked = !active && i < 2 && entries.length > 0;
-
       days.push({ label, active, cracked });
     }
-
     return days;
   }, [entries]);
 
@@ -226,6 +187,7 @@ export default function App() {
   }, [weeklyEntries]);
 
   function resetFlow() {
+    setMind("");
     setAvoiding("");
     setMove("");
     setCountdown(8);
@@ -235,7 +197,7 @@ export default function App() {
   }
 
   function beginCommit() {
-    if (!avoiding.trim() || !move.trim()) return;
+    if (!mind.trim() || !avoiding.trim() || !move.trim()) return;
     setCountdown(8);
     setScreen("commit");
   }
@@ -245,6 +207,7 @@ export default function App() {
       id: Date.now(),
       createdAt: new Date().toISOString(),
       weekKey: getWeekKey(new Date()),
+      mind: mind.trim(),
       avoiding: avoiding.trim(),
       move: move.trim(),
       status,
@@ -256,17 +219,12 @@ export default function App() {
   }
 
   async function shareMove() {
-    const text = `I committed to this move: ${move}. My streak is on the line. Check on me.`;
-
+    const text = `I said I would do this: ${move}. Check on me.`;
     try {
       if (navigator.share) {
-        await navigator.share({
-          title: "Reset accountability",
-          text,
-        });
+        await navigator.share({ title: "Reset", text });
         return;
       }
-
       await navigator.clipboard.writeText(text);
       setShareCopied(true);
       window.setTimeout(() => setShareCopied(false), 1800);
@@ -274,6 +232,8 @@ export default function App() {
       console.error("Share failed", error);
     }
   }
+
+  const resultCopy = latestEntry ? getResultCopy(latestEntry.status, latestEntry.id) : "";
 
   const styles: Record<string, CSSProperties> = {
     page: {
@@ -448,16 +408,16 @@ export default function App() {
     chips: {
       display: "flex",
       flexWrap: "wrap",
-      gap: 10,
-      marginBottom: 14,
+      gap: 8,
+      marginBottom: 12,
     },
     chip: {
-      padding: "12px 14px",
+      padding: "10px 12px",
       borderRadius: 999,
       border: "1px solid rgba(255,255,255,0.1)",
-      background: "rgba(255,255,255,0.06)",
+      background: "rgba(255,255,255,0.04)",
       color: "#f6ede4",
-      fontSize: 14,
+      fontSize: 13,
       fontWeight: 600,
       cursor: "pointer",
     },
@@ -640,12 +600,16 @@ export default function App() {
     },
   };
 
+  const today = new Date();
+
   return (
     <div style={styles.page}>
       <div style={styles.wrap}>
         <div style={styles.badgeRow}>
           <div style={styles.badge}>Reset</div>
-          <div style={styles.today}>{today.toLocaleDateString(undefined, { month: "short", day: "numeric" })}</div>
+          <div style={styles.today}>
+            {today.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+          </div>
         </div>
 
         <div style={styles.topCard}>
@@ -714,30 +678,77 @@ export default function App() {
         >
           {screen === "home" && (
             <>
-              <div style={styles.stepPill}>10 second reset</div>
-              <div style={styles.title}>Break the loop fast.</div>
-              <div style={styles.sub}>
-                Catch the drift. Pick one move. Start before your brain escapes.
-              </div>
+              <div style={styles.stepPill}>Reset</div>
+              <div style={styles.title}>You&apos;re here for a reason.</div>
+              <div style={styles.sub}>Empty your head. Then move.</div>
 
-              <button style={styles.cta} onClick={() => setScreen("avoid")}>
-                Reset now
+              <button style={styles.cta} onClick={() => setScreen("mind")}>
+                Start
               </button>
 
               <button style={styles.ctaMuted} onClick={() => setScreen("wrap")}>
-                View weekly wrap
+                Weekly wrap
+              </button>
+            </>
+          )}
+
+          {screen === "mind" && (
+            <>
+              <div style={styles.stepPill}>Step 1 / 3</div>
+              <div style={styles.title}>What&apos;s on your mind?</div>
+              <div style={styles.sub}>Say it as it is.</div>
+
+              <div style={styles.chips}>
+                {MIND_SUGGESTIONS.map((option) => (
+                  <button
+                    key={option}
+                    style={{
+                      ...styles.chip,
+                      ...(mind === option ? styles.chipActive : {}),
+                    }}
+                    onClick={() => setMind(option)}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+
+              <input
+                style={styles.input}
+                placeholder="Don’t filter it."
+                value={mind}
+                maxLength={120}
+                onChange={(e) => setMind(e.target.value)}
+              />
+
+              <div style={styles.helper}>Short. Clear.</div>
+
+              <button
+                style={{
+                  ...styles.cta,
+                  opacity: mind.trim() ? 1 : 0.42,
+                  cursor: mind.trim() ? "pointer" : "not-allowed",
+                }}
+                disabled={!mind.trim()}
+                onClick={() => setScreen("avoid")}
+              >
+                Continue
+              </button>
+
+              <button style={styles.ctaMuted} onClick={resetFlow}>
+                Cancel
               </button>
             </>
           )}
 
           {screen === "avoid" && (
             <>
-              <div style={styles.stepPill}>Step 1 / 2</div>
-              <div style={styles.title}>What are you avoiding?</div>
-              <div style={styles.sub}>Pick the nearest match or write it in one line.</div>
+              <div style={styles.stepPill}>Step 2 / 3</div>
+              <div style={styles.title}>What are you actually avoiding?</div>
+              <div style={styles.sub}>The real thing. Not the excuse.</div>
 
               <div style={styles.chips}>
-                {AVOIDING_OPTIONS.map((option) => (
+                {AVOIDING_SUGGESTIONS.map((option) => (
                   <button
                     key={option}
                     style={{
@@ -753,13 +764,13 @@ export default function App() {
 
               <input
                 style={styles.input}
-                placeholder="or write your own..."
+                placeholder="Be honest. Not smart."
                 value={avoiding}
-                maxLength={80}
+                maxLength={120}
                 onChange={(e) => setAvoiding(e.target.value)}
               />
 
-              <div style={styles.helper}>Keep it blunt. Honest beats smart.</div>
+              <div style={styles.helper}>No polishing.</div>
 
               <button
                 style={{
@@ -770,23 +781,23 @@ export default function App() {
                 disabled={!avoiding.trim()}
                 onClick={() => setScreen("move")}
               >
-                Next
+                Continue
               </button>
 
-              <button style={styles.ctaMuted} onClick={resetFlow}>
-                Cancel
+              <button style={styles.ctaMuted} onClick={() => setScreen("mind")}>
+                Back
               </button>
             </>
           )}
 
           {screen === "move" && (
             <>
-              <div style={styles.stepPill}>Step 2 / 2</div>
-              <div style={styles.title}>Pick one move.</div>
-              <div style={styles.sub}>Smallest visible action. Not a full plan.</div>
+              <div style={styles.stepPill}>Step 3 / 3</div>
+              <div style={styles.title}>What&apos;s the next move?</div>
+              <div style={styles.sub}>Not a plan. One action.</div>
 
               <div style={styles.chips}>
-                {MOVE_OPTIONS.map((option) => (
+                {MOVE_SUGGESTIONS.map((option) => (
                   <button
                     key={option}
                     style={{
@@ -802,13 +813,13 @@ export default function App() {
 
               <input
                 style={styles.input}
-                placeholder="or define your move..."
+                placeholder="Something small. Something real."
                 value={move}
-                maxLength={80}
+                maxLength={120}
                 onChange={(e) => setMove(e.target.value)}
               />
 
-              <div style={styles.helper}>Examples: “Send the reply.” “Open the draft.”</div>
+              <div style={styles.helper}>Visible. Immediate.</div>
 
               <button
                 style={{
@@ -840,9 +851,9 @@ export default function App() {
                 Commit
               </div>
 
-              <div style={styles.title}>Do this now.</div>
+              <div style={styles.title}>Do it.</div>
               <div style={{ ...styles.sub, color: "rgba(255,247,241,0.82)" }}>
-                Waiting on you.
+                No more thinking.
               </div>
 
               <div style={styles.moveBox}>
@@ -858,7 +869,7 @@ export default function App() {
               {countdown <= 0 && (
                 <div style={styles.statusRow}>
                   <button style={styles.statusPrimary} onClick={() => saveResult("done")}>
-                    Yes, I did it
+                    Yes
                   </button>
                   <button style={styles.statusSecondary} onClick={() => saveResult("not_yet")}>
                     Not yet
@@ -871,36 +882,32 @@ export default function App() {
           {screen === "result" && latestEntry && (
             <>
               <div style={styles.stepPill}>Result</div>
-              <div style={styles.title}>
-                {latestEntry.status === "done" ? "You broke the loop." : "You caught it."}
-              </div>
+              <div style={styles.title}>{resultCopy}</div>
               <div style={styles.sub}>
-                {latestEntry.status === "done"
-                  ? "Good. Momentum matters more than mood."
-                  : "Good. Seeing the pattern is still useful."}
+                {latestEntry.status === "done" ? "Keep it going." : "Try again. Smaller."}
               </div>
 
               <div style={styles.resultBox}>
-                <div style={styles.label}>Latest move</div>
+                <div style={styles.label}>Move</div>
                 <div style={styles.resultMove}>{latestEntry.move}</div>
                 <div style={styles.resultText}>
-                  Avoiding: {latestEntry.avoiding} · {formatFullDate(latestEntry.createdAt)}
+                  {latestEntry.avoiding} · {formatFullDate(latestEntry.createdAt)}
                 </div>
               </div>
 
               <div style={styles.shareBox}>
                 <div style={styles.shareTitle}>Accountability</div>
                 <div style={styles.shareText}>
-                  Share your move with one person. External commitment is stronger than self-talk.
+                  Send it to one person. Make it harder to disappear.
                 </div>
 
-                <button style={styles.ctaDark ? { ...styles.cta, ...styles.ctaDark } : styles.cta} onClick={shareMove}>
+                <button style={{ ...styles.cta, ...styles.ctaDark }} onClick={shareMove}>
                   {shareCopied ? "Copied" : "Share my move"}
                 </button>
               </div>
 
               <button style={styles.ctaMuted} onClick={resetFlow}>
-                New reset
+                Again
               </button>
             </>
           )}
@@ -908,17 +915,17 @@ export default function App() {
           {screen === "wrap" && (
             <>
               <div style={styles.stepPill}>Weekly wrap</div>
-              <div style={styles.title}>This week, in one glance.</div>
-              <div style={styles.sub}>Fast enough to check. Sharp enough to matter.</div>
+              <div style={styles.title}>Here&apos;s the week.</div>
+              <div style={styles.sub}>No story. Just the pattern.</div>
 
               <div style={styles.wrapGrid}>
                 <div style={styles.wrapStat}>
-                  <div style={styles.label}>Moves attempted</div>
+                  <div style={styles.label}>Tried</div>
                   <div style={styles.wrapStatBig}>{weeklyWrapData.attempted}</div>
                 </div>
 
                 <div style={styles.wrapStat}>
-                  <div style={styles.label}>Moves done</div>
+                  <div style={styles.label}>Done</div>
                   <div style={styles.wrapStatBig}>{weeklyWrapData.done}</div>
                 </div>
 
@@ -929,20 +936,22 @@ export default function App() {
 
                 <div style={styles.wrapStat}>
                   <div style={styles.label}>Most avoided</div>
-                  <div style={{ ...styles.wrapStatBig, fontSize: 18 }}>{weeklyWrapData.mostAvoided}</div>
+                  <div style={{ ...styles.wrapStatBig, fontSize: 18 }}>
+                    {weeklyWrapData.mostAvoided}
+                  </div>
                 </div>
               </div>
 
               <div style={styles.wrapInsight}>{weeklyWrapData.insight}</div>
 
               <button style={styles.cta} onClick={() => setScreen("home")}>
-                Back home
+                Back
               </button>
             </>
           )}
         </div>
 
-        <div style={styles.footer}>Reset is for people who drift, avoid, and still want to come back.</div>
+        <div style={styles.footer}>For when your head is full and you still need to move.</div>
       </div>
     </div>
   );
