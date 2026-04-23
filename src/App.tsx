@@ -1,4 +1,4 @@
-import React, { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 
 type Screen = "start" | "mind" | "avoid" | "move" | "commit" | "result" | "history";
 type EntryStatus = "done" | "not_yet";
@@ -18,7 +18,6 @@ const MIND_SUGGESTIONS = ["Too much in my head", "I feel off", "I keep circling 
 const AVOIDING_SUGGESTIONS = ["Starting", "A message", "A decision"];
 const MOVE_SUGGESTIONS = ["Send it", "Open it", "Start 2 min"];
 
-// Countdown shortened to 5 — enough to pause without losing the window
 const COMMIT_SECONDS = 5;
 
 function startOfDay(date: Date): Date {
@@ -42,6 +41,16 @@ function getResultLine(status: EntryStatus, seed: number): string {
   return source[seed % source.length];
 }
 
+function progressBarStyle(pct: number): CSSProperties {
+  return {
+    height: "100%",
+    background: "#23201D",
+    borderRadius: 999,
+    width: `${pct}%`,
+    transition: "width 0.4s ease",
+  };
+}
+
 export default function App() {
   const [screen, setScreen] = useState<Screen>("start");
   const [mind, setMind] = useState("");
@@ -53,7 +62,6 @@ export default function App() {
   const [shareCopied, setShareCopied] = useState(false);
   const [breathePhase, setBreathePhase] = useState<"in" | "out">("in");
 
-  // Auto-focus inputs on each step
   const mindRef = useRef<HTMLInputElement>(null);
   const avoidRef = useRef<HTMLInputElement>(null);
   const moveRef = useRef<HTMLInputElement>(null);
@@ -75,7 +83,6 @@ export default function App() {
     }
   }, [entries]);
 
-  // Auto-focus the active input when screen changes
   useEffect(() => {
     const timer = window.setTimeout(() => {
       if (screen === "mind") mindRef.current?.focus();
@@ -85,13 +92,11 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [screen]);
 
-  // Countdown + breathing phase toggle
   useEffect(() => {
     if (screen !== "commit" || countdown <= 0) return;
     const timer = window.setTimeout(() => {
       setCountdown((prev) => {
         const next = prev - 1;
-        // Toggle breathing phase every 2 ticks
         setBreathePhase((p) => (next % 2 === 0 ? (p === "in" ? "out" : "in") : p));
         return next;
       });
@@ -104,12 +109,8 @@ export default function App() {
     [entries, latestId]
   );
 
-  const doneCount = useMemo(
-    () => entries.filter((e) => e.status === "done").length,
-    [entries]
-  );
+  const doneCount = useMemo(() => entries.filter((e) => e.status === "done").length, [entries]);
 
-  // Streak: consecutive days with at least one "done" entry
   const streak = useMemo(() => {
     let s = 0;
     for (let i = 0; i < 30; i++) {
@@ -192,9 +193,7 @@ export default function App() {
   const resultCopy = latestEntry ? getResultLine(latestEntry.status, latestEntry.id) : "";
   const today = new Date();
 
-  // ─── Styles ──────────────────────────────────────────────────────────────────
-
-  const styles: Record<string, CSSProperties> = {
+  const styles = {
     page: {
       minHeight: "100vh",
       background: "#F5F1EA",
@@ -202,18 +201,18 @@ export default function App() {
       fontFamily: "Inter, system-ui, sans-serif",
       padding: "20px 14px 48px",
       boxSizing: "border-box",
-    },
+    } as CSSProperties,
     wrap: {
       maxWidth: 560,
       margin: "0 auto",
-    },
+    } as CSSProperties,
     topRow: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
       gap: 12,
       marginBottom: 14,
-    },
+    } as CSSProperties,
     badge: {
       display: "inline-block",
       border: "1px solid #DDD5CA",
@@ -224,13 +223,12 @@ export default function App() {
       fontSize: 11,
       letterSpacing: "0.22em",
       textTransform: "uppercase",
-    },
+    } as CSSProperties,
     date: {
       fontSize: 12,
       color: "#6F6861",
-    },
+    } as CSSProperties,
 
-    // ── Tracker ────────────────────────────────────────────────────────────────
     trackerCard: {
       background: "#FFFDF9",
       border: "1px solid #DDD5CA",
@@ -238,15 +236,15 @@ export default function App() {
       padding: 16,
       marginBottom: 14,
       boxShadow: "0 14px 40px rgba(35, 32, 29, 0.05)",
-    },
+    } as CSSProperties,
     trackerTop: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
       gap: 10,
       marginBottom: 12,
-      flexWrap: "wrap" as const,
-    },
+      flexWrap: "wrap",
+    } as CSSProperties,
     label: {
       fontSize: 11,
       letterSpacing: "0.12em",
@@ -254,11 +252,11 @@ export default function App() {
       color: "#6F6861",
       fontWeight: 700,
       marginBottom: 6,
-    },
+    } as CSSProperties,
     trackerText: {
       fontSize: 13,
       color: "#6F6861",
-    },
+    } as CSSProperties,
     streakPill: {
       display: "inline-block",
       background: "#23201D",
@@ -267,29 +265,28 @@ export default function App() {
       padding: "4px 10px",
       fontSize: 11,
       fontWeight: 700,
-    },
+    } as CSSProperties,
     trackerRow: {
       display: "grid",
       gridTemplateColumns: "repeat(7, 1fr)",
       gap: 8,
-    },
+    } as CSSProperties,
     trackerDay: {
       textAlign: "center",
       fontSize: 10,
       color: "#6F6861",
-    },
+    } as CSSProperties,
     dot: {
       width: 11,
       height: 11,
       borderRadius: 999,
       background: "#DDD5CA",
       margin: "0 auto 6px",
-    },
+    } as CSSProperties,
     dotActive: {
       background: "#23201D",
-    },
+    } as CSSProperties,
 
-    // ── Hero (start screen) ────────────────────────────────────────────────────
     heroCard: {
       position: "relative",
       minHeight: 580,
@@ -297,7 +294,7 @@ export default function App() {
       overflow: "hidden",
       backgroundColor: "#EDE7DE",
       backgroundImage:
-        "linear-gradient(rgba(245,241,234,0.45), rgba(245,241,234,0.75)), url('/garden.png')",
+        "linear-gradient(rgba(245,241,234,0.45), rgba(245,241,234,0.75)), url('/garden.jpg.png')",
       backgroundSize: "cover",
       backgroundPosition: "center",
       border: "1px solid #DDD5CA",
@@ -305,14 +302,14 @@ export default function App() {
       display: "flex",
       alignItems: "stretch",
       marginBottom: 10,
-    },
+    } as CSSProperties,
     heroOverlay: {
       width: "100%",
       padding: 28,
       display: "flex",
       flexDirection: "column",
       justifyContent: "space-between",
-    },
+    } as CSSProperties,
     heroTitle: {
       fontSize: "clamp(40px, 9vw, 58px)",
       lineHeight: 0.96,
@@ -322,16 +319,17 @@ export default function App() {
       maxWidth: 320,
       color: "#161413",
       marginBottom: 16,
-    },
+      whiteSpace: "pre-line",
+    } as CSSProperties,
     heroSub: {
       fontSize: 15,
       lineHeight: 1.55,
       color: "#2B2723",
       maxWidth: 240,
-    },
+    } as CSSProperties,
     heroBottom: {
       maxWidth: 320,
-    },
+    } as CSSProperties,
     startButton: {
       width: "100%",
       padding: "18px 20px",
@@ -344,43 +342,34 @@ export default function App() {
       fontFamily: 'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
       cursor: "pointer",
       marginBottom: 12,
-    },
+    } as CSSProperties,
     heroFoot: {
       fontSize: 13,
       color: "#2B2723",
       textAlign: "center",
-    },
+    } as CSSProperties,
 
-    // ── Step cards ─────────────────────────────────────────────────────────────
     card: {
       background: "#FFFDF9",
       border: "1px solid #DDD5CA",
       borderRadius: 28,
       padding: 24,
       boxShadow: "0 18px 50px rgba(35, 32, 29, 0.06)",
-    },
+    } as CSSProperties,
     commitCard: {
       background: "#12110F",
       color: "#F3ECE3",
       border: "1px solid #2A2724",
       boxShadow: "0 18px 50px rgba(18, 17, 15, 0.22)",
-    },
+    } as CSSProperties,
 
-    // Progress bar
     progressWrap: {
       height: 3,
       background: "#EDE7DE",
       borderRadius: 999,
       marginBottom: 20,
       overflow: "hidden",
-    },
-    progressBar: (pct: number): CSSProperties => ({
-      height: "100%",
-      background: "#23201D",
-      borderRadius: 999,
-      width: `${pct}%`,
-      transition: "width 0.4s ease",
-    }),
+    } as CSSProperties,
 
     stepPill: {
       display: "inline-block",
@@ -393,11 +382,11 @@ export default function App() {
       background: "#F1ECE4",
       color: "#6F6861",
       marginBottom: 14,
-    },
+    } as CSSProperties,
     stepPillDark: {
       background: "rgba(255,255,255,0.08)",
       color: "#A79E93",
-    },
+    } as CSSProperties,
     title: {
       fontSize: "clamp(28px, 6vw, 38px)",
       lineHeight: 0.98,
@@ -405,19 +394,18 @@ export default function App() {
       fontWeight: 500,
       fontFamily: 'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
       marginBottom: 8,
-    },
+    } as CSSProperties,
     sub: {
       fontSize: 14,
       color: "#6F6861",
       lineHeight: 1.55,
       marginBottom: 14,
       maxWidth: 420,
-    },
+    } as CSSProperties,
     subDark: {
       color: "#A79E93",
-    },
+    } as CSSProperties,
 
-    // Focus hint — contextual anchor for drifting attention
     focusHint: {
       fontSize: 12,
       color: "#6F6861",
@@ -427,19 +415,19 @@ export default function App() {
       padding: "8px 12px",
       marginBottom: 14,
       lineHeight: 1.5,
-    },
+    } as CSSProperties,
     focusHintDark: {
       background: "rgba(255,255,255,0.06)",
       border: "1px solid rgba(255,255,255,0.1)",
       color: "#A79E93",
-    },
+    } as CSSProperties,
 
     chips: {
       display: "flex",
-      flexWrap: "wrap" as const,
+      flexWrap: "wrap",
       gap: 7,
       marginBottom: 10,
-    },
+    } as CSSProperties,
     chip: {
       padding: "9px 13px",
       borderRadius: 999,
@@ -449,12 +437,12 @@ export default function App() {
       fontSize: 13,
       fontWeight: 600,
       cursor: "pointer",
-    },
+    } as CSSProperties,
     chipActive: {
       background: "#23201D",
       color: "#FFFDF9",
       border: "1px solid #23201D",
-    },
+    } as CSSProperties,
     input: {
       width: "100%",
       padding: "15px 0 11px",
@@ -464,33 +452,33 @@ export default function App() {
       color: "#161413",
       fontSize: 19,
       lineHeight: 1.4,
-      boxSizing: "border-box" as const,
+      boxSizing: "border-box",
       outline: "none",
       borderRadius: 0,
       fontFamily: "inherit",
-    },
+    } as CSSProperties,
     inputDark: {
       color: "#F3ECE3",
       borderBottom: "1.5px solid #3A3530",
-    },
+    } as CSSProperties,
     charCount: {
       fontSize: 11,
       color: "#B5ADA6",
-      textAlign: "right" as const,
-    },
+      textAlign: "right",
+    } as CSSProperties,
     helper: {
       fontSize: 12,
       color: "#736C64",
       marginTop: 6,
       marginBottom: 16,
-    },
+    } as CSSProperties,
     helperRow: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
       marginTop: 6,
       marginBottom: 16,
-    },
+    } as CSSProperties,
     cta: {
       width: "100%",
       padding: "15px 18px",
@@ -502,15 +490,15 @@ export default function App() {
       fontWeight: 800,
       cursor: "pointer",
       fontFamily: "inherit",
-    },
+    } as CSSProperties,
     ctaDark: {
       background: "#F3ECE3",
       color: "#12110F",
-    },
+    } as CSSProperties,
     ctaDisabled: {
       opacity: 0.38,
-      cursor: "not-allowed" as const,
-    },
+      cursor: "not-allowed",
+    } as CSSProperties,
     ctaMuted: {
       width: "100%",
       padding: "13px 18px",
@@ -523,40 +511,39 @@ export default function App() {
       cursor: "pointer",
       marginTop: 9,
       fontFamily: "inherit",
-    },
+    } as CSSProperties,
     ctaMutedDark: {
       border: "1px solid #2A2724",
       color: "#A79E93",
-    },
+    } as CSSProperties,
 
-    // ── Commit screen ──────────────────────────────────────────────────────────
     moveBox: {
       background: "rgba(255,255,255,0.06)",
       border: "1px solid rgba(255,255,255,0.08)",
       borderRadius: 20,
       padding: 18,
       marginBottom: 16,
-    },
+    } as CSSProperties,
     moveBig: {
       fontSize: 26,
       lineHeight: 1.15,
       fontWeight: 500,
       fontFamily: 'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
       letterSpacing: "-0.04em",
-    },
+    } as CSSProperties,
     breathingWrap: {
       display: "flex",
-      flexDirection: "column" as const,
+      flexDirection: "column",
       alignItems: "center",
       padding: "8px 0 20px",
-    },
+    } as CSSProperties,
     breatheLabel: {
       fontSize: 11,
       color: "#A79E93",
       letterSpacing: "0.12em",
       textTransform: "uppercase",
       marginBottom: 10,
-    },
+    } as CSSProperties,
     breathingRing: {
       width: 96,
       height: 96,
@@ -566,35 +553,35 @@ export default function App() {
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      position: "relative" as const,
+      position: "relative",
       marginBottom: 14,
-    },
+    } as CSSProperties,
     ringNum: {
       fontSize: 46,
       fontWeight: 900,
       letterSpacing: "-0.06em",
       lineHeight: 1,
-      position: "relative" as const,
+      position: "relative",
       zIndex: 1,
-    },
+    } as CSSProperties,
     countdownText: {
       fontSize: 14,
       fontWeight: 600,
       opacity: 0.85,
       letterSpacing: "0.04em",
-    },
+    } as CSSProperties,
     breatheGuide: {
       fontSize: 12,
       color: "#A79E93",
       marginTop: 6,
       letterSpacing: "0.02em",
-    },
+    } as CSSProperties,
     statusRow: {
       display: "flex",
       gap: 10,
-      flexWrap: "wrap" as const,
+      flexWrap: "wrap",
       marginTop: 8,
-    },
+    } as CSSProperties,
     statusPrimary: {
       flex: 1,
       minWidth: 130,
@@ -607,7 +594,7 @@ export default function App() {
       cursor: "pointer",
       fontFamily: "inherit",
       fontSize: 15,
-    },
+    } as CSSProperties,
     statusSecondary: {
       flex: 1,
       minWidth: 130,
@@ -620,9 +607,8 @@ export default function App() {
       cursor: "pointer",
       fontFamily: "inherit",
       fontSize: 15,
-    },
+    } as CSSProperties,
 
-    // ── Result screen ──────────────────────────────────────────────────────────
     resultBox: {
       background: "#F7F3EC",
       border: "1px solid #DDD5CA",
@@ -630,14 +616,14 @@ export default function App() {
       padding: 16,
       marginTop: 12,
       marginBottom: 14,
-    },
+    } as CSSProperties,
     resultBoxTop: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "flex-start",
       gap: 10,
       marginBottom: 10,
-    },
+    } as CSSProperties,
     resultMove: {
       fontSize: 21,
       lineHeight: 1.2,
@@ -645,12 +631,12 @@ export default function App() {
       fontFamily: 'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
       marginBottom: 8,
       letterSpacing: "-0.03em",
-    },
+    } as CSSProperties,
     resultMeta: {
       fontSize: 13,
       color: "#6F6861",
       lineHeight: 1.5,
-    },
+    } as CSSProperties,
     statusBadgeDone: {
       display: "inline-block",
       padding: "4px 10px",
@@ -659,7 +645,7 @@ export default function App() {
       fontWeight: 700,
       background: "#23201D",
       color: "#FFFDF9",
-    },
+    } as CSSProperties,
     statusBadgeNot: {
       display: "inline-block",
       padding: "4px 10px",
@@ -668,83 +654,80 @@ export default function App() {
       fontWeight: 700,
       background: "#ECE7DE",
       color: "#6F6861",
-    },
+    } as CSSProperties,
     shareBox: {
       marginTop: 12,
       padding: 14,
       borderRadius: 18,
       background: "#F7F3EC",
       border: "1px solid #DDD5CA",
-    },
+    } as CSSProperties,
     shareTitle: {
       fontSize: 13,
       fontWeight: 700,
       marginBottom: 5,
-    },
+    } as CSSProperties,
     shareText: {
       fontSize: 13,
       color: "#6F6861",
       lineHeight: 1.5,
       marginBottom: 11,
-    },
+    } as CSSProperties,
 
-    // ── History screen ─────────────────────────────────────────────────────────
     historyList: {
       display: "grid",
       gap: 10,
-    },
+    } as CSSProperties,
     historyCard: {
       padding: 14,
       borderRadius: 16,
       background: "#F7F3EC",
       border: "1px solid #DDD5CA",
-    },
+    } as CSSProperties,
     historyTop: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
       gap: 8,
       marginBottom: 9,
-      flexWrap: "wrap" as const,
-    },
+      flexWrap: "wrap",
+    } as CSSProperties,
     historyDate: {
       fontSize: 12,
       color: "#6F6861",
-    },
+    } as CSSProperties,
     historyLine: {
       fontSize: 13,
       lineHeight: 1.5,
       color: "#161413",
       marginBottom: 5,
-    },
+    } as CSSProperties,
     historyLineLabel: {
       fontWeight: 700,
       color: "#6F6861",
-    },
+    } as CSSProperties,
     emptyState: {
-      textAlign: "center" as const,
+      textAlign: "center",
       padding: "32px 16px",
       color: "#6F6861",
       fontSize: 14,
       lineHeight: 1.6,
-    },
+    } as CSSProperties,
 
     footer: {
       textAlign: "center",
       fontSize: 12,
       color: "#736C64",
       marginTop: 10,
-    },
+    } as CSSProperties,
   };
-
-  // ─── Render ───────────────────────────────────────────────────────────────────
 
   function renderStepCard(step: 1 | 2 | 3, content: React.ReactNode) {
     const pct = step === 1 ? 33 : step === 2 ? 66 : 100;
     return (
       <div style={styles.card}>
         <div style={styles.progressWrap}>
-          <div style={styles.progressBar(pct)} />
+          <div style={progressBarStyle(pct)} />
         </div>
         {content}
       </div>
@@ -754,7 +737,6 @@ export default function App() {
   return (
     <div style={styles.page}>
       <div style={styles.wrap}>
-        {/* Top row */}
         <div style={styles.topRow}>
           <div style={styles.badge}>Reset</div>
           <div style={styles.date}>
@@ -762,7 +744,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Tracker */}
         <div style={styles.trackerCard}>
           <div style={styles.trackerTop}>
             <div>
@@ -787,7 +768,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* ── Start ── */}
         {screen === "start" && (
           <>
             <div style={styles.heroCard}>
@@ -810,7 +790,6 @@ export default function App() {
           </>
         )}
 
-        {/* ── Step 1: Mind ── */}
         {screen === "mind" &&
           renderStepCard(
             1,
@@ -824,6 +803,7 @@ export default function App() {
                 {MIND_SUGGESTIONS.map((opt) => (
                   <button
                     key={opt}
+                    type="button"
                     style={{ ...styles.chip, ...(mind === opt ? styles.chipActive : {}) }}
                     onClick={() => setMind(opt)}
                   >
@@ -858,7 +838,6 @@ export default function App() {
             </>
           )}
 
-        {/* ── Step 2: Avoid ── */}
         {screen === "avoid" &&
           renderStepCard(
             2,
@@ -872,6 +851,7 @@ export default function App() {
                 {AVOIDING_SUGGESTIONS.map((opt) => (
                   <button
                     key={opt}
+                    type="button"
                     style={{ ...styles.chip, ...(avoiding === opt ? styles.chipActive : {}) }}
                     onClick={() => setAvoiding(opt)}
                   >
@@ -906,7 +886,6 @@ export default function App() {
             </>
           )}
 
-        {/* ── Step 3: Move ── */}
         {screen === "move" &&
           renderStepCard(
             3,
@@ -922,6 +901,7 @@ export default function App() {
                 {MOVE_SUGGESTIONS.map((opt) => (
                   <button
                     key={opt}
+                    type="button"
                     style={{ ...styles.chip, ...(move === opt ? styles.chipActive : {}) }}
                     onClick={() => setMove(opt)}
                   >
@@ -956,7 +936,6 @@ export default function App() {
             </>
           )}
 
-        {/* ── Commit (breathing + countdown) ── */}
         {screen === "commit" && (
           <div style={{ ...styles.card, ...styles.commitCard }}>
             <div style={{ ...styles.stepPill, ...styles.stepPillDark }}>
@@ -972,14 +951,11 @@ export default function App() {
               <div style={styles.moveBig}>{move}</div>
             </div>
 
-            {/* Breathing ring */}
             <div style={styles.breathingWrap}>
               <div style={styles.breatheLabel}>
                 {breathePhase === "in" ? "Breathe in" : "Breathe out"}
               </div>
               <div style={styles.breathingRing}>
-                {/* Pulse ring via CSS animation — inline keyframes not supported,
-                    so we use a simple border opacity trick instead */}
                 <div
                   style={{
                     position: "absolute",
@@ -1012,7 +988,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ── Result ── */}
         {screen === "result" && latestEntry && (
           <div style={styles.card}>
             <div style={styles.stepPill}>Result</div>
@@ -1059,7 +1034,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ── History ── */}
         {screen === "history" && (
           <div style={styles.card}>
             <div style={styles.stepPill}>History</div>
