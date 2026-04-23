@@ -1,876 +1,482 @@
-import React, { CSSProperties, useEffect, useMemo, useState } from "react";
+"use client";
 
-type Screen = "start" | "mind" | "avoid" | "move" | "commit" | "result" | "history";
-type EntryStatus = "done" | "not_yet";
+import { useMemo, useState } from "react";
 
-interface Entry {
-  id: number;
-  createdAt: string;
-  mind: string;
-  avoiding: string;
-  move: string;
-  status: EntryStatus;
-}
+const needOptions = [
+  {
+    value: "clarity",
+    label: "Clarity",
+  },
+  {
+    value: "flow",
+    label: "Flow",
+  },
+  {
+    value: "action",
+    label: "Action",
+  },
+  {
+    value: "space",
+    label: "Space",
+  },
+];
 
-const STORAGE_KEY = "reset_app_v8_entries";
+const blockerOptions = [
+  {
+    value: "overthinking",
+    label: "Overthinking",
+  },
+  {
+    value: "avoidance",
+    label: "Avoidance",
+  },
+  {
+    value: "fear",
+    label: "Fear",
+  },
+  {
+    value: "overload",
+    label: "Overload",
+  },
+];
 
-const MIND_SUGGESTIONS = ["Too much in my head", "I feel off", "I keep circling this"];
-const AVOIDING_SUGGESTIONS = ["Starting", "A message", "A decision"];
-const MOVE_SUGGESTIONS = ["Send it", "Open it", "Start 2 min"];
+function getReflection(name: string, need: string, blocker: string) {
+  const safeName = name.trim() || "You";
 
-function startOfDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function getResultLine(status: EntryStatus, seed: number): string {
-  const yes = ["Good.", "That counts.", "You moved.", "Keep going."];
-  const no = ["Then make it smaller.", "You're still avoiding.", "Cut it in half.", "Try again."];
-  const source = status === "done" ? yes : no;
-  return source[seed % source.length];
-}
-
-export default function App() {
-  const [screen, setScreen] = useState<Screen>("start");
-  const [mind, setMind] = useState("");
-  const [avoiding, setAvoiding] = useState("");
-  const [move, setMove] = useState("");
-  const [entries, setEntries] = useState<Entry[]>([]);
-  const [countdown, setCountdown] = useState(8);
-  const [latestId, setLatestId] = useState<number | null>(null);
-  const [shareCopied, setShareCopied] = useState(false);
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setEntries(JSON.parse(raw) as Entry[]);
-    } catch (error) {
-      console.error("Failed to load entries", error);
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-    } catch (error) {
-      console.error("Failed to save entries", error);
-    }
-  }, [entries]);
-
-  useEffect(() => {
-    if (screen !== "commit" || countdown <= 0) return;
-    const timer = window.setTimeout(() => setCountdown((prev) => prev - 1), 1000);
-    return () => window.clearTimeout(timer);
-  }, [screen, countdown]);
-
-  const latestEntry = useMemo(
-    () => entries.find((entry) => entry.id === latestId) ?? null,
-    [entries, latestId]
-  );
-
-  const doneCount = useMemo(
-    () => entries.filter((entry) => entry.status === "done").length,
-    [entries]
-  );
-
-  const trackerDays = useMemo(() => {
-    const days: { label: string; active: boolean }[] = [];
-    for (let i = 6; i >= 0; i -= 1) {
-      const day = new Date();
-      day.setDate(day.getDate() - i);
-      const label = day.toLocaleDateString(undefined, { weekday: "short" });
-      const active = entries.some((entry) => {
-        if (entry.status !== "done") return false;
-        return startOfDay(new Date(entry.createdAt)).getTime() === startOfDay(day).getTime();
-      });
-      days.push({ label, active });
-    }
-    return days;
-  }, [entries]);
-
-  function resetFlow() {
-    setMind("");
-    setAvoiding("");
-    setMove("");
-    setCountdown(8);
-    setLatestId(null);
-    setShareCopied(false);
-    setScreen("start");
-  }
-
-  function beginCommit() {
-    if (!mind.trim() || !avoiding.trim() || !move.trim()) return;
-    setCountdown(8);
-    setScreen("commit");
-  }
-
-  function saveResult(status: EntryStatus) {
-    const newEntry: Entry = {
-      id: Date.now(),
-      createdAt: new Date().toISOString(),
-      mind: mind.trim(),
-      avoiding: avoiding.trim(),
-      move: move.trim(),
-      status,
-    };
-
-    setEntries((prev) => [newEntry, ...prev].slice(0, 30));
-    setLatestId(newEntry.id);
-    setScreen("result");
-  }
-
-  async function shareMove() {
-    const text = `I said I would do this: ${move}. Check on me.`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: "Reset", text });
-        return;
-      }
-      await navigator.clipboard.writeText(text);
-      setShareCopied(true);
-      window.setTimeout(() => setShareCopied(false), 1800);
-    } catch (error) {
-      console.error("Share failed", error);
-    }
-  }
-
-  const resultCopy = latestEntry ? getResultLine(latestEntry.status, latestEntry.id) : "";
-
-  const styles: Record<string, CSSProperties> = {
-    page: {
-      minHeight: "100vh",
-      background: "#F5F1EA",
-      color: "#161413",
-      fontFamily: "Inter, system-ui, sans-serif",
-      padding: "20px 14px 40px",
-      boxSizing: "border-box",
+  const reflections: Record<string, Record<string, string>> = {
+    clarity: {
+      overthinking: `${safeName}, you do not need more input. You need to stop looping and choose.`,
+      avoidance: `${safeName}, clarity is not missing. You are delaying the truth you already see.`,
+      fear: `${safeName}, the decision is not unclear. The risk of acting is what feels heavy.`,
+      overload: `${safeName}, you are trying to solve too much at once. Clarity needs one thing, not everything.`,
     },
-    wrap: {
-      maxWidth: 560,
-      margin: "0 auto",
+    flow: {
+      overthinking: `${safeName}, flow is breaking because you keep interrupting yourself with too much analysis.`,
+      avoidance: `${safeName}, your rhythm is not broken by lack of ability. It is broken by resistance.`,
+      fear: `${safeName}, you are holding back your own movement because starting feels too exposed.`,
+      overload: `${safeName}, flow will not return by pushing harder. It returns when the friction is reduced.`,
     },
-    topRow: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      gap: 12,
-      marginBottom: 14,
+    action: {
+      overthinking: `${safeName}, action is not blocked by strategy. It is blocked by hesitation.`,
+      avoidance: `${safeName}, you already know the move. You just keep stepping around it.`,
+      fear: `${safeName}, the next step is clear enough. What is stopping you is the cost of being seen trying.`,
+      overload: `${safeName}, action will not come from pressure. It will come from making the next move smaller.`,
     },
-    badge: {
-      display: "inline-block",
-      border: "1px solid #DDD5CA",
-      background: "#FFFDF9",
-      color: "#6F6861",
-      borderRadius: 999,
-      padding: "7px 11px",
-      fontSize: 11,
-      letterSpacing: "0.22em",
-      textTransform: "uppercase",
-    },
-    date: {
-      fontSize: 12,
-      color: "#6F6861",
-    },
-    trackerCard: {
-      background: "#FFFDF9",
-      border: "1px solid #DDD5CA",
-      borderRadius: 22,
-      padding: 16,
-      marginBottom: 14,
-      boxShadow: "0 14px 40px rgba(35, 32, 29, 0.05)",
-    },
-    trackerTop: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      gap: 10,
-      marginBottom: 12,
-      flexWrap: "wrap",
-    },
-    label: {
-      fontSize: 11,
-      letterSpacing: "0.12em",
-      textTransform: "uppercase",
-      color: "#6F6861",
-      fontWeight: 700,
-      marginBottom: 6,
-    },
-    trackerText: {
-      fontSize: 13,
-      color: "#6F6861",
-    },
-    trackerRow: {
-      display: "grid",
-      gridTemplateColumns: "repeat(7, 1fr)",
-      gap: 8,
-    },
-    trackerDay: {
-      textAlign: "center",
-      fontSize: 11,
-      color: "#6F6861",
-    },
-    dot: {
-      width: 12,
-      height: 12,
-      borderRadius: 999,
-      background: "#DDD5CA",
-      margin: "0 auto 7px",
-    },
-    dotActive: {
-      background: "#23201D",
-    },
-    heroCard: {
-      position: "relative",
-      minHeight: 620,
-      borderRadius: 28,
-      overflow: "hidden",
-      backgroundColor: "#EDE7DE",
-      backgroundImage:
-        "linear-gradient(rgba(245,241,234,0.45), rgba(245,241,234,0.75)), url('/garden.png')",
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-      border: "1px solid #DDD5CA",
-      boxShadow: "0 18px 50px rgba(35, 32, 29, 0.06)",
-      display: "flex",
-      alignItems: "stretch",
-    },
-    heroOverlay: {
-      width: "100%",
-      padding: 28,
-      display: "flex",
-      flexDirection: "column",
-      justifyContent: "space-between",
-    },
-    heroTop: {},
-    heroTitle: {
-      fontSize: "clamp(44px, 10vw, 64px)",
-      lineHeight: 0.95,
-      letterSpacing: "-0.06em",
-      fontWeight: 500,
-      fontFamily:
-        'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
-      maxWidth: 340,
-      color: "#161413",
-      marginBottom: 18,
-    },
-    heroSub: {
-      fontSize: 16,
-      lineHeight: 1.55,
-      color: "#2B2723",
-      maxWidth: 260,
-    },
-    heroBottom: {
-      maxWidth: 320,
-    },
-    startButton: {
-      width: "100%",
-      padding: "18px 20px",
-      borderRadius: 999,
-      border: "none",
-      background: "#161413",
-      color: "#FFFDF9",
-      fontSize: 18,
-      fontWeight: 500,
-      fontFamily:
-        'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
-      cursor: "pointer",
-      marginBottom: 12,
-    },
-    heroFoot: {
-      fontSize: 13,
-      color: "#2B2723",
-      textAlign: "center",
-    },
-    card: {
-      background: "#FFFDF9",
-      border: "1px solid #DDD5CA",
-      borderRadius: 28,
-      padding: 22,
-      boxShadow: "0 18px 50px rgba(35, 32, 29, 0.06)",
-    },
-    commitCard: {
-      background: "#12110F",
-      color: "#F3ECE3",
-      border: "1px solid #2A2724",
-      boxShadow: "0 18px 50px rgba(18, 17, 15, 0.22)",
-    },
-    stepPill: {
-      display: "inline-block",
-      padding: "8px 11px",
-      borderRadius: 999,
-      fontSize: 12,
-      fontWeight: 700,
-      letterSpacing: "0.1em",
-      textTransform: "uppercase",
-      background: "#F1ECE4",
-      color: "#6F6861",
-      marginBottom: 14,
-    },
-    stepPillDark: {
-      background: "rgba(255,255,255,0.08)",
-      color: "#A79E93",
-    },
-    title: {
-      fontSize: "clamp(30px, 7vw, 42px)",
-      lineHeight: 0.98,
-      letterSpacing: "-0.05em",
-      fontWeight: 500,
-      fontFamily:
-        'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
-      marginBottom: 10,
-    },
-    sub: {
-      fontSize: 15,
-      color: "#6F6861",
-      lineHeight: 1.55,
-      marginBottom: 18,
-      maxWidth: 420,
-    },
-    subDark: {
-      color: "#A79E93",
-    },
-    chips: {
-      display: "flex",
-      flexWrap: "wrap",
-      gap: 8,
-      marginBottom: 12,
-    },
-    chip: {
-      padding: "10px 12px",
-      borderRadius: 999,
-      border: "1px solid #DDD5CA",
-      background: "#F7F3EC",
-      color: "#23201D",
-      fontSize: 13,
-      fontWeight: 600,
-      cursor: "pointer",
-    },
-    chipActive: {
-      background: "#23201D",
-      color: "#FFFDF9",
-      border: "1px solid #23201D",
-    },
-    input: {
-      width: "100%",
-      padding: "16px 0 12px",
-      border: "none",
-      borderBottom: "1px solid #CFC5B7",
-      background: "transparent",
-      color: "#161413",
-      fontSize: 20,
-      lineHeight: 1.4,
-      boxSizing: "border-box",
-      outline: "none",
-      borderRadius: 0,
-    },
-    helper: {
-      fontSize: 12,
-      color: "#736C64",
-      marginTop: 10,
-      marginBottom: 18,
-    },
-    helperDark: {
-      color: "#A79E93",
-    },
-    cta: {
-      width: "100%",
-      padding: "15px 18px",
-      borderRadius: 18,
-      border: "none",
-      background: "#23201D",
-      color: "#FFFDF9",
-      fontSize: 15,
-      fontWeight: 800,
-      cursor: "pointer",
-    },
-    ctaDark: {
-      background: "#F3ECE3",
-      color: "#12110F",
-    },
-    ctaMuted: {
-      width: "100%",
-      padding: "14px 18px",
-      borderRadius: 16,
-      border: "1px solid #DDD5CA",
-      background: "transparent",
-      color: "#6F6861",
-      fontSize: 14,
-      fontWeight: 700,
-      cursor: "pointer",
-      marginTop: 10,
-    },
-    ctaMutedDark: {
-      border: "1px solid #2A2724",
-      color: "#A79E93",
-    },
-    moveBox: {
-      background: "rgba(255,255,255,0.06)",
-      border: "1px solid rgba(255,255,255,0.08)",
-      borderRadius: 20,
-      padding: 16,
-      marginBottom: 18,
-    },
-    moveBig: {
-      fontSize: 24,
-      lineHeight: 1.18,
-      fontWeight: 500,
-      fontFamily:
-        'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
-      letterSpacing: "-0.04em",
-    },
-    countdownWrap: {
-      display: "grid",
-      placeItems: "center",
-      padding: "10px 0 18px",
-    },
-    countdown: {
-      fontSize: "clamp(70px, 18vw, 110px)",
-      lineHeight: 1,
-      fontWeight: 900,
-      letterSpacing: "-0.08em",
-    },
-    countdownText: {
-      marginTop: 8,
-      fontSize: 15,
-      fontWeight: 600,
-      opacity: 0.88,
-    },
-    statusRow: {
-      display: "flex",
-      gap: 10,
-      flexWrap: "wrap",
-      marginTop: 8,
-    },
-    statusPrimary: {
-      flex: 1,
-      minWidth: 140,
-      padding: "14px 16px",
-      borderRadius: 16,
-      border: "none",
-      background: "#F3ECE3",
-      color: "#12110F",
-      fontWeight: 800,
-      cursor: "pointer",
-    },
-    statusSecondary: {
-      flex: 1,
-      minWidth: 140,
-      padding: "14px 16px",
-      borderRadius: 16,
-      border: "1px solid #2A2724",
-      background: "transparent",
-      color: "#F3ECE3",
-      fontWeight: 800,
-      cursor: "pointer",
-    },
-    resultBox: {
-      background: "#F7F3EC",
-      border: "1px solid #DDD5CA",
-      borderRadius: 20,
-      padding: 16,
-      marginTop: 10,
-      marginBottom: 16,
-    },
-    resultMove: {
-      fontSize: 22,
-      lineHeight: 1.2,
-      fontWeight: 500,
-      fontFamily:
-        'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
-      marginBottom: 8,
-      letterSpacing: "-0.03em",
-    },
-    resultText: {
-      fontSize: 14,
-      color: "#6F6861",
-      lineHeight: 1.55,
-    },
-    shareBox: {
-      marginTop: 14,
-      padding: 14,
-      borderRadius: 18,
-      background: "#F7F3EC",
-      border: "1px solid #DDD5CA",
-    },
-    shareTitle: {
-      fontSize: 13,
-      fontWeight: 700,
-      marginBottom: 6,
-    },
-    shareText: {
-      fontSize: 13,
-      color: "#6F6861",
-      lineHeight: 1.5,
-      marginBottom: 12,
-    },
-    historyList: {
-      display: "grid",
-      gap: 10,
-    },
-    historyCard: {
-      padding: 14,
-      borderRadius: 18,
-      background: "#F7F3EC",
-      border: "1px solid #DDD5CA",
-    },
-    historyTop: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      gap: 10,
-      marginBottom: 10,
-      flexWrap: "wrap",
-    },
-    historyDate: {
-      fontSize: 12,
-      color: "#6F6861",
-    },
-    statusTag: {
-      display: "inline-block",
-      padding: "6px 10px",
-      borderRadius: 999,
-      fontSize: 11,
-      fontWeight: 700,
-      background: "#ECE7DE",
-      color: "#2B2723",
-    },
-    historyText: {
-      fontSize: 14,
-      lineHeight: 1.5,
-      color: "#161413",
-      marginBottom: 8,
-    },
-    footer: {
-      textAlign: "center",
-      fontSize: 12,
-      color: "#736C64",
-      marginTop: 12,
+    space: {
+      overthinking: `${safeName}, your mind is crowded. Space is not a reward. It is the requirement.`,
+      avoidance: `${safeName}, you keep filling the day so you do not have to hear what is actually there.`,
+      fear: `${safeName}, creating space feels dangerous because silence makes the real issue harder to ignore.`,
+      overload: `${safeName}, you do not need more discipline right now. You need room to think clearly again.`,
     },
   };
 
-  const today = new Date();
+  return (
+    reflections[need]?.[blocker] ||
+    `${safeName}, something needs to become simpler before you can move cleanly.`
+  );
+}
+
+function getNextStep(need: string, blocker: string) {
+  const steps: Record<string, Record<string, string>> = {
+    clarity: {
+      overthinking: "Write down the two real options and choose one before the day ends.",
+      avoidance: "Name the decision you have been postponing in one sentence.",
+      fear: "Decide what you would choose if fear was not allowed to vote first.",
+      overload: "Cut the problem down to the one decision that matters most today.",
+    },
+    flow: {
+      overthinking: "Remove one unnecessary step from the task you keep stalling on.",
+      avoidance: "Start the task before you feel ready and stay with it for five minutes.",
+      fear: "Do the first visible part, not the perfect part.",
+      overload: "Choose one task only and protect 15 minutes for it.",
+    },
+    action: {
+      overthinking: "Do the first small move now, before you evaluate it again.",
+      avoidance: "Touch the task you have been circling today, even briefly.",
+      fear: "Take the move that creates evidence, not comfort.",
+      overload: "Shrink the next step until it feels almost too easy to avoid.",
+    },
+    space: {
+      overthinking: "Take ten quiet minutes with no input and write what is actually bothering you.",
+      avoidance: "Stop one numbing habit for the next hour and sit with what comes up.",
+      fear: "Give yourself one uninterrupted pause without trying to earn it.",
+      overload: "Cancel, delay, or drop one thing that is making your thinking noisy.",
+    },
+  };
 
   return (
-    <div style={styles.page}>
-      <div style={styles.wrap}>
-        <div style={styles.topRow}>
-          <div style={styles.badge}>Reset</div>
-          <div style={styles.date}>
-            {today.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+    steps[need]?.[blocker] ||
+    "Choose one cleaner move and do it before you ask yourself how you feel about it."
+  );
+}
+
+export default function ResetPage() {
+  const [name, setName] = useState("");
+  const [need, setNeed] = useState("");
+  const [blocker, setBlocker] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+
+  const reflection = useMemo(
+    () => getReflection(name, need, blocker),
+    [name, need, blocker]
+  );
+
+  const nextStep = useMemo(
+    () => getNextStep(need, blocker),
+    [need, blocker]
+  );
+
+  const canSubmit = name.trim() && need && blocker;
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setSubmitted(true);
+  }
+
+  function handleReset() {
+    setSubmitted(false);
+  }
+
+  return (
+    <main className="min-h-screen bg-[#0B0B0F] text-white">
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_35%),linear-gradient(to_bottom,#0b0b0f,#101117)]" />
+        <div className="relative mx-auto max-w-6xl px-6 py-20 md:px-10 md:py-28">
+          <div className="grid items-start gap-10 lg:grid-cols-[1.05fr_0.95fr]">
+            <div className="max-w-3xl">
+              <p className="text-sm uppercase tracking-[0.25em] text-white/45">
+                Reset
+              </p>
+
+              <h1 className="mt-4 text-4xl font-semibold tracking-tight text-white md:text-6xl">
+                Clarity • Flow • Action
+              </h1>
+
+              <p className="mt-4 text-lg text-white/70 md:text-xl">
+                Structured self-reset
+              </p>
+
+              <p className="mt-8 max-w-2xl text-lg leading-8 text-white/82 md:text-xl">
+                You do not need more motivation. You need a cleaner decision.
+              </p>
+
+              <p className="mt-5 max-w-2xl text-base leading-8 text-white/60 md:text-lg">
+                Reset is a guided reflection tool that helps you stop spiraling,
+                name what you really need, and leave with one clear next move.
+              </p>
+
+              <div className="mt-10 flex flex-col gap-4 sm:flex-row">
+                <a
+                  href="#personal-reset"
+                  className="rounded-2xl bg-white px-6 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                >
+                  Get one clear next step
+                </a>
+                <a
+                  href="#how-it-works"
+                  className="rounded-2xl border border-white/12 px-6 py-3 text-sm font-medium text-white transition hover:bg-white/5"
+                >
+                  See how it works
+                </a>
+              </div>
+            </div>
+
+            <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 backdrop-blur-md shadow-[0_12px_50px_rgba(0,0,0,0.25)]">
+              <p className="text-xs uppercase tracking-[0.2em] text-white/40">
+                Live preview
+              </p>
+
+              <div className="mt-4 rounded-[24px] border border-white/10 bg-black/20 p-5">
+                <p className="text-sm text-white/40">Sample reflection</p>
+                <p className="mt-3 text-xl leading-8 text-white">
+                  Omnia, clarity is not missing. You are delaying the truth you
+                  already see.
+                </p>
+              </div>
+
+              <div className="mt-4 rounded-[24px] border border-white/10 bg-black/20 p-5">
+                <p className="text-sm text-white/40">Next step</p>
+                <p className="mt-3 text-base leading-7 text-white/75">
+                  Name the decision you have been postponing in one sentence.
+                </p>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/55">
+                  2 prompts
+                </span>
+                <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/55">
+                  1 reflection
+                </span>
+                <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/55">
+                  1 next move
+                </span>
+              </div>
+            </div>
           </div>
         </div>
+      </section>
 
-        <div style={styles.trackerCard}>
-          <div style={styles.trackerTop}>
-            <div>
-              <div style={styles.label}>Momentum</div>
-              <div style={styles.trackerText}>{doneCount} times you actually moved.</div>
-            </div>
-            <div style={styles.trackerText}>Last 7 days</div>
+      <section
+        id="personal-reset"
+        className="mx-auto max-w-6xl px-6 py-6 md:px-10 md:py-10"
+      >
+        <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
+          <div className="rounded-[32px] border border-white/10 bg-white/5 p-8 backdrop-blur-md">
+            <p className="text-sm uppercase tracking-[0.22em] text-white/42">
+              Make it personal
+            </p>
+
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white md:text-4xl">
+              Not a long intake. Just enough to make it hit.
+            </h2>
+
+            <p className="mt-5 text-base leading-8 text-white/66">
+              The first interaction should feel direct, not invasive. Ask for
+              the name. Ask for one need. Ask what is in the way. Then reflect
+              something honest back.
+            </p>
           </div>
 
-          <div style={styles.trackerRow}>
-            {trackerDays.map((day, idx) => (
-              <div key={`${day.label}-${idx}`} style={styles.trackerDay}>
-                <div
-                  style={{
-                    ...styles.dot,
-                    ...(day.active ? styles.dotActive : {}),
-                  }}
-                />
-                {day.label}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {screen === "start" ? (
-          <div style={styles.heroCard}>
-            <div style={styles.heroOverlay}>
-              <div style={styles.heroTop}>
-                <div style={styles.heroTitle}>Empty your head. Take action.</div>
-                <div style={styles.heroSub}>Clarity comes when you stop running.</div>
-              </div>
-
-              <div style={styles.heroBottom}>
-                <button style={styles.startButton} onClick={() => setScreen("mind")}>
-                  Start
-                </button>
-                <div style={styles.heroFoot}>This is for you, not for anyone.</div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div
-            style={{
-              ...styles.card,
-              ...(screen === "commit" ? styles.commitCard : {}),
-            }}
-          >
-            {screen === "mind" && (
+          <div className="rounded-[32px] border border-white/10 bg-white/5 p-8 backdrop-blur-md shadow-[0_12px_50px_rgba(0,0,0,0.25)]">
+            {!submitted ? (
               <>
-                <div style={styles.stepPill}>Step 1 / 3</div>
-                <div style={styles.title}>What&apos;s on your mind?</div>
-                <div style={styles.sub}>Say it as it is.</div>
+                <p className="text-sm uppercase tracking-[0.22em] text-white/42">
+                  Personal reset
+                </p>
 
-                <div style={styles.chips}>
-                  {MIND_SUGGESTIONS.map((option) => (
-                    <button
-                      key={option}
-                      style={{
-                        ...styles.chip,
-                        ...(mind === option ? styles.chipActive : {}),
-                      }}
-                      onClick={() => setMind(option)}
+                <h3 className="mt-4 text-3xl font-semibold tracking-tight text-white">
+                  Three quick inputs. One honest reflection.
+                </h3>
+
+                <p className="mt-3 text-base leading-8 text-white/62">
+                  Enough to make the experience feel personal. Not enough to make
+                  it heavy.
+                </p>
+
+                <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+                  <div>
+                    <label
+                      htmlFor="name"
+                      className="mb-2 block text-sm font-medium text-white/82"
                     >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-
-                <input
-                  style={styles.input}
-                  placeholder="Don’t filter it."
-                  value={mind}
-                  maxLength={120}
-                  onChange={(e) => setMind(e.target.value)}
-                />
-
-                <div style={styles.helper}>Short. Clear.</div>
-
-                <button
-                  style={{
-                    ...styles.cta,
-                    opacity: mind.trim() ? 1 : 0.42,
-                    cursor: mind.trim() ? "pointer" : "not-allowed",
-                  }}
-                  disabled={!mind.trim()}
-                  onClick={() => setScreen("avoid")}
-                >
-                  Continue
-                </button>
-
-                <button style={styles.ctaMuted} onClick={resetFlow}>
-                  Cancel
-                </button>
-              </>
-            )}
-
-            {screen === "avoid" && (
-              <>
-                <div style={styles.stepPill}>Step 2 / 3</div>
-                <div style={styles.title}>What are you actually avoiding?</div>
-                <div style={styles.sub}>The real thing. Not the excuse.</div>
-
-                <div style={styles.chips}>
-                  {AVOIDING_SUGGESTIONS.map((option) => (
-                    <button
-                      key={option}
-                      style={{
-                        ...styles.chip,
-                        ...(avoiding === option ? styles.chipActive : {}),
-                      }}
-                      onClick={() => setAvoiding(option)}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-
-                <input
-                  style={styles.input}
-                  placeholder="Be honest. Not smart."
-                  value={avoiding}
-                  maxLength={120}
-                  onChange={(e) => setAvoiding(e.target.value)}
-                />
-
-                <div style={styles.helper}>No polishing.</div>
-
-                <button
-                  style={{
-                    ...styles.cta,
-                    opacity: avoiding.trim() ? 1 : 0.42,
-                    cursor: avoiding.trim() ? "pointer" : "not-allowed",
-                  }}
-                  disabled={!avoiding.trim()}
-                  onClick={() => setScreen("move")}
-                >
-                  Continue
-                </button>
-
-                <button style={styles.ctaMuted} onClick={() => setScreen("mind")}>
-                  Back
-                </button>
-              </>
-            )}
-
-            {screen === "move" && (
-              <>
-                <div style={styles.stepPill}>Step 3 / 3</div>
-                <div style={styles.title}>What&apos;s the next move?</div>
-                <div style={styles.sub}>Not a plan. One action.</div>
-
-                <div style={styles.chips}>
-                  {MOVE_SUGGESTIONS.map((option) => (
-                    <button
-                      key={option}
-                      style={{
-                        ...styles.chip,
-                        ...(move === option ? styles.chipActive : {}),
-                      }}
-                      onClick={() => setMove(option)}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-
-                <input
-                  style={styles.input}
-                  placeholder="Something small. Something real."
-                  value={move}
-                  maxLength={120}
-                  onChange={(e) => setMove(e.target.value)}
-                />
-
-                <div style={styles.helper}>Visible. Immediate.</div>
-
-                <button
-                  style={{
-                    ...styles.cta,
-                    opacity: move.trim() ? 1 : 0.42,
-                    cursor: move.trim() ? "pointer" : "not-allowed",
-                  }}
-                  disabled={!move.trim()}
-                  onClick={beginCommit}
-                >
-                  Commit
-                </button>
-
-                <button style={styles.ctaMuted} onClick={() => setScreen("avoid")}>
-                  Back
-                </button>
-              </>
-            )}
-
-            {screen === "commit" && (
-              <>
-                <div style={{ ...styles.stepPill, ...styles.stepPillDark }}>Commit</div>
-                <div style={styles.title}>Do it.</div>
-                <div style={{ ...styles.sub, ...styles.subDark }}>No more thinking.</div>
-
-                <div style={styles.moveBox}>
-                  <div style={{ ...styles.label, color: "#A79E93" }}>Your move</div>
-                  <div style={styles.moveBig}>{move}</div>
-                </div>
-
-                <div style={styles.countdownWrap}>
-                  <div style={styles.countdown}>{countdown}</div>
-                  <div style={styles.countdownText}>Just start.</div>
-                </div>
-
-                {countdown <= 0 && (
-                  <div style={styles.statusRow}>
-                    <button style={styles.statusPrimary} onClick={() => saveResult("done")}>
-                      Yes
-                    </button>
-                    <button style={styles.statusSecondary} onClick={() => saveResult("not_yet")}>
-                      Not yet
-                    </button>
+                      Your name
+                    </label>
+                    <input
+                      id="name"
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Enter your name"
+                      className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white placeholder:text-white/25 outline-none transition focus:border-white/30"
+                    />
                   </div>
-                )}
-              </>
-            )}
 
-            {screen === "result" && latestEntry && (
-              <>
-                <div style={styles.stepPill}>Result</div>
-                <div style={styles.title}>{resultCopy}</div>
-                <div style={styles.sub}>
-                  {latestEntry.status === "done" ? "Keep it going." : "Try again. Smaller."}
-                </div>
-
-                <div style={styles.resultBox}>
-                  <div style={styles.label}>Move</div>
-                  <div style={styles.resultMove}>{latestEntry.move}</div>
-                  <div style={styles.resultText}>
-                    {latestEntry.avoiding} · {formatDate(latestEntry.createdAt)}
+                  <div>
+                    <label
+                      htmlFor="need"
+                      className="mb-2 block text-sm font-medium text-white/82"
+                    >
+                      What do you need most right now?
+                    </label>
+                    <select
+                      id="need"
+                      value={need}
+                      onChange={(e) => setNeed(e.target.value)}
+                      className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none transition focus:border-white/30"
+                    >
+                      <option value="" className="text-black">
+                        Select one
+                      </option>
+                      {needOptions.map((option) => (
+                        <option
+                          key={option.value}
+                          value={option.value}
+                          className="text-black"
+                        >
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                </div>
 
-                <div style={styles.shareBox}>
-                  <div style={styles.shareTitle}>Accountability</div>
-                  <div style={styles.shareText}>Send it to one person. Make it harder to disappear.</div>
-                  <button style={styles.cta} onClick={shareMove}>
-                    {shareCopied ? "Copied" : "Share my move"}
+                  <div>
+                    <label
+                      htmlFor="blocker"
+                      className="mb-2 block text-sm font-medium text-white/82"
+                    >
+                      What is most in the way?
+                    </label>
+                    <select
+                      id="blocker"
+                      value={blocker}
+                      onChange={(e) => setBlocker(e.target.value)}
+                      className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none transition focus:border-white/30"
+                    >
+                      <option value="" className="text-black">
+                        Select one
+                      </option>
+                      {blockerOptions.map((option) => (
+                        <option
+                          key={option.value}
+                          value={option.value}
+                          className="text-black"
+                        >
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={!canSubmit}
+                    className="w-full rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
+                  >
+                    See your reflection
                   </button>
-                </div>
-
-                <button style={styles.ctaMuted} onClick={() => setScreen("history")}>
-                  View history
-                </button>
-
-                <button style={styles.ctaMuted} onClick={resetFlow}>
-                  Again
-                </button>
+                </form>
               </>
-            )}
-
-            {screen === "history" && (
+            ) : (
               <>
-                <div style={styles.stepPill}>History</div>
-                <div style={styles.title}>Here&apos;s what happened.</div>
-                <div style={styles.sub}>No story. Just the pattern.</div>
+                <p className="text-sm uppercase tracking-[0.22em] text-white/42">
+                  Your reflection
+                </p>
 
-                <div style={styles.historyList}>
-                  {entries.length === 0 ? (
-                    <div style={styles.historyCard}>
-                      <div style={styles.historyText}>Nothing yet.</div>
-                    </div>
-                  ) : (
-                    entries.map((entry) => (
-                      <div key={entry.id} style={styles.historyCard}>
-                        <div style={styles.historyTop}>
-                          <div style={styles.historyDate}>{formatDate(entry.createdAt)}</div>
-                          <div style={styles.statusTag}>
-                            {entry.status === "done" ? "Done" : "Not yet"}
-                          </div>
-                        </div>
+                <h3 className="mt-4 text-3xl font-semibold tracking-tight text-white leading-tight">
+                  {reflection}
+                </h3>
 
-                        <div style={styles.historyText}>
-                          <strong>Mind:</strong> {entry.mind}
-                        </div>
-                        <div style={styles.historyText}>
-                          <strong>Avoiding:</strong> {entry.avoiding}
-                        </div>
-                        <div style={{ ...styles.historyText, marginBottom: 0 }}>
-                          <strong>Move:</strong> {entry.move}
-                        </div>
-                      </div>
-                    ))
-                  )}
+                <div className="mt-8 rounded-2xl border border-white/10 bg-black/20 p-5">
+                  <p className="text-sm uppercase tracking-[0.18em] text-white/40">
+                    Next move
+                  </p>
+                  <p className="mt-3 text-base leading-8 text-white/72">
+                    {nextStep}
+                  </p>
                 </div>
 
-                <button style={styles.ctaMuted} onClick={resetFlow}>
-                  Back home
-                </button>
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                  <button
+                    onClick={handleReset}
+                    className="rounded-2xl border border-white/12 px-5 py-3 text-sm font-medium text-white transition hover:bg-white/5"
+                  >
+                    Edit answers
+                  </button>
+
+                  <a
+                    href="#how-it-works"
+                    className="rounded-2xl bg-white px-5 py-3 text-center text-sm font-medium text-black transition hover:opacity-90"
+                  >
+                    See how Reset works
+                  </a>
+                </div>
               </>
             )}
           </div>
-        )}
+        </div>
+      </section>
 
-        <div style={styles.footer}>For when your head is full and you still need to move.</div>
-      </div>
-    </div>
+      <section className="mx-auto max-w-6xl px-6 py-8 md:px-10 md:py-14">
+        <div className="grid items-center gap-8 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="overflow-hidden rounded-[32px] border border-white/10 bg-white/5">
+            <img
+              src="/garden.jpg"
+              alt="Person sitting on a bench in a garden"
+              className="h-full w-full object-cover"
+            />
+          </div>
+
+          <div className="rounded-[32px] border border-white/10 bg-white/5 p-8 backdrop-blur-md">
+            <p className="text-sm uppercase tracking-[0.22em] text-white/42">
+              Reflection
+            </p>
+
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white md:text-4xl">
+              Clarity is rarely missing. Most of the time, it is avoided.
+            </h2>
+
+            <div className="mt-8 rounded-2xl border border-white/10 bg-black/20 p-5">
+              <p className="text-sm uppercase tracking-[0.18em] text-white/40">
+                Daily signal
+              </p>
+              <p className="mt-3 text-base leading-8 text-white/74">
+                One honest question can change the direction of a day.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="how-it-works"
+        className="mx-auto max-w-6xl px-6 py-10 md:px-10 md:py-16"
+      >
+        <div className="mb-8 max-w-2xl">
+          <p className="text-sm uppercase tracking-[0.22em] text-white/42">
+            How it works
+          </p>
+          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white md:text-4xl">
+            Stop circling. Name the friction. Move cleaner.
+          </h2>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-3">
+          <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-md">
+            <div className="text-3xl font-semibold text-white/90">1</div>
+            <h3 className="mt-5 text-xl font-semibold text-white">
+              Interrupt the pattern
+            </h3>
+            <p className="mt-3 text-sm leading-7 text-white/62 md:text-base">
+              Break autopilot before the day runs you.
+            </p>
+          </div>
+
+          <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-md">
+            <div className="text-3xl font-semibold text-white/90">2</div>
+            <h3 className="mt-5 text-xl font-semibold text-white">
+              Name the real need
+            </h3>
+            <p className="mt-3 text-sm leading-7 text-white/62 md:text-base">
+              Choose what you need most right now instead of spiraling through
+              everything.
+            </p>
+          </div>
+
+          <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-md">
+            <div className="text-3xl font-semibold text-white/90">3</div>
+            <h3 className="mt-5 text-xl font-semibold text-white">
+              Move with clarity
+            </h3>
+            <p className="mt-3 text-sm leading-7 text-white/62 md:text-base">
+              Leave with one direct next step instead of empty motivation.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-4xl px-6 py-14 text-center md:px-10 md:py-20">
+        <p className="text-sm uppercase tracking-[0.22em] text-white/42">
+          Final note
+        </p>
+
+        <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white md:text-4xl">
+          Reset is not here to comfort avoidance.
+        </h2>
+
+        <p className="mx-auto mt-5 max-w-3xl text-base leading-8 text-white/62 md:text-lg">
+          It is here to help people stop circling, face the actual friction, and
+          make one cleaner move forward.
+        </p>
+
+        <a
+          href="#personal-reset"
+          className="mt-10 inline-flex rounded-2xl bg-white px-6 py-3 text-sm font-medium text-black transition hover:opacity-90"
+        >
+          Run your first reset
+        </a>
+      </section>
+    </main>
   );
 }
