@@ -1,6 +1,18 @@
 import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "./supabaseClient";
+import type { User } from "@supabase/supabase-js";
 
-type Screen = "start" | "mind" | "avoid" | "move" | "commit" | "result" | "history";
+type Screen =
+  | "auth"
+  | "profile"
+  | "start"
+  | "mind"
+  | "avoid"
+  | "move"
+  | "commit"
+  | "result"
+  | "history";
+
 type EntryStatus = "done" | "not_yet";
 
 interface Entry {
@@ -13,7 +25,12 @@ interface Entry {
   feedback: string;
 }
 
-const STORAGE_KEY = "reset_app_v10_entries";
+interface Profile {
+  id: string;
+  name: string;
+  age: number | null;
+  country: string | null;
+}
 
 const MIND_SUGGESTIONS = ["Too much in my head", "I feel off", "I keep circling this"];
 const AVOIDING_SUGGESTIONS = ["Starting", "A message", "A decision"];
@@ -97,8 +114,35 @@ function generateFeedback(
   return source[seed % source.length];
 }
 
+function mapEntry(row: any): Entry {
+  return {
+    id: row.id,
+    createdAt: row.created_at,
+    mind: row.mind,
+    avoiding: row.avoiding,
+    move: row.move,
+    status: row.status,
+    feedback: row.feedback,
+  };
+}
+
 export default function App() {
-  const [screen, setScreen] = useState<Screen>("start");
+  const [screen, setScreen] = useState<Screen>("auth");
+  const [loading, setLoading] = useState(true);
+
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authMode, setAuthMode] = useState<"login" | "signup">("signup");
+  const [authError, setAuthError] = useState("");
+
+  const [profileName, setProfileName] = useState("");
+  const [profileAge, setProfileAge] = useState("");
+  const [profileCountry, setProfileCountry] = useState("");
+  const [profileError, setProfileError] = useState("");
+
   const [mind, setMind] = useState("");
   const [avoiding, setAvoiding] = useState("");
   const [move, setMove] = useState("");
@@ -113,21 +157,77 @@ export default function App() {
   const moveRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setEntries(JSON.parse(raw) as Entry[]);
-    } catch (error) {
-      console.error("Failed to load entries", error);
+    async function init() {
+      const { data } = await supabase.auth.getUser();
+      const currentUser = data.user ?? null;
+
+      setUser(currentUser);
+
+      if (!currentUser) {
+        setScreen("auth");
+        setLoading(false);
+        return;
+      }
+
+      await loadProfileAndEntries(currentUser.id);
+      setLoading(false);
     }
+
+    init();
+
+    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const nextUser = session?.user ?? null;
+      setUser(nextUser);
+
+      if (!nextUser) {
+        setProfile(null);
+        setEntries([]);
+        setScreen("auth");
+        return;
+      }
+
+      await loadProfileAndEntries(nextUser.id);
+    });
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-    } catch (error) {
-      console.error("Failed to save entries", error);
+  async function loadProfileAndEntries(userId: string) {
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (!profileData) {
+      setProfile(null);
+      setScreen("profile");
+      return;
     }
-  }, [entries]);
+
+    setProfile(profileData as Profile);
+    setProfileName(profileData.name ?? "");
+    setProfileAge(profileData.age ? String(profileData.age) : "");
+    setProfileCountry(profileData.country ?? "");
+
+    const { data: entryData, error } = await supabase
+      .from("entries")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(30);
+
+    if (error) {
+      console.error("Failed to load entries", error);
+      setEntries([]);
+    } else {
+      setEntries((entryData ?? []).map(mapEntry));
+    }
+
+    setScreen("start");
+  }
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -194,6 +294,105 @@ export default function App() {
     return days;
   }, [entries]);
 
+  async function handleAuth() {
+    setAuthError("");
+
+    if (!authEmail.trim() || !authPassword.trim()) {
+      setAuthError("Email and password are required.");
+      return;
+    }
+
+    if (authPassword.length < 6) {
+      setAuthError("Password must be at least 6 characters.");
+      return;
+    }
+
+    if (authMode === "signup") {
+      const { data, error } = await supabase.auth.signUp({
+        email: authEmail.trim(),
+        password: authPassword,
+      });
+
+      if (error) {
+        setAuthError(error.message);
+        return;
+      }
+
+      if (data.user) {
+        setUser(data.user);
+        setScreen("profile");
+      } else {
+        setAuthError("Check your email to confirm your account, then log in.");
+      }
+    } else {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: authEmail.trim(),
+        password: authPassword,
+      });
+
+      if (error) {
+        setAuthError(error.message);
+        return;
+      }
+
+      if (data.user) {
+        setUser(data.user);
+        await loadProfileAndEntries(data.user.id);
+      }
+    }
+  }
+
+  async function saveProfile() {
+    setProfileError("");
+
+    if (!user) {
+      setProfileError("You need to log in first.");
+      return;
+    }
+
+    if (!profileName.trim()) {
+      setProfileError("Name is required.");
+      return;
+    }
+
+    const ageNumber = profileAge.trim() ? Number(profileAge) : null;
+
+    if (ageNumber !== null && (!Number.isFinite(ageNumber) || ageNumber < 13 || ageNumber > 120)) {
+      setProfileError("Enter a valid age.");
+      return;
+    }
+
+    const payload = {
+      id: user.id,
+      name: profileName.trim(),
+      age: ageNumber,
+      country: profileCountry.trim() || null,
+    };
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .upsert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      setProfileError(error.message);
+      return;
+    }
+
+    setProfile(data as Profile);
+    setScreen("start");
+  }
+
+  async function signOut() {
+    await supabase.auth.signOut();
+    resetFlow();
+    setUser(null);
+    setProfile(null);
+    setEntries([]);
+    setScreen("auth");
+  }
+
   function resetFlow() {
     setMind("");
     setAvoiding("");
@@ -202,7 +401,7 @@ export default function App() {
     setBreathePhase("in");
     setLatestId(null);
     setShareCopied(false);
-    setScreen("start");
+    setScreen(user ? "start" : "auth");
   }
 
   function beginCommit() {
@@ -212,13 +411,17 @@ export default function App() {
     setScreen("commit");
   }
 
-  function saveResult(status: EntryStatus) {
-    const id = Date.now();
-    const feedback = generateFeedback(status, mind, avoiding, move, id);
+  async function saveResult(status: EntryStatus) {
+    if (!user) {
+      setScreen("auth");
+      return;
+    }
 
-    const newEntry: Entry = {
-      id,
-      createdAt: new Date().toISOString(),
+    const seed = Date.now();
+    const feedback = generateFeedback(status, mind, avoiding, move, seed);
+
+    const payload = {
+      user_id: user.id,
       mind: mind.trim(),
       avoiding: avoiding.trim(),
       move: move.trim(),
@@ -226,6 +429,19 @@ export default function App() {
       feedback,
     };
 
+    const { data, error } = await supabase
+      .from("entries")
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Failed to save entry", error);
+      alert("The entry did not save. Check Supabase policies.");
+      return;
+    }
+
+    const newEntry = mapEntry(data);
     setEntries((prev) => [newEntry, ...prev].slice(0, 30));
     setLatestId(newEntry.id);
     setScreen("result");
@@ -776,6 +992,16 @@ export default function App() {
       color: "#736C64",
       marginTop: 10,
     } as CSSProperties,
+    error: {
+      color: "#8B1E1E",
+      background: "#F8E7E7",
+      border: "1px solid #E7BABA",
+      borderRadius: 12,
+      padding: "10px 12px",
+      fontSize: 13,
+      lineHeight: 1.4,
+      marginBottom: 12,
+    } as CSSProperties,
   };
 
   function renderStepCard(step: 1 | 2 | 3, content: React.ReactNode) {
@@ -790,40 +1016,144 @@ export default function App() {
     );
   }
 
+  if (loading) {
+    return (
+      <div style={styles.page}>
+        <div style={styles.wrap}>
+          <div style={styles.card}>
+            <div style={styles.title}>Loading.</div>
+            <div style={styles.sub}>Checking your session.</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.page}>
       <div style={styles.wrap}>
         <div style={styles.topRow}>
           <div style={styles.badge}>Reset</div>
           <div style={styles.date}>
+            {profile?.name ? `${profile.name} · ` : ""}
             {today.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
           </div>
         </div>
 
-        <div style={styles.trackerCard}>
-          <div style={styles.trackerTop}>
-            <div>
-              <div style={styles.label}>Momentum</div>
-              <div style={styles.trackerText}>
-                {doneCount} time{doneCount !== 1 ? "s" : ""} you actually moved.
+        {screen !== "auth" && screen !== "profile" && (
+          <div style={styles.trackerCard}>
+            <div style={styles.trackerTop}>
+              <div>
+                <div style={styles.label}>Momentum</div>
+                <div style={styles.trackerText}>
+                  {doneCount} time{doneCount !== 1 ? "s" : ""} you actually moved.
+                </div>
               </div>
+              {streak > 1 ? (
+                <div style={styles.streakPill}>{streak} day streak</div>
+              ) : (
+                <div style={styles.trackerText}>Last 7 days</div>
+              )}
             </div>
-            {streak > 1 ? (
-              <div style={styles.streakPill}>{streak} day streak</div>
-            ) : (
-              <div style={styles.trackerText}>Last 7 days</div>
-            )}
-          </div>
 
-          <div style={styles.trackerRow}>
-            {trackerDays.map((day, idx) => (
-              <div key={`${day.label}-${idx}`} style={styles.trackerDay}>
-                <div style={{ ...styles.dot, ...(day.active ? styles.dotActive : {}) }} />
-                {day.label}
-              </div>
-            ))}
+            <div style={styles.trackerRow}>
+              {trackerDays.map((day, idx) => (
+                <div key={`${day.label}-${idx}`} style={styles.trackerDay}>
+                  <div style={{ ...styles.dot, ...(day.active ? styles.dotActive : {}) }} />
+                  {day.label}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
+
+        {screen === "auth" && (
+          <div style={styles.card}>
+            <div style={styles.stepPill}>{authMode === "signup" ? "Create account" : "Log in"}</div>
+            <div style={styles.title}>Your reset needs a home.</div>
+            <div style={styles.sub}>
+              Create an account so your answers save in the database, not only on your phone.
+            </div>
+
+            {authError && <div style={styles.error}>{authError}</div>}
+
+            <input
+              style={styles.input}
+              placeholder="Email"
+              value={authEmail}
+              onChange={(e) => setAuthEmail(e.target.value)}
+            />
+
+            <input
+              style={{ ...styles.input, marginTop: 10 }}
+              placeholder="Password, minimum 6 characters"
+              type="password"
+              value={authPassword}
+              onChange={(e) => setAuthPassword(e.target.value)}
+            />
+
+            <div style={styles.focusHint}>
+              By continuing, you agree that your profile information and reset entries will be stored
+              to support your app experience.
+            </div>
+
+            <button style={styles.cta} onClick={handleAuth}>
+              {authMode === "signup" ? "Sign up" : "Log in"}
+            </button>
+
+            <button
+              style={styles.ctaMuted}
+              onClick={() => {
+                setAuthError("");
+                setAuthMode(authMode === "signup" ? "login" : "signup");
+              }}
+            >
+              {authMode === "signup"
+                ? "Already have an account? Log in"
+                : "New here? Create account"}
+            </button>
+          </div>
+        )}
+
+        {screen === "profile" && (
+          <div style={styles.card}>
+            <div style={styles.stepPill}>Profile</div>
+            <div style={styles.title}>Tell us who is resetting.</div>
+            <div style={styles.sub}>For now: name, age, and country of residence.</div>
+
+            {profileError && <div style={styles.error}>{profileError}</div>}
+
+            <input
+              style={styles.input}
+              placeholder="Name"
+              value={profileName}
+              onChange={(e) => setProfileName(e.target.value)}
+            />
+
+            <input
+              style={{ ...styles.input, marginTop: 10 }}
+              placeholder="Age"
+              type="number"
+              value={profileAge}
+              onChange={(e) => setProfileAge(e.target.value)}
+            />
+
+            <input
+              style={{ ...styles.input, marginTop: 10 }}
+              placeholder="Country of residence"
+              value={profileCountry}
+              onChange={(e) => setProfileCountry(e.target.value)}
+            />
+
+            <button style={{ ...styles.cta, marginTop: 18 }} onClick={saveProfile}>
+              Save profile
+            </button>
+
+            <button style={styles.ctaMuted} onClick={signOut}>
+              Log out
+            </button>
+          </div>
+        )}
 
         {screen === "start" && (
           <>
@@ -840,7 +1170,7 @@ export default function App() {
                   <button style={styles.startButton} onClick={() => setScreen("mind")}>
                     Start Reset
                   </button>
-                  <div style={styles.heroFoot}>This is for you, not for anyone.</div>
+                  <div style={styles.heroFoot}>This is saved to your reset record.</div>
                 </div>
               </div>
             </div>
@@ -860,6 +1190,14 @@ export default function App() {
 
             <button style={styles.ctaMuted} onClick={() => setScreen("history")}>
               View history
+            </button>
+
+            <button style={styles.ctaMuted} onClick={() => setScreen("profile")}>
+              Edit profile
+            </button>
+
+            <button style={styles.ctaMuted} onClick={signOut}>
+              Log out
             </button>
           </>
         )}
