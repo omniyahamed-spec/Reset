@@ -142,6 +142,7 @@ export default function App() {
   const [latestId, setLatestId] = useState<number | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [breathePhase, setBreathePhase] = useState<"in" | "out">("in");
+  const [showResultPopup, setShowResultPopup] = useState(false);
 
   const mindRef = useRef<HTMLInputElement>(null);
   const avoidRef = useRef<HTMLInputElement>(null);
@@ -186,7 +187,7 @@ export default function App() {
       .select("*")
       .eq("profile_id", profileId)
       .order("created_at", { ascending: false })
-      .limit(30);
+      .limit(50);
 
     if (error) {
       console.error("Failed to load entries", error);
@@ -226,12 +227,32 @@ export default function App() {
     [entries, latestId]
   );
 
-  const doneCount = useMemo(() => entries.filter((e) => e.status === "done").length, [entries]);
+  const doneCount = useMemo(
+    () => entries.filter((e) => e.status === "done").length,
+    [entries]
+  );
+
+  const notYetCount = useMemo(
+    () => entries.filter((e) => e.status === "not_yet").length,
+    [entries]
+  );
+
+  const totalResets = entries.length;
 
   const lastNotYet = useMemo(
     () => entries.find((e) => e.status === "not_yet"),
     [entries]
   );
+
+  const latestResetTime = latestEntry
+    ? new Date(latestEntry.createdAt).toLocaleString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
 
   const streak = useMemo(() => {
     let s = 0;
@@ -323,6 +344,7 @@ export default function App() {
     setBreathePhase("in");
     setLatestId(null);
     setShareCopied(false);
+    setShowResultPopup(false);
     setScreen(profile ? "start" : "profile");
   }
 
@@ -365,8 +387,9 @@ export default function App() {
     }
 
     const newEntry = mapEntry(data);
-    setEntries((prev) => [newEntry, ...prev].slice(0, 30));
+    setEntries((prev) => [newEntry, ...prev].slice(0, 50));
     setLatestId(newEntry.id);
+    setShowResultPopup(true);
     setScreen("result");
   }
 
@@ -928,6 +951,82 @@ export default function App() {
       lineHeight: 1.4,
       marginBottom: 12,
     },
+    modalBackdrop: {
+      position: "fixed",
+      inset: 0,
+      background: "rgba(18, 17, 15, 0.45)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 18,
+      zIndex: 999,
+    },
+    modalCard: {
+      width: "100%",
+      maxWidth: 420,
+      background: "#FFFDF9",
+      borderRadius: 28,
+      overflow: "hidden",
+      border: "1px solid #DDD5CA",
+      boxShadow: "0 25px 80px rgba(18, 17, 15, 0.28)",
+    },
+    modalImage: {
+      height: 190,
+      backgroundImage:
+        "linear-gradient(rgba(245,241,234,0.12), rgba(245,241,234,0.55)), url('/garden.png')",
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+    },
+    modalBody: {
+      padding: 22,
+    },
+    modalTitle: {
+      fontSize: 34,
+      lineHeight: 1,
+      letterSpacing: "-0.05em",
+      fontWeight: 500,
+      fontFamily: 'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
+      marginBottom: 8,
+    },
+    modalText: {
+      fontSize: 14,
+      color: "#6F6861",
+      lineHeight: 1.5,
+      marginBottom: 16,
+    },
+    summaryGrid: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 10,
+      marginBottom: 14,
+    },
+    summaryBox: {
+      background: "#F7F3EC",
+      border: "1px solid #DDD5CA",
+      borderRadius: 16,
+      padding: 12,
+    },
+    summaryNum: {
+      fontSize: 24,
+      fontWeight: 800,
+      letterSpacing: "-0.04em",
+    },
+    summaryLabel: {
+      fontSize: 11,
+      color: "#6F6861",
+      textTransform: "uppercase",
+      letterSpacing: "0.08em",
+      marginTop: 3,
+    },
+    modalDate: {
+      background: "#F7F3EC",
+      border: "1px solid #DDD5CA",
+      borderRadius: 16,
+      padding: 12,
+      fontSize: 13,
+      color: "#6F6861",
+      marginBottom: 14,
+    },
   };
 
   function renderStepCard(step: 1 | 2 | 3, content: React.ReactNode) {
@@ -1366,6 +1465,56 @@ export default function App() {
             <button style={{ ...styles.ctaMuted, marginTop: 16 }} onClick={resetFlow}>
               Back home
             </button>
+          </div>
+        )}
+
+        {showResultPopup && latestEntry && (
+          <div style={styles.modalBackdrop}>
+            <div style={styles.modalCard}>
+              <div style={styles.modalImage} />
+
+              <div style={styles.modalBody}>
+                <div style={styles.modalTitle}>
+                  {latestEntry.status === "done"
+                    ? "Bravo. You did it."
+                    : "Not yet. Still counted."}
+                </div>
+
+                <div style={styles.modalText}>
+                  {latestEntry.status === "done"
+                    ? "That was a real reset. Small move, real evidence. This is exactly what the app is built for."
+                    : "You did not complete it yet, but now the pattern is visible. Shrink the move and try again."}
+                </div>
+
+                <div style={styles.summaryGrid}>
+                  <div style={styles.summaryBox}>
+                    <div style={styles.summaryNum}>{totalResets}</div>
+                    <div style={styles.summaryLabel}>Total resets</div>
+                  </div>
+
+                  <div style={styles.summaryBox}>
+                    <div style={styles.summaryNum}>{doneCount}</div>
+                    <div style={styles.summaryLabel}>Completed</div>
+                  </div>
+
+                  <div style={styles.summaryBox}>
+                    <div style={styles.summaryNum}>{notYetCount}</div>
+                    <div style={styles.summaryLabel}>Not yet</div>
+                  </div>
+
+                  <div style={styles.summaryBox}>
+                    <div style={styles.summaryNum}>{streak}</div>
+                    <div style={styles.summaryLabel}>Day streak</div>
+                  </div>
+                </div>
+
+                <div style={styles.modalDate}>Latest reset: {latestResetTime}</div>
+
+                <button style={styles.cta} onClick={() => setShowResultPopup(false)}>
+                  See my result
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
