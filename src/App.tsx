@@ -1,9 +1,7 @@
 import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "./supabaseClient";
-import type { User } from "@supabase/supabase-js";
 
 type Screen =
-  | "auth"
   | "profile"
   | "start"
   | "mind"
@@ -28,8 +26,6 @@ interface Entry {
 interface Profile {
   id: string;
   name: string;
-  age: number | null;
-  country: string | null;
 }
 
 const MIND_SUGGESTIONS = ["Too much in my head", "I feel off", "I keep circling this"];
@@ -37,6 +33,10 @@ const AVOIDING_SUGGESTIONS = ["Starting", "A message", "A decision"];
 const MOVE_SUGGESTIONS = ["Send it", "Open it", "Start 2 min"];
 
 const COMMIT_SECONDS = 5;
+
+function makeProfileId(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, "-");
+}
 
 function startOfDay(date: Date): Date {
   const d = new Date(date);
@@ -127,20 +127,11 @@ function mapEntry(row: any): Entry {
 }
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>("auth");
+  const [screen, setScreen] = useState<Screen>("profile");
   const [loading, setLoading] = useState(true);
 
-  const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-
-  const [authEmail, setAuthEmail] = useState("");
-  const [authPassword, setAuthPassword] = useState("");
-  const [authMode, setAuthMode] = useState<"login" | "signup">("signup");
-  const [authError, setAuthError] = useState("");
-
   const [profileName, setProfileName] = useState("");
-  const [profileAge, setProfileAge] = useState("");
-  const [profileCountry, setProfileCountry] = useState("");
   const [profileError, setProfileError] = useState("");
 
   const [mind, setMind] = useState("");
@@ -158,75 +149,52 @@ export default function App() {
 
   useEffect(() => {
     async function init() {
-      const { data } = await supabase.auth.getUser();
-      const currentUser = data.user ?? null;
+      const savedProfileId = localStorage.getItem("reset_profile_id");
 
-      setUser(currentUser);
-
-      if (!currentUser) {
-        setScreen("auth");
+      if (!savedProfileId) {
+        setScreen("profile");
         setLoading(false);
         return;
       }
 
-      await loadProfileAndEntries(currentUser.id);
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", savedProfileId)
+        .maybeSingle();
+
+      if (error || !data) {
+        localStorage.removeItem("reset_profile_id");
+        setScreen("profile");
+        setLoading(false);
+        return;
+      }
+
+      setProfile(data as Profile);
+      setProfileName(data.name ?? "");
+      await loadEntries(savedProfileId);
+      setScreen("start");
       setLoading(false);
     }
 
     init();
-
-    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const nextUser = session?.user ?? null;
-      setUser(nextUser);
-
-      if (!nextUser) {
-        setProfile(null);
-        setEntries([]);
-        setScreen("auth");
-        return;
-      }
-
-      await loadProfileAndEntries(nextUser.id);
-    });
-
-    return () => {
-      listener.subscription.unsubscribe();
-    };
   }, []);
 
-  async function loadProfileAndEntries(userId: string) {
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .maybeSingle();
-
-    if (!profileData) {
-      setProfile(null);
-      setScreen("profile");
-      return;
-    }
-
-    setProfile(profileData as Profile);
-    setProfileName(profileData.name ?? "");
-    setProfileAge(profileData.age ? String(profileData.age) : "");
-    setProfileCountry(profileData.country ?? "");
-
-    const { data: entryData, error } = await supabase
+  async function loadEntries(profileId: string) {
+    const { data, error } = await supabase
       .from("entries")
       .select("*")
-      .eq("user_id", userId)
+      .eq("profile_id", profileId)
       .order("created_at", { ascending: false })
       .limit(30);
 
     if (error) {
       console.error("Failed to load entries", error);
       setEntries([]);
-    } else {
-      setEntries((entryData ?? []).map(mapEntry));
+      return;
     }
 
-    setScreen("start");
+    setEntries((data ?? []).map(mapEntry));
   }
 
   useEffect(() => {
@@ -235,11 +203,13 @@ export default function App() {
       if (screen === "avoid") avoidRef.current?.focus();
       if (screen === "move") moveRef.current?.focus();
     }, 80);
+
     return () => window.clearTimeout(timer);
   }, [screen]);
 
   useEffect(() => {
     if (screen !== "commit" || countdown <= 0) return;
+
     const timer = window.setTimeout(() => {
       setCountdown((prev) => {
         const next = prev - 1;
@@ -247,6 +217,7 @@ export default function App() {
         return next;
       });
     }, 1000);
+
     return () => window.clearTimeout(timer);
   }, [screen, countdown]);
 
@@ -264,118 +235,58 @@ export default function App() {
 
   const streak = useMemo(() => {
     let s = 0;
+
     for (let i = 0; i < 30; i++) {
       const d = new Date();
       d.setDate(d.getDate() - i);
+
       const has = entries.some(
         (e) =>
           e.status === "done" &&
           startOfDay(new Date(e.createdAt)).getTime() === startOfDay(d).getTime()
       );
+
       if (has) s++;
       else break;
     }
+
     return s;
   }, [entries]);
 
   const trackerDays = useMemo(() => {
     const days: { label: string; active: boolean }[] = [];
+
     for (let i = 6; i >= 0; i--) {
       const day = new Date();
       day.setDate(day.getDate() - i);
+
       const label = day.toLocaleDateString(undefined, { weekday: "short" });
+
       const active = entries.some(
         (e) =>
           e.status === "done" &&
           startOfDay(new Date(e.createdAt)).getTime() === startOfDay(day).getTime()
       );
+
       days.push({ label, active });
     }
+
     return days;
   }, [entries]);
 
-  async function handleAuth() {
-    setAuthError("");
-
-    if (!authEmail.trim() || !authPassword.trim()) {
-      setAuthError("Email and password are required.");
-      return;
-    }
-
-    if (authPassword.length < 6) {
-      setAuthError("Password must be at least 6 characters.");
-      return;
-    }
-
-    if (authMode === "signup") {
-      const { data, error } = await supabase.auth.signUp({
-        email: authEmail.trim(),
-        password: authPassword,
-      });
-
-      if (error) {
-        setAuthError(error.message);
-        return;
-      }
-
-      if (data.user) {
-        setUser(data.user);
-        setScreen("profile");
-      } else {
-        setAuthError("Check your email to confirm your account, then log in.");
-      }
-    } else {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: authEmail.trim(),
-        password: authPassword,
-      });
-
-      if (error) {
-        setAuthError(error.message);
-        return;
-      }
-
-      if (data.user) {
-        setUser(data.user);
-        await loadProfileAndEntries(data.user.id);
-      }
-    }
-  }
-
   async function saveProfile() {
     setProfileError("");
-
-    const {
-      data: { user: currentUser },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !currentUser) {
-      setProfileError("You need to log in again before saving your profile.");
-      setScreen("auth");
-      return;
-    }
 
     if (!profileName.trim()) {
       setProfileError("Name is required.");
       return;
     }
 
-    const ageNumber = profileAge.trim() ? Number(profileAge) : null;
-
-    if (
-      ageNumber !== null &&
-      (!Number.isFinite(ageNumber) || ageNumber < 13 || ageNumber > 120)
-    ) {
-      setProfileError("Enter a valid age.");
-      return;
-    }
+    const id = makeProfileId(profileName);
 
     const payload = {
-      id: currentUser.id,
+      id,
       name: profileName.trim(),
-      age: ageNumber,
-      country: profileCountry.trim() || null,
     };
 
     const { data, error } = await supabase
@@ -390,24 +301,18 @@ export default function App() {
       return;
     }
 
-    setUser(currentUser);
+    localStorage.setItem("reset_profile_id", id);
     setProfile(data as Profile);
+    await loadEntries(id);
     setScreen("start");
   }
 
-  async function signOut() {
-    await supabase.auth.signOut();
-    setMind("");
-    setAvoiding("");
-    setMove("");
-    setCountdown(COMMIT_SECONDS);
-    setBreathePhase("in");
-    setLatestId(null);
-    setShareCopied(false);
-    setUser(null);
+  function changeName() {
+    localStorage.removeItem("reset_profile_id");
     setProfile(null);
     setEntries([]);
-    setScreen("auth");
+    setProfileName("");
+    setScreen("profile");
   }
 
   function resetFlow() {
@@ -418,19 +323,20 @@ export default function App() {
     setBreathePhase("in");
     setLatestId(null);
     setShareCopied(false);
-    setScreen(user ? "start" : "auth");
+    setScreen(profile ? "start" : "profile");
   }
 
   function beginCommit() {
     if (!mind.trim() || !avoiding.trim() || !move.trim()) return;
+
     setCountdown(COMMIT_SECONDS);
     setBreathePhase("in");
     setScreen("commit");
   }
 
   async function saveResult(status: EntryStatus) {
-    if (!user) {
-      setScreen("auth");
+    if (!profile) {
+      setScreen("profile");
       return;
     }
 
@@ -438,7 +344,7 @@ export default function App() {
     const feedback = generateFeedback(status, mind, avoiding, move, seed);
 
     const payload = {
-      user_id: user.id,
+      profile_id: profile.id,
       mind: mind.trim(),
       avoiding: avoiding.trim(),
       move: move.trim(),
@@ -454,7 +360,7 @@ export default function App() {
 
     if (error) {
       console.error("Failed to save entry", error);
-      alert("The entry did not save. Check Supabase policies.");
+      alert("The entry did not save. Check Supabase table or policies.");
       return;
     }
 
@@ -466,6 +372,7 @@ export default function App() {
 
   function resumeLastNotYet() {
     if (!lastNotYet) return;
+
     setMind(lastNotYet.mind);
     setAvoiding(lastNotYet.avoiding);
     setMove(lastNotYet.move);
@@ -476,11 +383,13 @@ export default function App() {
 
   async function shareMove() {
     const text = `I said I would do this: ${move}. Check on me.`;
+
     try {
       if (navigator.share) {
         await navigator.share({ title: "Reset", text });
         return;
       }
+
       await navigator.clipboard.writeText(text);
       setShareCopied(true);
       window.setTimeout(() => setShareCopied(false), 1800);
@@ -1023,6 +932,7 @@ export default function App() {
 
   function renderStepCard(step: 1 | 2 | 3, content: React.ReactNode) {
     const pct = step === 1 ? 33 : step === 2 ? 66 : 100;
+
     return (
       <div style={styles.card}>
         <div style={styles.progressWrap}>
@@ -1039,7 +949,7 @@ export default function App() {
         <div style={styles.wrap}>
           <div style={styles.card}>
             <div style={styles.title}>Loading.</div>
-            <div style={styles.sub}>Checking your session.</div>
+            <div style={styles.sub}>Checking your reset record.</div>
           </div>
         </div>
       </div>
@@ -1057,7 +967,7 @@ export default function App() {
           </div>
         </div>
 
-        {screen !== "auth" && screen !== "profile" && (
+        {screen !== "profile" && (
           <div style={styles.trackerCard}>
             <div style={styles.trackerTop}>
               <div>
@@ -1066,6 +976,7 @@ export default function App() {
                   {doneCount} time{doneCount !== 1 ? "s" : ""} you actually moved.
                 </div>
               </div>
+
               {streak > 1 ? (
                 <div style={styles.streakPill}>{streak} day streak</div>
               ) : (
@@ -1084,90 +995,23 @@ export default function App() {
           </div>
         )}
 
-        {screen === "auth" && (
-          <div style={styles.card}>
-            <div style={styles.stepPill}>{authMode === "signup" ? "Create account" : "Log in"}</div>
-            <div style={styles.title}>Your reset needs a home.</div>
-            <div style={styles.sub}>
-              Create an account so your answers save in the database, not only on your phone.
-            </div>
-
-            {authError && <div style={styles.error}>{authError}</div>}
-
-            <input
-              style={styles.input}
-              placeholder="Email"
-              value={authEmail}
-              onChange={(e) => setAuthEmail(e.target.value)}
-            />
-
-            <input
-              style={{ ...styles.input, marginTop: 10 }}
-              placeholder="Password, minimum 6 characters"
-              type="password"
-              value={authPassword}
-              onChange={(e) => setAuthPassword(e.target.value)}
-            />
-
-            <div style={styles.focusHint}>
-              By continuing, you agree that your profile information and reset entries will be stored
-              to support your app experience.
-            </div>
-
-            <button style={styles.cta} onClick={handleAuth}>
-              {authMode === "signup" ? "Sign up" : "Log in"}
-            </button>
-
-            <button
-              style={styles.ctaMuted}
-              onClick={() => {
-                setAuthError("");
-                setAuthMode(authMode === "signup" ? "login" : "signup");
-              }}
-            >
-              {authMode === "signup"
-                ? "Already have an account? Log in"
-                : "New here? Create account"}
-            </button>
-          </div>
-        )}
-
         {screen === "profile" && (
           <div style={styles.card}>
-            <div style={styles.stepPill}>Profile</div>
-            <div style={styles.title}>Tell us who is resetting.</div>
-            <div style={styles.sub}>For now: name, age, and country of residence.</div>
+            <div style={styles.stepPill}>Name</div>
+            <div style={styles.title}>Enter your name.</div>
+            <div style={styles.sub}>No username. No password. Just your reset record.</div>
 
             {profileError && <div style={styles.error}>{profileError}</div>}
 
             <input
               style={styles.input}
-              placeholder="Name"
+              placeholder="Your name"
               value={profileName}
               onChange={(e) => setProfileName(e.target.value)}
             />
 
-            <input
-              style={{ ...styles.input, marginTop: 10 }}
-              placeholder="Age"
-              type="number"
-              value={profileAge}
-              onChange={(e) => setProfileAge(e.target.value)}
-            />
-
-            <input
-              style={{ ...styles.input, marginTop: 10 }}
-              placeholder="Country of residence"
-              value={profileCountry}
-              onChange={(e) => setProfileCountry(e.target.value)}
-            />
-
             <button style={{ ...styles.cta, marginTop: 18 }} onClick={saveProfile}>
-              Save profile
-            </button>
-
-            <button style={styles.ctaMuted} onClick={signOut}>
-              Log out
+              Continue
             </button>
           </div>
         )}
@@ -1209,12 +1053,8 @@ export default function App() {
               View history
             </button>
 
-            <button style={styles.ctaMuted} onClick={() => setScreen("profile")}>
-              Edit profile
-            </button>
-
-            <button style={styles.ctaMuted} onClick={signOut}>
-              Log out
+            <button style={styles.ctaMuted} onClick={changeName}>
+              Change name
             </button>
           </>
         )}
@@ -1453,6 +1293,7 @@ export default function App() {
               <div style={styles.shareText}>
                 Send it to one person. Make it harder to disappear.
               </div>
+
               <button style={styles.cta} onClick={shareMove}>
                 {shareCopied ? "Copied" : "Share my move"}
               </button>
