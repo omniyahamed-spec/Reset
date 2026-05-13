@@ -1,4 +1,4 @@
-import { CSSProperties, useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "./supabaseClient";
 
 type Screen =
@@ -75,7 +75,6 @@ function progressBarStyle(pct: number): CSSProperties {
   };
 }
 
-// ── AI Feedback via Anthropic API ─────────────────────────────────────────
 async function getAIFeedback(
   status: EntryStatus,
   mind: string,
@@ -94,7 +93,7 @@ What they were avoiding: "${avoiding}"
 Their committed move: "${move}"
 ${pastPatterns ? `Their recent patterns: ${pastPatterns}` : ""}
 
-Write 2-3 sentences of feedback. Be specific to EXACTLY what they wrote — not generic. 
+Write 2-3 sentences of feedback. Be specific to EXACTLY what they wrote — not generic.
 If done: acknowledge the specific thing they did, note why it matters, one line of forward momentum.
 If not yet: don't shame them. Name the real reason this specific thing is hard. Make the move smaller in one concrete suggestion.
 Tone: like a sharp, caring friend who doesn't sugarcoat. Direct. Human. Never corporate.
@@ -130,7 +129,6 @@ function getFallbackFeedback(status: EntryStatus): string {
   return "Not yet is just data. The move was probably too big. Cut it in half and try the smaller door.";
 }
 
-// ── Pattern analysis ──────────────────────────────────────────────────────
 function analyzePatterns(entries: Entry[]): {
   topAvoiding: string | null;
   completionRate: number;
@@ -174,15 +172,15 @@ function analyzePatterns(entries: Entry[]): {
   return { topAvoiding, completionRate, mostProductiveDays, recurringMind };
 }
 
+// ── THE FIX IS HERE — Array.from instead of spread ──
 function buildPastPatternsSummary(entries: Entry[]): string {
   if (entries.length < 3) return "";
   const recent = entries.slice(0, 7);
-  const avoidingList = [...new Set(recent.map((e) => e.avoiding))].slice(0, 3).join(", ");
+  const avoidingList = Array.from(new Set(recent.map((e) => e.avoiding))).slice(0, 3).join(", ");
   const doneCount = recent.filter((e) => e.status === "done").length;
   return `Recently avoided: ${avoidingList}. Completed ${doneCount}/${recent.length} recent moves.`;
 }
 
-// ── Push notification helpers ─────────────────────────────────────────────
 async function requestNotificationPermission(): Promise<boolean> {
   if (!("Notification" in window)) return false;
   if (Notification.permission === "granted") return true;
@@ -467,10 +465,8 @@ export default function App() {
 
   async function saveResult(status: EntryStatus) {
     if (!profile) return;
-
     setAiFeedbackLoading(true);
     const pastPatterns = buildPastPatternsSummary(entries);
-
     const payload = {
       profile_id: profile.id,
       mind: mind.trim(),
@@ -479,39 +475,27 @@ export default function App() {
       status,
       feedback: "...",
     };
-
-    const { data, error } = await supabase
-      .from("entries")
-      .insert(payload)
-      .select()
-      .single();
-
+    const { data, error } = await supabase.from("entries").insert(payload).select().single();
     if (error) {
       alert("The entry did not save. Check Supabase table or policies.");
       setAiFeedbackLoading(false);
       return;
     }
-
     const newEntry = mapEntry(data);
     setEntries((prev) => [newEntry, ...prev].slice(0, 50));
     setLatestId(newEntry.id);
     setScreen("result");
-
     const newStreak = status === "done" ? streak + 1 : streak;
     if (status === "done" && MILESTONE_DAYS.includes(newStreak)) {
       setShowMilestone(true);
     } else {
       setShowResultPopup(true);
     }
-
     const feedback = await getAIFeedback(status, mind, avoiding, move, profile.name, pastPatterns);
     setAiFeedback(feedback);
     setAiFeedbackLoading(false);
-
     await supabase.from("entries").update({ feedback }).eq("id", newEntry.id);
-    setEntries((prev) =>
-      prev.map((e) => (e.id === newEntry.id ? { ...e, feedback } : e))
-    );
+    setEntries((prev) => prev.map((e) => (e.id === newEntry.id ? { ...e, feedback } : e)));
   }
 
   async function toggleNotifications() {
@@ -652,7 +636,6 @@ export default function App() {
     historyLineLabel: { fontWeight: 700, color: "#6F6861" },
     emptyState: { textAlign: "center" as const, padding: "32px 16px", color: "#6F6861", fontSize: 14 },
     statusBadge: (s: EntryStatus): CSSProperties => ({ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 999, background: s === "done" ? "#E8F5E9" : "#FFF3E0", color: s === "done" ? "#2E7D32" : "#E65100" }),
-    insightsCard: { background: "#FFFDF9", border: "1px solid #DDD5CA", borderRadius: 22, padding: 20, marginBottom: 12 },
     insightRow: { display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 16 },
     insightIcon: { fontSize: 22, flexShrink: 0, marginTop: 2 },
     insightTitle: { fontSize: 13, fontWeight: 700, color: "#23201D", marginBottom: 3 },
@@ -706,7 +689,6 @@ export default function App() {
       `}</style>
       <div style={styles.wrap}>
 
-        {/* Top bar */}
         <div style={styles.topRow}>
           <div style={styles.badge}>Reset</div>
           <div style={{ display: "flex", gap: 8 }}>
@@ -719,7 +701,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Streak tracker */}
         {screen !== "profile" && (
           <div style={isMilestone ? styles.trackerCardMilestone : styles.trackerCard}>
             <div style={styles.trackerTop}>
@@ -751,7 +732,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Streak at risk banner */}
         {screen === "start" && streakAtRisk && !hasResetToday && (
           <div style={styles.riskBanner}>
             <div style={styles.riskText}>You had a streak going. You haven't moved today. One reset keeps it alive.</div>
@@ -759,7 +739,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Check-in screen */}
         {screen === "checkin" && checkinEntry && (
           <div style={styles.checkinCard}>
             <div style={styles.checkinBadge}>Daily Check-in</div>
@@ -772,25 +751,17 @@ export default function App() {
           </div>
         )}
 
-        {/* Profile */}
         {screen === "profile" && (
           <div style={styles.card}>
             <div style={styles.stepPill}>Name</div>
             <div style={styles.title}>What do people call you?</div>
             <div style={styles.sub}>Just your first name. This stays on your device.</div>
-            <input
-              style={styles.input}
-              placeholder="Your name"
-              value={profileName}
-              onChange={(e) => setProfileName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && saveProfile()}
-            />
+            <input style={styles.input} placeholder="Your name" value={profileName} onChange={(e) => setProfileName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveProfile()} />
             {profileError && <div style={{ color: "#C0392B", fontSize: 13, marginBottom: 10 }}>{profileError}</div>}
             <button style={{ ...styles.cta, marginTop: 18 }} onClick={saveProfile}>Start</button>
           </div>
         )}
 
-        {/* Start */}
         {screen === "start" && (
           <>
             <div style={styles.heroCard}>
@@ -800,14 +771,11 @@ export default function App() {
                   <div style={styles.heroSub}>Empty the noise. Name the dodge. Make one clean move.</div>
                 </div>
                 <div style={styles.heroBottom}>
-                  <button style={styles.startButton} onClick={() => setScreen("mind")}>
-                    {hasResetToday ? "Reset again" : "Start Reset"}
-                  </button>
+                  <button style={styles.startButton} onClick={() => setScreen("mind")}>{hasResetToday ? "Reset again" : "Start Reset"}</button>
                   <div style={styles.heroFoot}>This is saved to your reset record.</div>
                 </div>
               </div>
             </div>
-
             {lastNotYet && !hasResetToday && (
               <div style={styles.unfinishedCard}>
                 <div style={styles.label}>Unfinished business</div>
@@ -816,24 +784,19 @@ export default function App() {
                 <button style={{ ...styles.cta, marginTop: 12 }} onClick={resumeLastNotYet}>Resume</button>
               </div>
             )}
-
             <div style={styles.notifRow}>
               <div>
                 <div style={styles.notifLabel}>Daily reminder at noon</div>
-                <div style={styles.notifSub}>
-                  {notifPermission === "denied" ? "Blocked in browser settings" : notifEnabled ? "You'll get a nudge if you haven't moved" : "Off — tap to enable"}
-                </div>
+                <div style={styles.notifSub}>{notifPermission === "denied" ? "Blocked in browser settings" : notifEnabled ? "You'll get a nudge if you haven't moved" : "Off — tap to enable"}</div>
               </div>
               <div style={styles.toggleTrack(notifEnabled)} onClick={notifPermission !== "denied" ? toggleNotifications : undefined} role="switch" aria-checked={notifEnabled}>
                 <div style={styles.toggleThumb(notifEnabled)} />
               </div>
             </div>
-
             <button style={styles.ctaMuted} onClick={() => setScreen("history")}>View history</button>
           </>
         )}
 
-        {/* Mind */}
         {screen === "mind" && renderStepCard(1, <>
           <div style={styles.stepPill}>Step 1 / 3</div>
           <div style={styles.title}>What's actually in your head?</div>
@@ -845,15 +808,11 @@ export default function App() {
             ))}
           </div>
           <input ref={mindRef} style={styles.input} placeholder="The loudest thing right now…" value={mind} maxLength={120} onChange={(e) => setMind(e.target.value)} onKeyDown={(e) => e.key === "Enter" && mind.trim() && setScreen("avoid")} />
-          <div style={styles.helperRow}>
-            <span style={styles.helper}>Be specific. Vague = stuck.</span>
-            <span style={styles.helper}>{mind.length}/120</span>
-          </div>
+          <div style={styles.helperRow}><span style={styles.helper}>Be specific. Vague = stuck.</span><span style={styles.helper}>{mind.length}/120</span></div>
           <button style={{ ...styles.cta, ...(mind.trim() ? {} : styles.ctaDisabled) }} disabled={!mind.trim()} onClick={() => setScreen("avoid")}>That's it. Continue.</button>
           <button style={styles.ctaMuted} onClick={resetFlow}>Cancel</button>
         </>)}
 
-        {/* Avoid */}
         {screen === "avoid" && renderStepCard(2, <>
           <div style={styles.stepPill}>Step 2 / 3</div>
           <div style={styles.title}>What are you avoiding?</div>
@@ -865,15 +824,11 @@ export default function App() {
             ))}
           </div>
           <input ref={avoidRef} style={styles.input} placeholder="What you keep not doing…" value={avoiding} maxLength={120} onChange={(e) => setAvoiding(e.target.value)} onKeyDown={(e) => e.key === "Enter" && avoiding.trim() && setScreen("move")} />
-          <div style={styles.helperRow}>
-            <span style={styles.helper}>Name it exactly.</span>
-            <span style={styles.helper}>{avoiding.length}/120</span>
-          </div>
+          <div style={styles.helperRow}><span style={styles.helper}>Name it exactly.</span><span style={styles.helper}>{avoiding.length}/120</span></div>
           <button style={{ ...styles.cta, ...(avoiding.trim() ? {} : styles.ctaDisabled) }} disabled={!avoiding.trim()} onClick={() => setScreen("move")}>Got it. Next.</button>
           <button style={styles.ctaMuted} onClick={() => setScreen("mind")}>← Back</button>
         </>)}
 
-        {/* Move */}
         {screen === "move" && renderStepCard(3, <>
           <div style={styles.stepPill}>Step 3 / 3</div>
           <div style={styles.title}>What's the smallest move?</div>
@@ -885,15 +840,11 @@ export default function App() {
             ))}
           </div>
           <input ref={moveRef} style={styles.input} placeholder="One tiny action…" value={move} maxLength={120} onChange={(e) => setMove(e.target.value)} onKeyDown={(e) => e.key === "Enter" && move.trim() && beginCommit()} />
-          <div style={styles.helperRow}>
-            <span style={styles.helper}>Embarrassingly small is right.</span>
-            <span style={styles.helper}>{move.length}/120</span>
-          </div>
+          <div style={styles.helperRow}><span style={styles.helper}>Embarrassingly small is right.</span><span style={styles.helper}>{move.length}/120</span></div>
           <button style={{ ...styles.cta, ...(move.trim() ? {} : styles.ctaDisabled) }} disabled={!move.trim()} onClick={beginCommit}>Commit.</button>
           <button style={styles.ctaMuted} onClick={() => setScreen("avoid")}>← Back</button>
         </>)}
 
-        {/* Commit */}
         {screen === "commit" && (
           <div style={{ ...styles.card, ...styles.commitCard }}>
             <div style={{ ...styles.stepPill, ...styles.stepPillDark }}>No more thinking.</div>
@@ -905,9 +856,7 @@ export default function App() {
             </div>
             {countdown > 0 ? (
               <>
-                <div style={styles.breatheRing(breathePhase)}>
-                  <div style={styles.breatheNum}>{countdown}</div>
-                </div>
+                <div style={styles.breatheRing(breathePhase)}><div style={styles.breatheNum}>{countdown}</div></div>
                 <div style={styles.breatheLabel}>{breathePhase === "in" ? "BREATHE IN" : "BREATHE OUT"}</div>
               </>
             ) : (
@@ -919,13 +868,10 @@ export default function App() {
           </div>
         )}
 
-        {/* Result */}
         {screen === "result" && latestEntry && (
           <div style={styles.card}>
             <div style={styles.stepPill}>Feedback</div>
-            <div style={styles.title}>
-              {latestEntry.status === "done" ? "You moved." : "You're still avoiding."}
-            </div>
+            <div style={styles.title}>{latestEntry.status === "done" ? "You moved." : "You're still avoiding."}</div>
             <div style={styles.aiFeedbackBox}>
               <div style={styles.aiBadge}>AI Insight</div>
               {aiFeedbackLoading ? (
@@ -938,9 +884,7 @@ export default function App() {
               <div style={{ ...styles.resultBox, background: streak >= 7 ? "#FFF8E1" : "#F7F3EC", border: streak >= 7 ? "1px solid #F0C040" : "1px solid #DDD5CA", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>
                   <div style={styles.label}>Current streak</div>
-                  <div style={{ ...styles.unfinishedMove, marginBottom: 0, color: streak >= 7 ? "#7A5200" : "#161413" }}>
-                    {streak} day{streak !== 1 ? "s" : ""}
-                  </div>
+                  <div style={{ ...styles.unfinishedMove, marginBottom: 0, color: streak >= 7 ? "#7A5200" : "#161413" }}>{streak} day{streak !== 1 ? "s" : ""}</div>
                 </div>
                 {streak >= 7 && <div style={{ fontSize: 28 }}>★</div>}
               </div>
@@ -954,7 +898,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Insights */}
         {screen === "insights" && (
           <div style={styles.card}>
             <div style={styles.stepPill}>Your patterns</div>
@@ -1013,7 +956,6 @@ export default function App() {
           </div>
         )}
 
-        {/* History */}
         {screen === "history" && (
           <div style={styles.card}>
             <div style={styles.stepPill}>History</div>
@@ -1051,7 +993,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Regular result popup */}
         {showResultPopup && latestEntry && !showMilestone && (
           <div style={styles.modalBackdrop}>
             <div style={styles.modalCard}>
@@ -1079,7 +1020,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Milestone popup */}
         {showMilestone && latestEntry && (
           <div style={styles.modalBackdrop}>
             <div style={styles.modalCardGold}>
