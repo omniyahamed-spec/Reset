@@ -10,26 +10,28 @@ type Screen =
   | "commit"
   | "result"
   | "history"
-  | "checkin";
+  | "checkin"
+  | "insights";
 
 type EntryStatus = "done" | "not_yet";
-
-interface Entry {
-  id: number;
-  createdAt: string;
-  mind: string;
-  avoiding: string;
-  move: string;
-  status: EntryStatus;
-  feedback: string;
-}
 
 interface Profile {
   id: string;
   name: string;
 }
 
-const MIND_SUGGESTIONS = ["Too much in my head", "I feel off", "I keep circling this"];
+interface Entry {
+  id: string;
+  profileId: string;
+  mind: string;
+  avoiding: string;
+  move: string;
+  status: EntryStatus;
+  feedback: string;
+  createdAt: string;
+}
+
+const MIND_SUGGESTIONS = ["Work", "A person", "Money", "Health"];
 const AVOIDING_SUGGESTIONS = ["Starting", "A message", "A decision"];
 const MOVE_SUGGESTIONS = ["Send it", "Open it", "Start 2 min"];
 
@@ -41,10 +43,8 @@ function makeProfileId(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, "-");
 }
 
-function startOfDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
+function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
 function formatDate(iso: string): string {
@@ -68,76 +68,121 @@ function getMilestoneLabel(streak: number): string | null {
 function progressBarStyle(pct: number): CSSProperties {
   return {
     height: "100%",
+    width: `${pct}%`,
     background: "#23201D",
     borderRadius: 999,
-    width: `${pct}%`,
     transition: "width 0.4s ease",
   };
 }
 
-function generateFeedback(
+// ── AI Feedback via Anthropic API ─────────────────────────────────────────
+async function getAIFeedback(
   status: EntryStatus,
   mind: string,
   avoiding: string,
   move: string,
-  seed: number
-): string {
-  const cleanAvoiding = avoiding.trim().toLowerCase();
-  const cleanMove = move.trim();
+  name: string,
+  pastPatterns: string
+): Promise<string> {
+  const prompt = `You are the voice inside Reset — a brutally honest, warm focus app for busy professionals.
 
-  const doneLines = [
-    `Look at you, actually becoming evidence. "${cleanMove}" happened. We may need to inform your excuses they lost today.`,
-    `You moved. Tiny? Maybe. Real? Yes. Your avoidance department is filing a complaint.`,
-    `Done. Not dramatic, not cinematic, but annoyingly effective. This is how people become dangerous.`,
-    `You did it. The brain wanted a full committee meeting. You chose action. Excellent governance.`,
-    `That counts. Your future self just raised one eyebrow and said, "Finally."`,
-    `You acted before the spiral finished its TED Talk. Strong move.`,
-  ];
+User: ${name}
+They just completed a reset session.
+Status: ${status === "done" ? "They DID the move" : "They did NOT do the move yet"}
+What was on their mind: "${mind}"
+What they were avoiding: "${avoiding}"
+Their committed move: "${move}"
+${pastPatterns ? `Their recent patterns: ${pastPatterns}` : ""}
 
-  const notYetLines = [
-    `Not yet. Fine. But let's not call it confusion. The move is probably too big or your excuse has better branding.`,
-    `Still parked. Make the move smaller. If it feels embarrassing, perfect — that means it might actually happen.`,
-    `You didn't do it. No tragedy. Just data. The task needs to be cut in half before your brain starts negotiating again.`,
-    `Avoidance won this round. Narrow victory. Shrink the move and ask for a rematch.`,
-    `Not yet means the action was too expensive emotionally. Make it cheaper. Ridiculously cheaper.`,
-    `You are not lazy. You are overcomplicating the doorway. Use the smaller door.`,
-  ];
+Write 2-3 sentences of feedback. Be specific to EXACTLY what they wrote — not generic. 
+If done: acknowledge the specific thing they did, note why it matters, one line of forward momentum.
+If not yet: don't shame them. Name the real reason this specific thing is hard. Make the move smaller in one concrete suggestion.
+Tone: like a sharp, caring friend who doesn't sugarcoat. Direct. Human. Never corporate.
+Never start with "I" or the user's name. No emojis. No lists.`;
 
-  const avoidanceLines: Record<string, string[]> = {
-    starting: [
-      `Classic. "Starting" — the tiny villain wearing a very expensive costume.`,
-      `Starting again? The beginning is not a monster. It just has bad PR.`,
-    ],
-    "a message": [
-      `A message. Of course. Humanity built satellites, but one text still has everyone acting haunted.`,
-      `The message will not explode. Probably. Send the clean version, not the perfect version.`,
-    ],
-    "a decision": [
-      `A decision. Translation: you already know, but you want the universe to co-sign the invoice.`,
-      `Decisions get heavier when you keep carrying them around. Put this one down.`,
-    ],
-  };
-
-  const specific = avoidanceLines[cleanAvoiding]?.[seed % avoidanceLines[cleanAvoiding].length];
-  if (specific) return specific;
-
-  const source = status === "done" ? doneLines : notYetLines;
-  return source[seed % source.length];
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.REACT_APP_ANTHROPIC_API_KEY || "",
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    const data = await response.json();
+    const text = data.content?.find((b: any) => b.type === "text")?.text ?? "";
+    return text.trim() || getFallbackFeedback(status);
+  } catch {
+    return getFallbackFeedback(status);
+  }
 }
 
-function mapEntry(row: any): Entry {
-  return {
-    id: row.id,
-    createdAt: row.created_at,
-    mind: row.mind,
-    avoiding: row.avoiding,
-    move: row.move,
-    status: row.status,
-    feedback: row.feedback,
-  };
+function getFallbackFeedback(status: EntryStatus): string {
+  if (status === "done") {
+    return "You moved. That's the whole game — not perfection, just momentum. Do it again tomorrow.";
+  }
+  return "Not yet is just data. The move was probably too big. Cut it in half and try the smaller door.";
 }
 
-// ── Push notification helpers ──────────────────────────────────────────────
+// ── Pattern analysis ──────────────────────────────────────────────────────
+function analyzePatterns(entries: Entry[]): {
+  topAvoiding: string | null;
+  completionRate: number;
+  mostProductiveDays: string[];
+  recurringMind: string | null;
+} {
+  if (entries.length < 3) {
+    return { topAvoiding: null, completionRate: 0, mostProductiveDays: [], recurringMind: null };
+  }
+
+  const avoidingMap: Record<string, number> = {};
+  entries.forEach((e) => {
+    const key = e.avoiding.toLowerCase().trim();
+    avoidingMap[key] = (avoidingMap[key] || 0) + 1;
+  });
+  const topAvoiding = Object.entries(avoidingMap).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+  const done = entries.filter((e) => e.status === "done").length;
+  const completionRate = Math.round((done / entries.length) * 100);
+
+  const dayMap: Record<string, { done: number; total: number }> = {};
+  entries.forEach((e) => {
+    const day = new Date(e.createdAt).toLocaleDateString(undefined, { weekday: "long" });
+    if (!dayMap[day]) dayMap[day] = { done: 0, total: 0 };
+    dayMap[day].total++;
+    if (e.status === "done") dayMap[day].done++;
+  });
+  const mostProductiveDays = Object.entries(dayMap)
+    .filter(([, v]) => v.total >= 2)
+    .sort((a, b) => b[1].done / b[1].total - a[1].done / a[1].total)
+    .slice(0, 2)
+    .map(([day]) => day);
+
+  const mindMap: Record<string, number> = {};
+  entries.forEach((e) => {
+    const key = e.mind.toLowerCase().trim();
+    mindMap[key] = (mindMap[key] || 0) + 1;
+  });
+  const recurringMind = Object.entries(mindMap).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+  return { topAvoiding, completionRate, mostProductiveDays, recurringMind };
+}
+
+function buildPastPatternsSummary(entries: Entry[]): string {
+  if (entries.length < 3) return "";
+  const recent = entries.slice(0, 7);
+  const avoidingList = [...new Set(recent.map((e) => e.avoiding))].slice(0, 3).join(", ");
+  const doneCount = recent.filter((e) => e.status === "done").length;
+  return `Recently avoided: ${avoidingList}. Completed ${doneCount}/${recent.length} recent moves.`;
+}
+
+// ── Push notification helpers ─────────────────────────────────────────────
 async function requestNotificationPermission(): Promise<boolean> {
   if (!("Notification" in window)) return false;
   if (Notification.permission === "granted") return true;
@@ -145,33 +190,25 @@ async function requestNotificationPermission(): Promise<boolean> {
   const result = await Notification.requestPermission();
   return result === "granted";
 }
-
 function scheduleLocalReminder(profileName: string) {
-  // Store the reminder preference; a SW or a simple interval on next load fires it
   localStorage.setItem("reset_reminder_enabled", "true");
   localStorage.setItem("reset_reminder_name", profileName);
 }
-
 function cancelLocalReminder() {
   localStorage.removeItem("reset_reminder_enabled");
 }
-
 function checkAndFireReminder(profileName: string, hasResetToday: boolean) {
   if (!("Notification" in window)) return;
   if (Notification.permission !== "granted") return;
-
   const enabled = localStorage.getItem("reset_reminder_enabled");
   if (!enabled) return;
-
   const now = new Date();
   const hour = now.getHours();
   const lastFired = localStorage.getItem("reset_reminder_last_fired");
   const today = startOfDay(now).toISOString();
-
-  if (lastFired === today) return; // Already fired today
-  if (hour < DAILY_REMINDER_HOUR) return; // Not noon yet
-  if (hasResetToday) return; // Already reset today
-
+  if (lastFired === today) return;
+  if (hour < DAILY_REMINDER_HOUR) return;
+  if (hasResetToday) return;
   localStorage.setItem("reset_reminder_last_fired", today);
   new Notification("Reset — your daily check-in", {
     body: `Hey ${profileName}. Head full? Name the dodge. Make one move.`,
@@ -180,20 +217,31 @@ function checkAndFireReminder(profileName: string, hasResetToday: boolean) {
   });
 }
 
+function mapEntry(row: any): Entry {
+  return {
+    id: row.id,
+    profileId: row.profile_id,
+    mind: row.mind,
+    avoiding: row.avoiding,
+    move: row.move,
+    status: row.status,
+    feedback: row.feedback,
+    createdAt: row.created_at,
+  };
+}
+
 export default function App() {
   const [screen, setScreen] = useState<Screen>("profile");
   const [loading, setLoading] = useState(true);
-
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileName, setProfileName] = useState("");
   const [profileError, setProfileError] = useState("");
-
+  const [entries, setEntries] = useState<Entry[]>([]);
   const [mind, setMind] = useState("");
   const [avoiding, setAvoiding] = useState("");
   const [move, setMove] = useState("");
-  const [entries, setEntries] = useState<Entry[]>([]);
   const [countdown, setCountdown] = useState(COMMIT_SECONDS);
-  const [latestId, setLatestId] = useState<number | null>(null);
+  const [latestId, setLatestId] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [breathePhase, setBreathePhase] = useState<"in" | "out">("in");
   const [showResultPopup, setShowResultPopup] = useState(false);
@@ -202,6 +250,8 @@ export default function App() {
   const [notifPermission, setNotifPermission] = useState<string>("default");
   const [streakAtRisk, setStreakAtRisk] = useState(false);
   const [checkinEntry, setCheckinEntry] = useState<Entry | null>(null);
+  const [aiFeedback, setAiFeedback] = useState<string>("");
+  const [aiFeedbackLoading, setAiFeedbackLoading] = useState(false);
 
   const mindRef = useRef<HTMLInputElement>(null);
   const avoidRef = useRef<HTMLInputElement>(null);
@@ -212,10 +262,7 @@ export default function App() {
       const savedProfileId = localStorage.getItem("reset_profile_id");
       const reminderEnabled = localStorage.getItem("reset_reminder_enabled") === "true";
       setNotifEnabled(reminderEnabled);
-
-      if ("Notification" in window) {
-        setNotifPermission(Notification.permission);
-      }
+      if ("Notification" in window) setNotifPermission(Notification.permission);
 
       if (!savedProfileId) {
         setScreen("profile");
@@ -227,10 +274,9 @@ export default function App() {
         .from("profiles")
         .select("*")
         .eq("id", savedProfileId)
-        .maybeSingle();
+        .single();
 
       if (error || !data) {
-        localStorage.removeItem("reset_profile_id");
         setScreen("profile");
         setLoading(false);
         return;
@@ -241,20 +287,14 @@ export default function App() {
       await loadEntries(savedProfileId);
       setLoading(false);
     }
-
     init();
   }, []);
 
-  // After entries load, decide what screen to show
   useEffect(() => {
     if (loading || !profile) return;
-
     const hasResetToday = entries.some(
-      (e) =>
-        startOfDay(new Date(e.createdAt)).getTime() === startOfDay(new Date()).getTime()
+      (e) => startOfDay(new Date(e.createdAt)).getTime() === startOfDay(new Date()).getTime()
     );
-
-    // Check if streak is at risk (had a streak yesterday but not today)
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const hadYesterday = entries.some(
@@ -262,28 +302,21 @@ export default function App() {
         e.status === "done" &&
         startOfDay(new Date(e.createdAt)).getTime() === startOfDay(yesterday).getTime()
     );
+    if (hadYesterday && !hasResetToday) setStreakAtRisk(true);
 
-    if (hadYesterday && !hasResetToday) {
-      setStreakAtRisk(true);
-    }
-
-    // Daily check-in: find yesterday's not_yet entry
     const yesterdayNotYet = entries.find(
       (e) =>
         e.status === "not_yet" &&
         startOfDay(new Date(e.createdAt)).getTime() === startOfDay(yesterday).getTime()
     );
-
     if (yesterdayNotYet && !hasResetToday) {
       setCheckinEntry(yesterdayNotYet);
       setScreen("checkin");
     } else {
       setScreen("start");
     }
-
-    // Fire reminder if applicable
     checkAndFireReminder(profile.name, hasResetToday);
-  }, [loading, profile, entries.length]);
+  }, [loading, profile, entries.length]); // eslint-disable-line
 
   async function loadEntries(profileId: string) {
     const { data, error } = await supabase
@@ -292,14 +325,7 @@ export default function App() {
       .eq("profile_id", profileId)
       .order("created_at", { ascending: false })
       .limit(50);
-
-    if (error) {
-      console.error("Failed to load entries", error);
-      setEntries([]);
-      return;
-    }
-
-    setEntries((data ?? []).map(mapEntry));
+    if (!error && data) setEntries(data.map(mapEntry));
   }
 
   useEffect(() => {
@@ -324,14 +350,13 @@ export default function App() {
   }, [screen, countdown]);
 
   const latestEntry = useMemo(
-    () => entries.find((e) => e.id === latestId) ?? null,
+    () => (latestId ? entries.find((e) => e.id === latestId) ?? null : null),
     [entries, latestId]
   );
 
   const doneCount = useMemo(() => entries.filter((e) => e.status === "done").length, [entries]);
   const notYetCount = useMemo(() => entries.filter((e) => e.status === "not_yet").length, [entries]);
   const totalResets = entries.length;
-
   const lastNotYet = useMemo(() => entries.find((e) => e.status === "not_yet"), [entries]);
 
   const latestResetTime = latestEntry
@@ -339,10 +364,18 @@ export default function App() {
         weekday: "short",
         month: "short",
         day: "numeric",
-        hour: "2-digit",
+        hour: "numeric",
         minute: "2-digit",
       })
     : "";
+
+  const hasResetToday = useMemo(
+    () =>
+      entries.some(
+        (e) => startOfDay(new Date(e.createdAt)).getTime() === startOfDay(new Date()).getTime()
+      ),
+    [entries]
+  );
 
   const streak = useMemo(() => {
     let s = 0;
@@ -376,15 +409,7 @@ export default function App() {
     return days;
   }, [entries]);
 
-  const hasResetToday = useMemo(
-    () =>
-      entries.some(
-        (e) =>
-          startOfDay(new Date(e.createdAt)).getTime() === startOfDay(new Date()).getTime()
-      ),
-    [entries]
-  );
-
+  const patterns = useMemo(() => analyzePatterns(entries), [entries]);
   const milestoneLabel = getMilestoneLabel(streak);
   const isMilestone = milestoneLabel !== null;
 
@@ -401,15 +426,12 @@ export default function App() {
       .upsert(payload, { onConflict: "id" })
       .select()
       .single();
-
     if (error) {
       setProfileError(error.message);
       return;
     }
-
     localStorage.setItem("reset_profile_id", id);
     setProfile(data as Profile);
-    await loadEntries(id);
     setScreen("start");
   }
 
@@ -428,11 +450,11 @@ export default function App() {
     setAvoiding("");
     setMove("");
     setCountdown(COMMIT_SECONDS);
-    setBreathePhase("in");
     setLatestId(null);
     setShareCopied(false);
     setShowResultPopup(false);
     setShowMilestone(false);
+    setAiFeedback("");
     setScreen(profile ? "start" : "profile");
   }
 
@@ -444,20 +466,18 @@ export default function App() {
   }
 
   async function saveResult(status: EntryStatus) {
-    if (!profile) {
-      setScreen("profile");
-      return;
-    }
+    if (!profile) return;
 
-    const seed = Date.now();
-    const feedback = generateFeedback(status, mind, avoiding, move, seed);
+    setAiFeedbackLoading(true);
+    const pastPatterns = buildPastPatternsSummary(entries);
+
     const payload = {
       profile_id: profile.id,
       mind: mind.trim(),
       avoiding: avoiding.trim(),
       move: move.trim(),
       status,
-      feedback,
+      feedback: "...",
     };
 
     const { data, error } = await supabase
@@ -468,14 +488,15 @@ export default function App() {
 
     if (error) {
       alert("The entry did not save. Check Supabase table or policies.");
+      setAiFeedbackLoading(false);
       return;
     }
 
     const newEntry = mapEntry(data);
     setEntries((prev) => [newEntry, ...prev].slice(0, 50));
     setLatestId(newEntry.id);
+    setScreen("result");
 
-    // Check for milestone AFTER updating streak
     const newStreak = status === "done" ? streak + 1 : streak;
     if (status === "done" && MILESTONE_DAYS.includes(newStreak)) {
       setShowMilestone(true);
@@ -483,7 +504,14 @@ export default function App() {
       setShowResultPopup(true);
     }
 
-    setScreen("result");
+    const feedback = await getAIFeedback(status, mind, avoiding, move, profile.name, pastPatterns);
+    setAiFeedback(feedback);
+    setAiFeedbackLoading(false);
+
+    await supabase.from("entries").update({ feedback }).eq("id", newEntry.id);
+    setEntries((prev) =>
+      prev.map((e) => (e.id === newEntry.id ? { ...e, feedback } : e))
+    );
   }
 
   async function toggleNotifications() {
@@ -517,9 +545,7 @@ export default function App() {
     setMind(lastNotYet.mind);
     setAvoiding(lastNotYet.avoiding);
     setMove(lastNotYet.move);
-    setCountdown(COMMIT_SECONDS);
-    setBreathePhase("in");
-    setScreen("commit");
+    setScreen("move");
   }
 
   async function shareMove() {
@@ -532,799 +558,124 @@ export default function App() {
       await navigator.clipboard.writeText(text);
       setShareCopied(true);
       window.setTimeout(() => setShareCopied(false), 1800);
-    } catch (error) {
-      console.error("Share failed", error);
-    }
+    } catch {}
   }
 
-  const today = new Date();
+  if (loading) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#F5F1EA" }}>
+        <div style={{ fontSize: 13, color: "#6F6861", letterSpacing: "0.1em" }}>Loading...</div>
+      </div>
+    );
+  }
 
-  const styles: Record<string, CSSProperties> = {
-    page: {
-      minHeight: "100vh",
-      background: "#F5F1EA",
-      color: "#161413",
-      fontFamily: "Inter, system-ui, sans-serif",
-      padding: "20px 14px 48px",
-      boxSizing: "border-box",
-    },
-    wrap: {
-      maxWidth: 560,
-      margin: "0 auto",
-    },
-    topRow: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      gap: 12,
-      marginBottom: 14,
-    },
-    badge: {
-      display: "inline-block",
-      border: "1px solid #DDD5CA",
-      background: "#FFFDF9",
-      color: "#6F6861",
-      borderRadius: 999,
-      padding: "7px 11px",
-      fontSize: 11,
-      letterSpacing: "0.22em",
-      textTransform: "uppercase",
-    },
-    date: {
-      fontSize: 12,
-      color: "#6F6861",
-    },
-    // ── Streak tracker ────────────────────────────────────────────────────
-    trackerCard: {
-      background: "#FFFDF9",
-      border: "1px solid #DDD5CA",
-      borderRadius: 22,
-      padding: 16,
-      marginBottom: 14,
-      boxShadow: "0 14px 40px rgba(35, 32, 29, 0.05)",
-    },
-    trackerCardMilestone: {
-      background: "linear-gradient(135deg, #FFF8E1 0%, #FFF3CC 50%, #FFFDF9 100%)",
-      border: "1.5px solid #F0C040",
-      borderRadius: 22,
-      padding: 16,
-      marginBottom: 14,
-      boxShadow: "0 14px 40px rgba(240, 192, 64, 0.18)",
-      animation: "goldPulse 2s ease-in-out infinite",
-    },
-    trackerTop: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      gap: 10,
-      marginBottom: 12,
-      flexWrap: "wrap",
-    },
-    label: {
-      fontSize: 11,
-      letterSpacing: "0.12em",
-      textTransform: "uppercase",
-      color: "#6F6861",
-      fontWeight: 700,
-      marginBottom: 6,
-    },
-    trackerText: {
-      fontSize: 13,
-      color: "#6F6861",
-    },
-    streakPill: {
-      display: "inline-block",
-      background: "#23201D",
-      color: "#FFFDF9",
-      borderRadius: 999,
-      padding: "4px 10px",
-      fontSize: 11,
-      fontWeight: 700,
-    },
-    streakPillMilestone: {
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 5,
-      background: "#E8A000",
-      color: "#FFF8E1",
-      borderRadius: 999,
-      padding: "4px 10px",
-      fontSize: 11,
-      fontWeight: 700,
-    },
-    streakAtRiskPill: {
-      display: "inline-block",
-      background: "#8B1E1E",
-      color: "#FFFDF9",
-      borderRadius: 999,
-      padding: "4px 10px",
-      fontSize: 11,
-      fontWeight: 700,
-    },
-    trackerRow: {
-      display: "grid",
-      gridTemplateColumns: "repeat(7, 1fr)",
-      gap: 8,
-    },
-    trackerDay: {
-      textAlign: "center",
-      fontSize: 10,
-      color: "#6F6861",
-    },
-    dot: {
-      width: 11,
-      height: 11,
-      borderRadius: 999,
-      background: "#DDD5CA",
-      margin: "0 auto 6px",
-    },
-    dotActive: {
-      background: "#23201D",
-    },
-    dotToday: {
-      boxShadow: "0 0 0 2px #F5F1EA, 0 0 0 3.5px #23201D",
-    },
-    milestoneText: {
-      fontSize: 13,
-      color: "#B07A00",
-      fontStyle: "italic",
-      marginTop: 10,
-      lineHeight: 1.5,
-    },
-    // ── Streak at risk banner ─────────────────────────────────────────────
-    riskBanner: {
-      background: "#1E0A0A",
-      border: "1px solid #5C1F1F",
-      borderRadius: 16,
-      padding: "12px 16px",
-      marginBottom: 12,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 12,
-    },
-    riskText: {
-      fontSize: 13,
-      color: "#F5C0C0",
-      lineHeight: 1.45,
-      flex: 1,
-    },
-    riskButton: {
-      padding: "8px 14px",
-      borderRadius: 999,
-      border: "none",
-      background: "#8B1E1E",
-      color: "#FFFDF9",
-      fontSize: 12,
-      fontWeight: 700,
-      cursor: "pointer",
-      whiteSpace: "nowrap",
-    },
-    // ── Notification toggle ───────────────────────────────────────────────
-    notifRow: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 10,
-      background: "#FFFDF9",
-      border: "1px solid #DDD5CA",
-      borderRadius: 16,
-      padding: "12px 16px",
-      marginBottom: 10,
-    },
-    notifLabel: {
-      fontSize: 13,
-      color: "#23201D",
-      fontWeight: 600,
-    },
-    notifSub: {
-      fontSize: 11,
-      color: "#6F6861",
-      marginTop: 2,
-    },
-    toggleTrack: (on: boolean): CSSProperties => ({
-      width: 44,
-      height: 26,
-      borderRadius: 999,
-      background: on ? "#23201D" : "#DDD5CA",
-      position: "relative",
-      cursor: "pointer",
-      transition: "background 0.2s",
-      flexShrink: 0,
-    }),
-    toggleThumb: (on: boolean): CSSProperties => ({
-      position: "absolute",
-      top: 3,
-      left: on ? 21 : 3,
-      width: 20,
-      height: 20,
-      borderRadius: "50%",
-      background: "#FFFDF9",
-      transition: "left 0.2s",
-      boxShadow: "0 1px 4px rgba(0,0,0,0.18)",
-    }),
-    // ── Check-in screen ───────────────────────────────────────────────────
-    checkinCard: {
-      background: "#FFFDF9",
-      border: "1px solid #DDD5CA",
-      borderRadius: 28,
-      padding: 24,
-      boxShadow: "0 18px 50px rgba(35, 32, 29, 0.06)",
-    },
-    checkinBadge: {
-      display: "inline-block",
-      background: "#F7F1E6",
-      border: "1px solid #DDD5CA",
-      borderRadius: 999,
-      padding: "5px 12px",
-      fontSize: 11,
-      fontWeight: 700,
-      letterSpacing: "0.1em",
-      textTransform: "uppercase",
-      color: "#6F6861",
-      marginBottom: 14,
-    },
-    checkinMove: {
-      fontSize: 24,
-      lineHeight: 1.2,
-      fontWeight: 500,
-      fontFamily: 'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
-      margin: "10px 0 6px",
-      letterSpacing: "-0.03em",
-    },
-    // ── Hero ──────────────────────────────────────────────────────────────
-    heroCard: {
-      position: "relative",
-      minHeight: 580,
-      borderRadius: 28,
-      overflow: "hidden",
-      backgroundColor: "#EDE7DE",
-      backgroundImage:
-        "linear-gradient(rgba(245,241,234,0.45), rgba(245,241,234,0.75)), url('/garden.png')",
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-      border: "1px solid #DDD5CA",
-      boxShadow: "0 18px 50px rgba(35, 32, 29, 0.06)",
-      display: "flex",
-      alignItems: "stretch",
-      marginBottom: 10,
-    },
-    heroOverlay: {
-      width: "100%",
-      padding: 28,
-      display: "flex",
-      flexDirection: "column",
-      justifyContent: "space-between",
-    },
-    heroTitle: {
-      fontSize: "clamp(40px, 9vw, 58px)",
-      lineHeight: 0.96,
-      letterSpacing: "-0.06em",
-      fontWeight: 500,
-      fontFamily: 'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
-      maxWidth: 320,
-      color: "#161413",
-      marginBottom: 16,
-      whiteSpace: "pre-line",
-    },
-    heroSub: {
-      fontSize: 15,
-      lineHeight: 1.55,
-      color: "#2B2723",
-      maxWidth: 260,
-    },
-    heroBottom: { maxWidth: 320 },
-    startButton: {
-      width: "100%",
-      padding: "18px 20px",
-      borderRadius: 999,
-      border: "none",
-      background: "#161413",
-      color: "#FFFDF9",
-      fontSize: 18,
-      fontWeight: 500,
-      fontFamily: 'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
-      cursor: "pointer",
-      marginBottom: 12,
-    },
-    heroFoot: {
-      fontSize: 13,
-      color: "#2B2723",
-      textAlign: "center",
-    },
-    unfinishedCard: {
-      background: "#FFFDF9",
-      border: "1px solid #DDD5CA",
-      borderRadius: 20,
-      padding: 16,
-      marginBottom: 12,
-    },
-    unfinishedMove: {
-      fontSize: 20,
-      lineHeight: 1.2,
-      fontWeight: 500,
-      fontFamily: 'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
-      marginBottom: 10,
-    },
-    card: {
-      background: "#FFFDF9",
-      border: "1px solid #DDD5CA",
-      borderRadius: 28,
-      padding: 24,
-      boxShadow: "0 18px 50px rgba(35, 32, 29, 0.06)",
-    },
-    commitCard: {
-      background: "#12110F",
-      color: "#F3ECE3",
-      border: "1px solid #2A2724",
-      boxShadow: "0 18px 50px rgba(18, 17, 15, 0.22)",
-    },
-    progressWrap: {
-      height: 3,
-      background: "#EDE7DE",
-      borderRadius: 999,
-      marginBottom: 20,
-      overflow: "hidden",
-    },
-    stepPill: {
-      display: "inline-block",
-      padding: "7px 12px",
-      borderRadius: 999,
-      fontSize: 11,
-      fontWeight: 700,
-      letterSpacing: "0.1em",
-      textTransform: "uppercase",
-      background: "#F1ECE4",
-      color: "#6F6861",
-      marginBottom: 14,
-    },
-    stepPillDark: {
-      background: "rgba(255,255,255,0.08)",
-      color: "#A79E93",
-    },
-    title: {
-      fontSize: "clamp(28px, 6vw, 38px)",
-      lineHeight: 0.98,
-      letterSpacing: "-0.05em",
-      fontWeight: 500,
-      fontFamily: 'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
-      marginBottom: 8,
-    },
-    sub: {
-      fontSize: 14,
-      color: "#6F6861",
-      lineHeight: 1.55,
-      marginBottom: 14,
-      maxWidth: 420,
-    },
+  const styles: Record<string, CSSProperties | any> = {
+    page: { minHeight: "100vh", background: "#F5F1EA", padding: "0 0 40px" },
+    wrap: { maxWidth: 480, margin: "0 auto", padding: "0 16px" },
+    topRow: { display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 20, paddingBottom: 14 },
+    badge: { fontSize: 13, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "#23201D" },
+    profileBtn: { fontSize: 12, color: "#6F6861", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" },
+    card: { background: "#FFFDF9", border: "1px solid #DDD5CA", borderRadius: 28, padding: 24, marginBottom: 14, boxShadow: "0 18px 50px rgba(35,32,29,0.06)" },
+    progressWrap: { height: 3, background: "#E8E2D9", borderRadius: 999, marginBottom: 20, overflow: "hidden" },
+    stepPill: { display: "inline-block", background: "#F7F1E6", border: "1px solid #DDD5CA", borderRadius: 999, padding: "5px 12px", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: "#6F6861", marginBottom: 14 },
+    stepPillDark: { background: "#23201D", color: "#F5F1EA", border: "none" },
+    title: { fontSize: 28, lineHeight: 1.15, fontWeight: 500, fontFamily: 'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif', marginBottom: 6, letterSpacing: "-0.03em", color: "#161413" },
+    sub: { fontSize: 14, color: "#6F6861", lineHeight: 1.5, marginBottom: 14 },
     subDark: { color: "#A79E93" },
-    focusHint: {
-      fontSize: 12,
-      color: "#6F6861",
-      background: "#F7F3EC",
-      border: "1px solid #DDD5CA",
-      borderRadius: 10,
-      padding: "8px 12px",
-      marginBottom: 14,
-      lineHeight: 1.5,
-    },
-    chips: {
-      display: "flex",
-      flexWrap: "wrap",
-      gap: 7,
-      marginBottom: 10,
-    },
-    chip: {
-      padding: "9px 13px",
-      borderRadius: 999,
-      border: "1px solid #DDD5CA",
-      background: "#F7F3EC",
-      color: "#23201D",
-      fontSize: 13,
-      fontWeight: 600,
-      cursor: "pointer",
-    },
-    chipActive: {
-      background: "#23201D",
-      color: "#FFFDF9",
-      border: "1px solid #23201D",
-    },
-    input: {
-      width: "100%",
-      padding: "15px 0 11px",
-      border: "none",
-      borderBottom: "1.5px solid #CFC5B7",
-      background: "transparent",
-      color: "#161413",
-      fontSize: 19,
-      lineHeight: 1.4,
-      boxSizing: "border-box",
-      outline: "none",
-      borderRadius: 0,
-      fontFamily: "inherit",
-    },
-    charCount: {
-      fontSize: 11,
-      color: "#B5ADA6",
-      textAlign: "right",
-    },
-    helperRow: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginTop: 6,
-      marginBottom: 16,
-    },
+    label: { fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: "#6F6861" },
+    focusHint: { fontSize: 12, color: "#6F6861", marginBottom: 16, fontStyle: "italic" },
+    chips: { display: "flex", flexWrap: "wrap" as const, gap: 8, marginBottom: 14 },
+    chip: { padding: "7px 14px", borderRadius: 999, border: "1px solid #DDD5CA", background: "#F7F1E6", fontSize: 13, cursor: "pointer", color: "#4A4540", fontFamily: "inherit" },
+    chipActive: { background: "#23201D", color: "#F5F1EA", border: "1px solid #23201D" },
+    input: { width: "100%", padding: "13px 14px", borderRadius: 16, border: "1px solid #DDD5CA", background: "#F7F1E6", fontSize: 15, color: "#161413", fontFamily: "inherit", outline: "none", boxSizing: "border-box" as const, marginBottom: 8 },
+    helperRow: { display: "flex", justifyContent: "space-between", fontSize: 12, color: "#736C64", marginBottom: 16 },
     helper: { fontSize: 12, color: "#736C64" },
-    cta: {
-      width: "100%",
-      padding: "15px 18px",
-      borderRadius: 18,
-      border: "none",
-      background: "#23201D",
-      color: "#FFFDF9",
-      fontSize: 15,
-      fontWeight: 800,
-      cursor: "pointer",
-      fontFamily: "inherit",
-    },
+    cta: { width: "100%", padding: "15px 18px", borderRadius: 18, border: "none", background: "#23201D", color: "#F5F1EA", fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", marginBottom: 10 },
     ctaDisabled: { opacity: 0.38, cursor: "not-allowed" },
-    ctaMuted: {
-      width: "100%",
-      padding: "13px 18px",
-      borderRadius: 16,
-      border: "1px solid #DDD5CA",
-      background: "transparent",
-      color: "#6F6861",
-      fontSize: 14,
-      fontWeight: 700,
-      cursor: "pointer",
-      marginTop: 9,
-      fontFamily: "inherit",
-    },
-    moveBox: {
-      background: "rgba(255,255,255,0.06)",
-      border: "1px solid rgba(255,255,255,0.08)",
-      borderRadius: 20,
-      padding: 18,
-      marginBottom: 16,
-    },
-    moveBig: {
-      fontSize: 26,
-      lineHeight: 1.15,
-      fontWeight: 500,
-      fontFamily: 'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
-      letterSpacing: "-0.04em",
-    },
-    breathingWrap: {
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      padding: "8px 0 20px",
-    },
-    breatheLabel: {
-      fontSize: 11,
-      color: "#A79E93",
-      letterSpacing: "0.12em",
-      textTransform: "uppercase",
-      marginBottom: 10,
-    },
-    breathingRing: {
-      width: 96,
-      height: 96,
-      borderRadius: "50%",
-      background: "rgba(255,255,255,0.06)",
-      border: "2px solid rgba(255,255,255,0.15)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      position: "relative",
-      marginBottom: 14,
-    },
-    ringNum: {
-      fontSize: 46,
-      fontWeight: 900,
-      letterSpacing: "-0.06em",
-      lineHeight: 1,
-      position: "relative",
-      zIndex: 1,
-    },
-    countdownText: {
-      fontSize: 14,
-      fontWeight: 600,
-      opacity: 0.85,
-      letterSpacing: "0.04em",
-    },
-    breatheGuide: {
-      fontSize: 12,
-      color: "#A79E93",
-      marginTop: 6,
-      letterSpacing: "0.02em",
-    },
-    statusRow: {
-      display: "flex",
-      gap: 10,
-      flexWrap: "wrap",
-      marginTop: 8,
-    },
-    statusPrimary: {
-      flex: 1,
-      minWidth: 130,
-      padding: "14px 16px",
-      borderRadius: 16,
-      border: "none",
-      background: "#F3ECE3",
-      color: "#12110F",
-      fontWeight: 800,
-      cursor: "pointer",
-      fontFamily: "inherit",
-      fontSize: 15,
-    },
-    statusSecondary: {
-      flex: 1,
-      minWidth: 130,
-      padding: "14px 16px",
-      borderRadius: 16,
-      border: "1px solid #3A3530",
-      background: "transparent",
-      color: "#F3ECE3",
-      fontWeight: 800,
-      cursor: "pointer",
-      fontFamily: "inherit",
-      fontSize: 15,
-    },
-    resultBox: {
-      background: "#F7F3EC",
-      border: "1px solid #DDD5CA",
-      borderRadius: 20,
-      padding: 16,
-      marginTop: 12,
-      marginBottom: 14,
-    },
-    resultMove: {
-      fontSize: 21,
-      lineHeight: 1.2,
-      fontWeight: 500,
-      fontFamily: 'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
-      marginBottom: 8,
-      letterSpacing: "-0.03em",
-    },
-    resultMeta: {
-      fontSize: 13,
-      color: "#6F6861",
-      lineHeight: 1.5,
-    },
-    feedbackBox: {
-      background: "#FFFDF9",
-      border: "1px solid #DDD5CA",
-      borderRadius: 20,
-      padding: 16,
-      marginBottom: 14,
-    },
-    feedbackText: {
-      fontSize: 20,
-      lineHeight: 1.35,
-      fontWeight: 500,
-      letterSpacing: "-0.03em",
-      fontFamily: 'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
-    },
-    statusBadgeDone: {
-      display: "inline-block",
-      padding: "4px 10px",
-      borderRadius: 999,
-      fontSize: 11,
-      fontWeight: 700,
-      background: "#23201D",
-      color: "#FFFDF9",
-    },
-    statusBadgeNot: {
-      display: "inline-block",
-      padding: "4px 10px",
-      borderRadius: 999,
-      fontSize: 11,
-      fontWeight: 700,
-      background: "#ECE7DE",
-      color: "#6F6861",
-    },
-    shareBox: {
-      marginTop: 12,
-      padding: 14,
-      borderRadius: 18,
-      background: "#F7F3EC",
-      border: "1px solid #DDD5CA",
-    },
+    ctaMuted: { width: "100%", padding: "13px 18px", borderRadius: 18, border: "1px solid #DDD5CA", background: "transparent", color: "#6F6861", fontSize: 14, cursor: "pointer", fontFamily: "inherit", marginBottom: 8 },
+    ctaGold: { width: "100%", padding: "15px 18px", borderRadius: 18, border: "none", background: "#E8A000", color: "#FFF8E1", fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" },
+    trackerCard: { background: "#FFFDF9", border: "1px solid #DDD5CA", borderRadius: 22, padding: 16, marginBottom: 14, boxShadow: "0 14px 40px rgba(35,32,29,0.05)" },
+    trackerCardMilestone: { background: "linear-gradient(135deg,#FFF8E1 0%,#FFF3CC 50%,#FFFDF9 100%)", border: "1.5px solid #F0C040", borderRadius: 22, padding: 16, marginBottom: 14, boxShadow: "0 14px 40px rgba(240,192,64,0.18)", animation: "goldPulse 2s ease-in-out infinite" },
+    trackerTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 },
+    streakPill: { display: "inline-flex", alignItems: "center", gap: 5, background: "#23201D", color: "#F5F1EA", borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 700 },
+    streakPillMilestone: { display: "inline-flex", alignItems: "center", gap: 5, background: "#E8A000", color: "#FFF8E1", borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 700 },
+    streakAtRiskPill: { display: "inline-block", background: "#8B1E1E", color: "#FFFDF9", borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 700 },
+    trackerRow: { display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4, textAlign: "center" as const },
+    trackerDay: { fontSize: 10, color: "#6F6861", display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 5 },
+    trackerText: { fontSize: 12, color: "#6F6861" },
+    dot: { width: 10, height: 10, borderRadius: "50%", background: "#E8E2D9" },
+    dotActive: { background: "#23201D" },
+    dotToday: { boxShadow: "0 0 0 2px #F5F1EA, 0 0 0 3.5px #23201D" },
+    milestoneText: { fontSize: 13, color: "#B07A00", fontStyle: "italic", marginTop: 10, lineHeight: 1.5 },
+    riskBanner: { background: "#1E0A0A", border: "1px solid #5C1F1F", borderRadius: 16, padding: "12px 16px", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 },
+    riskText: { fontSize: 13, color: "#F5C0C0", lineHeight: 1.45, flex: 1 },
+    riskButton: { padding: "8px 14px", borderRadius: 999, border: "none", background: "#8B1E1E", color: "#FFFDF9", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" as const },
+    notifRow: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "#FFFDF9", border: "1px solid #DDD5CA", borderRadius: 16, padding: "12px 16px", marginBottom: 10 },
+    notifLabel: { fontSize: 13, color: "#23201D", fontWeight: 600 },
+    notifSub: { fontSize: 11, color: "#6F6861", marginTop: 2 },
+    toggleTrack: (on: boolean): CSSProperties => ({ width: 44, height: 26, borderRadius: 999, background: on ? "#23201D" : "#DDD5CA", position: "relative", cursor: "pointer", transition: "background 0.2s", flexShrink: 0 }),
+    toggleThumb: (on: boolean): CSSProperties => ({ position: "absolute", top: 3, left: on ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#FFFDF9", transition: "left 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.18)" }),
+    checkinCard: { background: "#FFFDF9", border: "1px solid #DDD5CA", borderRadius: 28, padding: 24, boxShadow: "0 18px 50px rgba(35,32,29,0.06)" },
+    checkinBadge: { display: "inline-block", background: "#F7F1E6", border: "1px solid #DDD5CA", borderRadius: 999, padding: "5px 12px", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: "#6F6861", marginBottom: 14 },
+    checkinMove: { fontSize: 24, lineHeight: 1.2, fontWeight: 500, fontFamily: 'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif', margin: "10px 0 6px", letterSpacing: "-0.03em" },
+    heroCard: { position: "relative", minHeight: 580, borderRadius: 28, overflow: "hidden", marginBottom: 14, backgroundImage: "url('/garden.png')", backgroundSize: "cover", backgroundPosition: "center" },
+    heroOverlay: { position: "absolute", inset: 0, background: "linear-gradient(180deg,rgba(245,241,234,0.08) 0%,rgba(35,32,29,0.72) 100%)", padding: "32px 28px", display: "flex", flexDirection: "column" as const, justifyContent: "space-between" },
+    heroTitle: { fontSize: 38, fontWeight: 500, lineHeight: 1.1, letterSpacing: "-0.04em", color: "#F5F1EA", fontFamily: 'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif', whiteSpace: "pre-line" as const, marginBottom: 10 },
+    heroSub: { fontSize: 15, color: "rgba(245,241,234,0.72)", lineHeight: 1.5, maxWidth: 260 },
+    heroBottom: { maxWidth: 320 },
+    startButton: { width: "100%", padding: "18px 20px", borderRadius: 20, border: "none", background: "#F5F1EA", color: "#23201D", fontSize: 16, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", marginBottom: 10 },
+    heroFoot: { fontSize: 12, color: "rgba(245,241,234,0.5)", textAlign: "center" as const, marginTop: 8 },
+    unfinishedCard: { background: "#FFFDF9", border: "1px solid #DDD5CA", borderRadius: 22, padding: 18, marginBottom: 12 },
+    unfinishedMove: { fontSize: 20, fontWeight: 500, fontFamily: 'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif', marginBottom: 4, letterSpacing: "-0.02em" },
+    commitCard: { background: "#161413", border: "1px solid #2A2520" },
+    moveBox: { background: "rgba(245,241,234,0.06)", borderRadius: 16, padding: "16px 18px", marginBottom: 24 },
+    moveBig: { fontSize: 26, fontWeight: 500, lineHeight: 1.2, color: "#F5F1EA", fontFamily: 'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif', letterSpacing: "-0.03em" },
+    breatheRing: (phase: string): CSSProperties => ({ width: 80, height: 80, borderRadius: "50%", border: `3px solid ${phase === "in" ? "#F5F1EA" : "rgba(245,241,234,0.3)"}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", transform: phase === "in" ? "scale(1.08)" : "scale(0.95)", transition: "all 1s ease" }),
+    breatheNum: { fontSize: 28, fontWeight: 800, color: "#F5F1EA", letterSpacing: "-0.04em" },
+    breatheLabel: { fontSize: 12, color: "rgba(245,241,234,0.5)", textAlign: "center" as const, marginBottom: 20, letterSpacing: "0.08em" },
+    statusRow: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },
+    statusPrimary: { padding: "14px 10px", borderRadius: 16, border: "none", background: "#F5F1EA", color: "#161413", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" },
+    statusSecondary: { padding: "14px 10px", borderRadius: 16, border: "1px solid rgba(245,241,234,0.2)", background: "transparent", color: "rgba(245,241,234,0.6)", fontSize: 14, cursor: "pointer", fontFamily: "inherit" },
+    feedbackBox: { background: "#F7F3EC", border: "1px solid #DDD5CA", borderRadius: 16, padding: "14px 16px", marginBottom: 14 },
+    feedbackText: { fontSize: 14, color: "#2B2723", lineHeight: 1.6 },
+    aiFeedbackBox: { background: "#F0EDE6", border: "1px solid #C8BFB4", borderRadius: 16, padding: "14px 16px", marginBottom: 14 },
+    aiBadge: { fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#8A7F74", marginBottom: 6 },
+    resultBox: { background: "#F7F3EC", border: "1px solid #DDD5CA", borderRadius: 16, padding: "12px 14px", marginBottom: 14 },
+    shareBox: { background: "#F7F3EC", border: "1px solid #DDD5CA", borderRadius: 16, padding: "14px 16px", marginBottom: 14 },
     shareTitle: { fontSize: 13, fontWeight: 700, marginBottom: 5 },
-    shareText: {
-      fontSize: 13,
-      color: "#6F6861",
-      lineHeight: 1.5,
-      marginBottom: 11,
-    },
+    shareText: { fontSize: 13, color: "#6F6861", lineHeight: 1.5, marginBottom: 11 },
     historyList: { display: "grid", gap: 10 },
-    historyCard: {
-      padding: 14,
-      borderRadius: 16,
-      background: "#F7F3EC",
-      border: "1px solid #DDD5CA",
-    },
-    historyTop: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      gap: 8,
-      marginBottom: 9,
-      flexWrap: "wrap",
-    },
+    historyCard: { padding: 14, borderRadius: 16, border: "1px solid #E8E2D9", background: "#FDFAF6" },
+    historyTop: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 9, flexWrap: "wrap" as const },
     historyDate: { fontSize: 12, color: "#6F6861" },
-    historyLine: {
-      fontSize: 13,
-      lineHeight: 1.5,
-      color: "#161413",
-      marginBottom: 5,
-    },
+    historyLine: { fontSize: 13, lineHeight: 1.5, color: "#161413", marginBottom: 5 },
     historyLineLabel: { fontWeight: 700, color: "#6F6861" },
-    emptyState: {
-      textAlign: "center",
-      padding: "32px 16px",
-      color: "#6F6861",
-      fontSize: 14,
-      lineHeight: 1.6,
-    },
-    footer: {
-      textAlign: "center",
-      fontSize: 12,
-      color: "#736C64",
-      marginTop: 10,
-    },
-    error: {
-      color: "#8B1E1E",
-      background: "#F8E7E7",
-      border: "1px solid #E7BABA",
-      borderRadius: 12,
-      padding: "10px 12px",
-      fontSize: 13,
-      lineHeight: 1.4,
-      marginBottom: 12,
-    },
-    // ── Modals ─────────────────────────────────────────────────────────────
-    modalBackdrop: {
-      position: "fixed",
-      inset: 0,
-      background: "rgba(18, 17, 15, 0.45)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: 18,
-      zIndex: 999,
-    },
-    modalCard: {
-      width: "100%",
-      maxWidth: 420,
-      background: "#FFFDF9",
-      borderRadius: 28,
-      overflow: "hidden",
-      border: "1px solid #DDD5CA",
-      boxShadow: "0 25px 80px rgba(18, 17, 15, 0.28)",
-    },
-    modalCardGold: {
-      width: "100%",
-      maxWidth: 420,
-      background: "linear-gradient(160deg, #FFF8E1 0%, #FFF3CC 100%)",
-      borderRadius: 28,
-      overflow: "hidden",
-      border: "2px solid #E8A000",
-      boxShadow: "0 25px 80px rgba(232, 160, 0, 0.3)",
-    },
-    modalImage: {
-      height: 190,
-      backgroundImage:
-        "linear-gradient(rgba(245,241,234,0.12), rgba(245,241,234,0.55)), url('/garden.png')",
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-    },
-    modalImageGold: {
-      height: 190,
-      background: "linear-gradient(135deg, #E8A000 0%, #F5C842 50%, #E8A000 100%)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: 72,
-    },
+    emptyState: { textAlign: "center" as const, padding: "32px 16px", color: "#6F6861", fontSize: 14 },
+    statusBadge: (s: EntryStatus): CSSProperties => ({ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 999, background: s === "done" ? "#E8F5E9" : "#FFF3E0", color: s === "done" ? "#2E7D32" : "#E65100" }),
+    insightsCard: { background: "#FFFDF9", border: "1px solid #DDD5CA", borderRadius: 22, padding: 20, marginBottom: 12 },
+    insightRow: { display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 16 },
+    insightIcon: { fontSize: 22, flexShrink: 0, marginTop: 2 },
+    insightTitle: { fontSize: 13, fontWeight: 700, color: "#23201D", marginBottom: 3 },
+    insightBody: { fontSize: 13, color: "#6F6861", lineHeight: 1.5 },
+    summaryGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 },
+    summaryBox: { background: "#F7F3EC", border: "1px solid #E8E2D9", borderRadius: 16, padding: 12 },
+    summaryBoxGold: { background: "rgba(232,160,0,0.1)", border: "1px solid rgba(232,160,0,0.3)", borderRadius: 16, padding: 12 },
+    summaryNum: { fontSize: 24, fontWeight: 800, letterSpacing: "-0.04em" },
+    summaryNumGold: { fontSize: 24, fontWeight: 800, letterSpacing: "-0.04em", color: "#7A5200" },
+    summaryLabel: { fontSize: 11, color: "#6F6861", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginTop: 3 },
+    summaryLabelGold: { fontSize: 11, color: "#9A7000", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginTop: 3 },
+    modalBackdrop: { position: "fixed" as const, inset: 0, background: "rgba(18,17,15,0.6)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: "0 16px 32px", zIndex: 100 },
+    modalCard: { width: "100%", maxWidth: 420, background: "#FFFDF9", borderRadius: 28, overflow: "hidden", border: "1px solid #DDD5CA", boxShadow: "0 25px 80px rgba(18,17,15,0.28)" },
+    modalCardGold: { width: "100%", maxWidth: 420, background: "linear-gradient(160deg,#FFF8E1 0%,#FFF3CC 100%)", borderRadius: 28, overflow: "hidden", border: "2px solid #E8A000", boxShadow: "0 25px 80px rgba(232,160,0,0.3)" },
+    modalImage: { height: 190, backgroundImage: "linear-gradient(rgba(245,241,234,0.12),rgba(245,241,234,0.55)),url('/garden.png')", backgroundSize: "cover", backgroundPosition: "center" },
+    modalImageGold: { height: 190, background: "linear-gradient(135deg,#E8A000 0%,#F5C842 50%,#E8A000 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 72 },
     modalBody: { padding: 22 },
-    modalTitle: {
-      fontSize: 34,
-      lineHeight: 1,
-      letterSpacing: "-0.05em",
-      fontWeight: 500,
-      fontFamily: 'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
-      marginBottom: 8,
-    },
-    modalTitleGold: {
-      fontSize: 34,
-      lineHeight: 1,
-      letterSpacing: "-0.05em",
-      fontWeight: 500,
-      fontFamily: 'Iowan Old Style, "Palatino Linotype", "Book Antiqua", Georgia, serif',
-      marginBottom: 8,
-      color: "#7A5200",
-    },
-    modalText: {
-      fontSize: 14,
-      color: "#6F6861",
-      lineHeight: 1.5,
-      marginBottom: 16,
-    },
-    modalTextGold: {
-      fontSize: 15,
-      color: "#8B6300",
-      lineHeight: 1.5,
-      marginBottom: 16,
-      fontStyle: "italic",
-    },
-    summaryGrid: {
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr",
-      gap: 10,
-      marginBottom: 14,
-    },
-    summaryBox: {
-      background: "#F7F3EC",
-      border: "1px solid #DDD5CA",
-      borderRadius: 16,
-      padding: 12,
-    },
-    summaryBoxGold: {
-      background: "rgba(232, 160, 0, 0.1)",
-      border: "1px solid rgba(232, 160, 0, 0.3)",
-      borderRadius: 16,
-      padding: 12,
-    },
-    summaryNum: {
-      fontSize: 24,
-      fontWeight: 800,
-      letterSpacing: "-0.04em",
-    },
-    summaryNumGold: {
-      fontSize: 24,
-      fontWeight: 800,
-      letterSpacing: "-0.04em",
-      color: "#7A5200",
-    },
-    summaryLabel: {
-      fontSize: 11,
-      color: "#6F6861",
-      textTransform: "uppercase",
-      letterSpacing: "0.08em",
-      marginTop: 3,
-    },
-    summaryLabelGold: {
-      fontSize: 11,
-      color: "#9A7000",
-      textTransform: "uppercase",
-      letterSpacing: "0.08em",
-      marginTop: 3,
-    },
-    modalDate: {
-      background: "#F7F3EC",
-      border: "1px solid #DDD5CA",
-      borderRadius: 16,
-      padding: 12,
-      fontSize: 13,
-      color: "#6F6861",
-      marginBottom: 14,
-    },
-    ctaGold: {
-      width: "100%",
-      padding: "15px 18px",
-      borderRadius: 18,
-      border: "none",
-      background: "#E8A000",
-      color: "#FFF8E1",
-      fontSize: 15,
-      fontWeight: 800,
-      cursor: "pointer",
-      fontFamily: "inherit",
-    },
+    modalTitle: { fontSize: 34, lineHeight: 1, letterSpacing: "-0.05em", fontWeight: 500, fontFamily: 'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif', marginBottom: 8 },
+    modalTitleGold: { fontSize: 34, lineHeight: 1, letterSpacing: "-0.05em", fontWeight: 500, fontFamily: 'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif', marginBottom: 8, color: "#7A5200" },
+    modalText: { fontSize: 14, color: "#6F6861", lineHeight: 1.5, marginBottom: 16 },
+    modalTextGold: { fontSize: 15, color: "#8B6300", lineHeight: 1.5, marginBottom: 16, fontStyle: "italic" },
+    modalDate: { background: "#F7F3EC", border: "1px solid #DDD5CA", borderRadius: 10, padding: "8px 12px", fontSize: 12, color: "#6F6861", marginBottom: 14 },
+    footer: { textAlign: "center" as const, fontSize: 12, color: "#A79E93", marginTop: 32, paddingBottom: 16 },
   };
 
   function renderStepCard(step: 1 | 2 | 3, content: React.ReactNode) {
@@ -1339,53 +690,45 @@ export default function App() {
     );
   }
 
-  if (loading) {
-    return (
-      <div style={styles.page}>
-        <div style={styles.wrap}>
-          <div style={styles.card}>
-            <div style={styles.title}>Loading.</div>
-            <div style={styles.sub}>Checking your reset record.</div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div style={styles.page}>
       <style>{`
         @keyframes goldPulse {
-          0%, 100% { box-shadow: 0 14px 40px rgba(240,192,64,0.18); }
+          0%,100% { box-shadow: 0 14px 40px rgba(240,192,64,0.18); }
           50% { box-shadow: 0 14px 55px rgba(240,192,64,0.38); }
         }
-        @keyframes goldShimmer {
-          0% { opacity: 0.85; }
-          50% { opacity: 1; }
-          100% { opacity: 0.85; }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
         }
+        .fade-in { animation: fadeIn 0.4s ease forwards; }
+        button:active { transform: scale(0.98); }
       `}</style>
-
       <div style={styles.wrap}>
+
+        {/* Top bar */}
         <div style={styles.topRow}>
           <div style={styles.badge}>Reset</div>
-          <div style={styles.date}>
-            {profile?.name ? `${profile.name} · ` : ""}
-            {today.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+          <div style={{ display: "flex", gap: 8 }}>
+            {profile && entries.length >= 3 && (
+              <button style={styles.profileBtn} onClick={() => setScreen("insights")}>Insights</button>
+            )}
+            {profile && (
+              <button style={styles.profileBtn} onClick={changeName}>{profile.name} ↩</button>
+            )}
           </div>
         </div>
 
-        {/* ── Tracker ── */}
+        {/* Streak tracker */}
         {screen !== "profile" && (
           <div style={isMilestone ? styles.trackerCardMilestone : styles.trackerCard}>
             <div style={styles.trackerTop}>
               <div>
                 <div style={styles.label}>Momentum</div>
-                <div style={styles.trackerText}>
-                  {doneCount} time{doneCount !== 1 ? "s" : ""} you actually moved.
+                <div style={{ ...styles.trackerText, marginTop: 3 }}>
+                  {streak > 0 ? `${streak} day${streak !== 1 ? "s" : ""} strong` : "Start today"}
                 </div>
               </div>
-
               {streakAtRisk && !hasResetToday ? (
                 <div style={styles.streakAtRiskPill}>⚠ Streak at risk</div>
               ) : isMilestone ? (
@@ -1396,69 +739,45 @@ export default function App() {
                 <div style={styles.trackerText}>Last 7 days</div>
               )}
             </div>
-
             <div style={styles.trackerRow}>
               {trackerDays.map((day, idx) => (
                 <div key={`${day.label}-${idx}`} style={styles.trackerDay}>
-                  <div
-                    style={{
-                      ...styles.dot,
-                      ...(day.active ? styles.dotActive : {}),
-                      ...(day.isToday ? styles.dotToday : {}),
-                    }}
-                  />
+                  <div style={{ ...styles.dot, ...(day.active ? styles.dotActive : {}), ...(day.isToday ? styles.dotToday : {}) }} />
                   {day.label}
                 </div>
               ))}
             </div>
-
-            {isMilestone && (
-              <div style={styles.milestoneText}>{milestoneLabel}</div>
-            )}
+            {isMilestone && <div style={styles.milestoneText}>{milestoneLabel}</div>}
           </div>
         )}
 
-        {/* ── Streak at risk banner ── */}
+        {/* Streak at risk banner */}
         {screen === "start" && streakAtRisk && !hasResetToday && (
           <div style={styles.riskBanner}>
-            <div style={styles.riskText}>
-              You had a streak going. You haven't moved today. One reset keeps it alive.
-            </div>
-            <button style={styles.riskButton} onClick={() => setScreen("mind")}>
-              Don't break it
-            </button>
+            <div style={styles.riskText}>You had a streak going. You haven't moved today. One reset keeps it alive.</div>
+            <button style={styles.riskButton} onClick={() => setScreen("mind")}>Don't break it</button>
           </div>
         )}
 
-        {/* ── Check-in screen ── */}
+        {/* Check-in screen */}
         {screen === "checkin" && checkinEntry && (
           <div style={styles.checkinCard}>
             <div style={styles.checkinBadge}>Daily Check-in</div>
             <div style={styles.title}>Yesterday you said "not yet."</div>
             <div style={styles.sub}>You said you'd do this:</div>
             <div style={styles.checkinMove}>{checkinEntry.move}</div>
-            <div style={{ ...styles.sub, marginBottom: 20 }}>
-              Did it happen? Or are you still carrying it?
-            </div>
-
-            <button style={styles.cta} onClick={resumeCheckin}>
-              Commit to it now
-            </button>
-            <button style={styles.ctaMuted} onClick={() => setScreen("start")}>
-              Start fresh instead
-            </button>
+            <div style={{ ...styles.sub, marginBottom: 20 }}>Did it happen? Or are you still carrying it?</div>
+            <button style={styles.cta} onClick={resumeCheckin}>Commit to it now</button>
+            <button style={styles.ctaMuted} onClick={() => setScreen("start")}>Start fresh instead</button>
           </div>
         )}
 
-        {/* ── Profile ── */}
+        {/* Profile */}
         {screen === "profile" && (
           <div style={styles.card}>
             <div style={styles.stepPill}>Name</div>
-            <div style={styles.title}>Enter your name.</div>
-            <div style={styles.sub}>No username. No password. Just your reset record.</div>
-
-            {profileError && <div style={styles.error}>{profileError}</div>}
-
+            <div style={styles.title}>What do people call you?</div>
+            <div style={styles.sub}>Just your first name. This stays on your device.</div>
             <input
               style={styles.input}
               placeholder="Your name"
@@ -1466,25 +785,20 @@ export default function App() {
               onChange={(e) => setProfileName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && saveProfile()}
             />
-
-            <button style={{ ...styles.cta, marginTop: 18 }} onClick={saveProfile}>
-              Continue
-            </button>
+            {profileError && <div style={{ color: "#C0392B", fontSize: 13, marginBottom: 10 }}>{profileError}</div>}
+            <button style={{ ...styles.cta, marginTop: 18 }} onClick={saveProfile}>Start</button>
           </div>
         )}
 
-        {/* ── Start ── */}
+        {/* Start */}
         {screen === "start" && (
           <>
             <div style={styles.heroCard}>
               <div style={styles.heroOverlay}>
                 <div>
                   <div style={styles.heroTitle}>You don't stay stuck.{"\n"}You move.</div>
-                  <div style={styles.heroSub}>
-                    Empty the noise. Name the dodge. Make one clean move.
-                  </div>
+                  <div style={styles.heroSub}>Empty the noise. Name the dodge. Make one clean move.</div>
                 </div>
-
                 <div style={styles.heroBottom}>
                   <button style={styles.startButton} onClick={() => setScreen("mind")}>
                     {hasResetToday ? "Reset again" : "Start Reset"}
@@ -1498,344 +812,216 @@ export default function App() {
               <div style={styles.unfinishedCard}>
                 <div style={styles.label}>Unfinished business</div>
                 <div style={styles.unfinishedMove}>{lastNotYet.move}</div>
-                <div style={styles.trackerText}>
-                  You said "not yet." Respectfully, the task is still staring.
-                </div>
-                <button style={{ ...styles.cta, marginTop: 12 }} onClick={resumeLastNotYet}>
-                  Resume
-                </button>
+                <div style={styles.trackerText}>You said "not yet." Respectfully, the task is still staring.</div>
+                <button style={{ ...styles.cta, marginTop: 12 }} onClick={resumeLastNotYet}>Resume</button>
               </div>
             )}
 
-            {/* Notification toggle */}
             <div style={styles.notifRow}>
               <div>
                 <div style={styles.notifLabel}>Daily reminder at noon</div>
                 <div style={styles.notifSub}>
-                  {notifPermission === "denied"
-                    ? "Blocked in browser settings"
-                    : notifEnabled
-                    ? "You'll get a nudge if you haven't moved"
-                    : "Off — tap to enable"}
+                  {notifPermission === "denied" ? "Blocked in browser settings" : notifEnabled ? "You'll get a nudge if you haven't moved" : "Off — tap to enable"}
                 </div>
               </div>
-              <div
-                style={styles.toggleTrack(notifEnabled)}
-                onClick={notifPermission !== "denied" ? toggleNotifications : undefined}
-                role="switch"
-                aria-checked={notifEnabled}
-              >
+              <div style={styles.toggleTrack(notifEnabled)} onClick={notifPermission !== "denied" ? toggleNotifications : undefined} role="switch" aria-checked={notifEnabled}>
                 <div style={styles.toggleThumb(notifEnabled)} />
               </div>
             </div>
 
-            <button style={styles.ctaMuted} onClick={() => setScreen("history")}>
-              View history
-            </button>
-
-            <button style={styles.ctaMuted} onClick={changeName}>
-              Change name
-            </button>
+            <button style={styles.ctaMuted} onClick={() => setScreen("history")}>View history</button>
           </>
         )}
 
-        {/* ── Mind ── */}
-        {screen === "mind" &&
-          renderStepCard(
-            1,
-            <>
-              <div style={styles.stepPill}>Step 1 / 3</div>
-              <div style={styles.title}>What's actually in your head?</div>
-              <div style={styles.sub}>Not everything. Just the loudest thing.</div>
-              <div style={styles.focusHint}>If you over-explain, you're avoiding.</div>
+        {/* Mind */}
+        {screen === "mind" && renderStepCard(1, <>
+          <div style={styles.stepPill}>Step 1 / 3</div>
+          <div style={styles.title}>What's actually in your head?</div>
+          <div style={styles.sub}>Not everything. Just the loudest thing.</div>
+          <div style={styles.focusHint}>If you over-explain, you're avoiding.</div>
+          <div style={styles.chips}>
+            {MIND_SUGGESTIONS.map((opt) => (
+              <button key={opt} type="button" style={{ ...styles.chip, ...(mind === opt ? styles.chipActive : {}) }} onClick={() => setMind(opt)}>{opt}</button>
+            ))}
+          </div>
+          <input ref={mindRef} style={styles.input} placeholder="The loudest thing right now…" value={mind} maxLength={120} onChange={(e) => setMind(e.target.value)} onKeyDown={(e) => e.key === "Enter" && mind.trim() && setScreen("avoid")} />
+          <div style={styles.helperRow}>
+            <span style={styles.helper}>Be specific. Vague = stuck.</span>
+            <span style={styles.helper}>{mind.length}/120</span>
+          </div>
+          <button style={{ ...styles.cta, ...(mind.trim() ? {} : styles.ctaDisabled) }} disabled={!mind.trim()} onClick={() => setScreen("avoid")}>That's it. Continue.</button>
+          <button style={styles.ctaMuted} onClick={resetFlow}>Cancel</button>
+        </>)}
 
-              <div style={styles.chips}>
-                {MIND_SUGGESTIONS.map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    style={{ ...styles.chip, ...(mind === opt ? styles.chipActive : {}) }}
-                    onClick={() => setMind(opt)}
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
+        {/* Avoid */}
+        {screen === "avoid" && renderStepCard(2, <>
+          <div style={styles.stepPill}>Step 2 / 3</div>
+          <div style={styles.title}>What are you avoiding?</div>
+          <div style={styles.sub}>Not the story. The thing itself.</div>
+          <div style={styles.focusHint}>If you soften it, you'll keep avoiding it.</div>
+          <div style={styles.chips}>
+            {AVOIDING_SUGGESTIONS.map((opt) => (
+              <button key={opt} type="button" style={{ ...styles.chip, ...(avoiding === opt ? styles.chipActive : {}) }} onClick={() => setAvoiding(opt)}>{opt}</button>
+            ))}
+          </div>
+          <input ref={avoidRef} style={styles.input} placeholder="What you keep not doing…" value={avoiding} maxLength={120} onChange={(e) => setAvoiding(e.target.value)} onKeyDown={(e) => e.key === "Enter" && avoiding.trim() && setScreen("move")} />
+          <div style={styles.helperRow}>
+            <span style={styles.helper}>Name it exactly.</span>
+            <span style={styles.helper}>{avoiding.length}/120</span>
+          </div>
+          <button style={{ ...styles.cta, ...(avoiding.trim() ? {} : styles.ctaDisabled) }} disabled={!avoiding.trim()} onClick={() => setScreen("move")}>Got it. Next.</button>
+          <button style={styles.ctaMuted} onClick={() => setScreen("mind")}>← Back</button>
+        </>)}
 
-              <input
-                ref={mindRef}
-                style={styles.input}
-                placeholder="Say it directly."
-                value={mind}
-                maxLength={120}
-                onChange={(e) => setMind(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && mind.trim() && setScreen("avoid")}
-              />
+        {/* Move */}
+        {screen === "move" && renderStepCard(3, <>
+          <div style={styles.stepPill}>Step 3 / 3</div>
+          <div style={styles.title}>What's the smallest move?</div>
+          <div style={styles.sub}>Not the plan. Just the first step.</div>
+          <div style={styles.focusHint}>If it feels big, you won't do it.</div>
+          <div style={styles.chips}>
+            {MOVE_SUGGESTIONS.map((opt) => (
+              <button key={opt} type="button" style={{ ...styles.chip, ...(move === opt ? styles.chipActive : {}) }} onClick={() => setMove(opt)}>{opt}</button>
+            ))}
+          </div>
+          <input ref={moveRef} style={styles.input} placeholder="One tiny action…" value={move} maxLength={120} onChange={(e) => setMove(e.target.value)} onKeyDown={(e) => e.key === "Enter" && move.trim() && beginCommit()} />
+          <div style={styles.helperRow}>
+            <span style={styles.helper}>Embarrassingly small is right.</span>
+            <span style={styles.helper}>{move.length}/120</span>
+          </div>
+          <button style={{ ...styles.cta, ...(move.trim() ? {} : styles.ctaDisabled) }} disabled={!move.trim()} onClick={beginCommit}>Commit.</button>
+          <button style={styles.ctaMuted} onClick={() => setScreen("avoid")}>← Back</button>
+        </>)}
 
-              <div style={styles.helperRow}>
-                <div style={styles.helper}>Short. Clear.</div>
-                <div style={styles.charCount}>{mind.length}/120</div>
-              </div>
-
-              <button
-                style={{ ...styles.cta, ...(mind.trim() ? {} : styles.ctaDisabled) }}
-                disabled={!mind.trim()}
-                onClick={() => setScreen("avoid")}
-              >
-                That's it. Continue.
-              </button>
-
-              <button style={styles.ctaMuted} onClick={resetFlow}>
-                Cancel
-              </button>
-            </>
-          )}
-
-        {/* ── Avoid ── */}
-        {screen === "avoid" &&
-          renderStepCard(
-            2,
-            <>
-              <div style={styles.stepPill}>Step 2 / 3</div>
-              <div style={styles.title}>What are you avoiding?</div>
-              <div style={styles.sub}>Not the story. The thing itself.</div>
-              <div style={styles.focusHint}>If you soften it, you'll keep avoiding it.</div>
-
-              <div style={styles.chips}>
-                {AVOIDING_SUGGESTIONS.map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    style={{ ...styles.chip, ...(avoiding === opt ? styles.chipActive : {}) }}
-                    onClick={() => setAvoiding(opt)}
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
-
-              <input
-                ref={avoidRef}
-                style={styles.input}
-                placeholder="Be honest."
-                value={avoiding}
-                maxLength={120}
-                onChange={(e) => setAvoiding(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && avoiding.trim() && setScreen("move")}
-              />
-
-              <div style={styles.helperRow}>
-                <div style={styles.helper}>No polishing.</div>
-                <div style={styles.charCount}>{avoiding.length}/120</div>
-              </div>
-
-              <button
-                style={{ ...styles.cta, ...(avoiding.trim() ? {} : styles.ctaDisabled) }}
-                disabled={!avoiding.trim()}
-                onClick={() => setScreen("move")}
-              >
-                Say it. Continue.
-              </button>
-
-              <button style={styles.ctaMuted} onClick={() => setScreen("mind")}>
-                Back
-              </button>
-            </>
-          )}
-
-        {/* ── Move ── */}
-        {screen === "move" &&
-          renderStepCard(
-            3,
-            <>
-              <div style={styles.stepPill}>Step 3 / 3</div>
-              <div style={styles.title}>What's the smallest move?</div>
-              <div style={styles.sub}>Not the plan. Just the first step.</div>
-              <div style={styles.focusHint}>If it feels big, you won't do it.</div>
-
-              <div style={styles.chips}>
-                {MOVE_SUGGESTIONS.map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    style={{ ...styles.chip, ...(move === opt ? styles.chipActive : {}) }}
-                    onClick={() => setMove(opt)}
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
-
-              <input
-                ref={moveRef}
-                style={styles.input}
-                placeholder="Make it almost too easy."
-                value={move}
-                maxLength={120}
-                onChange={(e) => setMove(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && move.trim() && beginCommit()}
-              />
-
-              <div style={styles.helperRow}>
-                <div style={styles.helper}>Visible. Immediate.</div>
-                <div style={styles.charCount}>{move.length}/120</div>
-              </div>
-
-              <button
-                style={{ ...styles.cta, ...(move.trim() ? {} : styles.ctaDisabled) }}
-                disabled={!move.trim()}
-                onClick={beginCommit}
-              >
-                Commit
-              </button>
-
-              <button style={styles.ctaMuted} onClick={() => setScreen("avoid")}>
-                Back
-              </button>
-            </>
-          )}
-
-        {/* ── Commit ── */}
+        {/* Commit */}
         {screen === "commit" && (
           <div style={{ ...styles.card, ...styles.commitCard }}>
             <div style={{ ...styles.stepPill, ...styles.stepPillDark }}>No more thinking.</div>
-
             <div style={styles.title}>Do this now.</div>
             <div style={{ ...styles.sub, ...styles.subDark }}>Start before you feel ready.</div>
-
             <div style={styles.moveBox}>
               <div style={{ ...styles.label, color: "#A79E93", marginBottom: 8 }}>Your move</div>
               <div style={styles.moveBig}>{move}</div>
             </div>
-
-            <div style={styles.breathingWrap}>
-              <div style={styles.breatheLabel}>
-                {breathePhase === "in" ? "Breathe in" : "Breathe out"}
-              </div>
-
-              <div style={styles.breathingRing}>
-                <div
-                  style={{
-                    position: "absolute",
-                    inset: -5,
-                    borderRadius: "50%",
-                    border: "2px solid rgba(255,255,255,0.2)",
-                    opacity: countdown % 2 === 0 ? 0.6 : 0.15,
-                    transform: countdown % 2 === 0 ? "scale(1.1)" : "scale(1.22)",
-                    transition: "opacity 0.9s, transform 0.9s",
-                  }}
-                />
-                <div style={styles.ringNum}>{countdown > 0 ? countdown : ""}</div>
-              </div>
-
-              <div style={styles.countdownText}>Just start.</div>
-              <div style={styles.breatheGuide}>
-                {breathePhase === "in" ? "Breathe in slowly..." : "Now breathe out..."}
-              </div>
-            </div>
-
-            {countdown <= 0 && (
+            {countdown > 0 ? (
+              <>
+                <div style={styles.breatheRing(breathePhase)}>
+                  <div style={styles.breatheNum}>{countdown}</div>
+                </div>
+                <div style={styles.breatheLabel}>{breathePhase === "in" ? "BREATHE IN" : "BREATHE OUT"}</div>
+              </>
+            ) : (
               <div style={styles.statusRow}>
-                <button style={styles.statusPrimary} onClick={() => saveResult("done")}>
-                  I did it
-                </button>
-                <button style={styles.statusSecondary} onClick={() => saveResult("not_yet")}>
-                  I didn't
-                </button>
+                <button style={styles.statusPrimary} onClick={() => saveResult("done")}>I did it</button>
+                <button style={styles.statusSecondary} onClick={() => saveResult("not_yet")}>I didn't</button>
               </div>
             )}
           </div>
         )}
 
-        {/* ── Result ── */}
+        {/* Result */}
         {screen === "result" && latestEntry && (
           <div style={styles.card}>
             <div style={styles.stepPill}>Feedback</div>
             <div style={styles.title}>
               {latestEntry.status === "done" ? "You moved." : "You're still avoiding."}
             </div>
-
-            <div style={styles.feedbackBox}>
-              <div style={styles.feedbackText}>{latestEntry.feedback}</div>
+            <div style={styles.aiFeedbackBox}>
+              <div style={styles.aiBadge}>AI Insight</div>
+              {aiFeedbackLoading ? (
+                <div style={{ ...styles.feedbackText, color: "#A79E93", fontStyle: "italic" }}>Thinking about what you just did...</div>
+              ) : (
+                <div style={styles.feedbackText}>{aiFeedback}</div>
+              )}
             </div>
-
-            <div style={styles.resultBox}>
-              <div style={styles.label}>Your move</div>
-              <div style={styles.resultMove}>{latestEntry.move}</div>
-              <div style={styles.resultMeta}>
-                Avoiding: {latestEntry.avoiding} · {formatDate(latestEntry.createdAt)}
-              </div>
-            </div>
-
             {latestEntry.status === "done" && streak > 0 && (
-              <div
-                style={{
-                  ...styles.resultBox,
-                  background: streak >= 7 ? "#FFF8E1" : "#F7F3EC",
-                  border: streak >= 7 ? "1px solid #F0C040" : "1px solid #DDD5CA",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
+              <div style={{ ...styles.resultBox, background: streak >= 7 ? "#FFF8E1" : "#F7F3EC", border: streak >= 7 ? "1px solid #F0C040" : "1px solid #DDD5CA", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>
                   <div style={styles.label}>Current streak</div>
-                  <div
-                    style={{
-                      ...styles.unfinishedMove,
-                      marginBottom: 0,
-                      color: streak >= 7 ? "#7A5200" : "#161413",
-                    }}
-                  >
+                  <div style={{ ...styles.unfinishedMove, marginBottom: 0, color: streak >= 7 ? "#7A5200" : "#161413" }}>
                     {streak} day{streak !== 1 ? "s" : ""}
                   </div>
                 </div>
                 {streak >= 7 && <div style={{ fontSize: 28 }}>★</div>}
               </div>
             )}
-
             <div style={styles.shareBox}>
               <div style={styles.shareTitle}>Accountability</div>
-              <div style={styles.shareText}>
-                Send it to one person. Make it harder to disappear.
-              </div>
-              <button style={styles.cta} onClick={shareMove}>
-                {shareCopied ? "Copied" : "Share my move"}
-              </button>
+              <div style={styles.shareText}>Send it to one person. Make it harder to disappear.</div>
+              <button style={styles.cta} onClick={shareMove}>{shareCopied ? "Copied" : "Share my move"}</button>
             </div>
-
-            <button style={styles.ctaMuted} onClick={() => setScreen("history")}>
-              View history
-            </button>
-
-            <button style={styles.ctaMuted} onClick={resetFlow}>
-              Reset again
-            </button>
+            <button style={styles.ctaMuted} onClick={resetFlow}>Back to start</button>
           </div>
         )}
 
-        {/* ── History ── */}
+        {/* Insights */}
+        {screen === "insights" && (
+          <div style={styles.card}>
+            <div style={styles.stepPill}>Your patterns</div>
+            <div style={styles.title}>What the data says.</div>
+            <div style={styles.sub}>Based on your last {Math.min(entries.length, 50)} resets.</div>
+            <div style={styles.summaryGrid}>
+              {[
+                { num: totalResets, label: "Total resets" },
+                { num: `${patterns.completionRate}%`, label: "Done rate" },
+                { num: doneCount, label: "Completed" },
+                { num: streak, label: "Day streak" },
+              ].map(({ num, label }) => (
+                <div key={label} style={styles.summaryBox}>
+                  <div style={styles.summaryNum}>{num}</div>
+                  <div style={styles.summaryLabel}>{label}</div>
+                </div>
+              ))}
+            </div>
+            {patterns.topAvoiding && (
+              <div style={styles.insightRow}>
+                <div style={styles.insightIcon}>🔁</div>
+                <div>
+                  <div style={styles.insightTitle}>You keep avoiding this</div>
+                  <div style={styles.insightBody}>"{patterns.topAvoiding}" shows up more than anything else. It's not a task problem — it's a resistance pattern.</div>
+                </div>
+              </div>
+            )}
+            {patterns.mostProductiveDays.length > 0 && (
+              <div style={styles.insightRow}>
+                <div style={styles.insightIcon}>📅</div>
+                <div>
+                  <div style={styles.insightTitle}>Your best days</div>
+                  <div style={styles.insightBody}>You complete moves most on {patterns.mostProductiveDays.join(" and ")}. Schedule your hardest tasks then.</div>
+                </div>
+              </div>
+            )}
+            {patterns.completionRate >= 70 && (
+              <div style={styles.insightRow}>
+                <div style={styles.insightIcon}>⚡</div>
+                <div>
+                  <div style={styles.insightTitle}>You follow through</div>
+                  <div style={styles.insightBody}>{patterns.completionRate}% completion rate. Most people are under 50%. You're not most people.</div>
+                </div>
+              </div>
+            )}
+            {patterns.completionRate < 50 && entries.length >= 5 && (
+              <div style={styles.insightRow}>
+                <div style={styles.insightIcon}>🎯</div>
+                <div>
+                  <div style={styles.insightTitle}>Your moves are too big</div>
+                  <div style={styles.insightBody}>{100 - patterns.completionRate}% of the time you don't follow through. The task isn't the problem — the size is.</div>
+                </div>
+              </div>
+            )}
+            <button style={styles.ctaMuted} onClick={() => setScreen("start")}>← Back</button>
+          </div>
+        )}
+
+        {/* History */}
         {screen === "history" && (
           <div style={styles.card}>
             <div style={styles.stepPill}>History</div>
             <div style={styles.title}>Here's what happened.</div>
             <div style={styles.sub}>No story. Just the pattern.</div>
-
-            {/* Summary stats */}
             {entries.length > 0 && (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: 8,
-                  marginBottom: 16,
-                }}
-              >
-                {[
-                  { num: totalResets, label: "Total" },
-                  { num: doneCount, label: "Done" },
-                  { num: streak, label: "Streak" },
-                ].map(({ num, label }) => (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 16 }}>
+                {[{ num: totalResets, label: "Total" }, { num: doneCount, label: "Done" }, { num: streak, label: "Streak" }].map(({ num, label }) => (
                   <div key={label} style={styles.summaryBox}>
                     <div style={styles.summaryNum}>{num}</div>
                     <div style={styles.summaryLabel}>{label}</div>
@@ -1843,76 +1029,36 @@ export default function App() {
                 ))}
               </div>
             )}
-
             <div style={styles.historyList}>
               {entries.length === 0 ? (
-                <div style={styles.emptyState}>
-                  <div style={{ fontSize: 28, marginBottom: 12 }}>◯</div>
-                  No resets yet.
-                  <br />
-                  Start one to build your record.
-                </div>
+                <div style={styles.emptyState}>No resets yet. Do your first one.</div>
               ) : (
                 entries.map((entry) => (
                   <div key={entry.id} style={styles.historyCard}>
                     <div style={styles.historyTop}>
-                      <div style={styles.historyDate}>{formatDate(entry.createdAt)}</div>
-                      <span
-                        style={
-                          entry.status === "done"
-                            ? styles.statusBadgeDone
-                            : styles.statusBadgeNot
-                        }
-                      >
-                        {entry.status === "done" ? "Done" : "Not yet"}
-                      </span>
+                      <span style={styles.historyDate}>{formatDate(entry.createdAt)}</span>
+                      <span style={styles.statusBadge(entry.status)}>{entry.status === "done" ? "Done" : "Not yet"}</span>
                     </div>
-
-                    <div style={styles.historyLine}>
-                      <span style={styles.historyLineLabel}>Mind </span>
-                      {entry.mind}
-                    </div>
-                    <div style={styles.historyLine}>
-                      <span style={styles.historyLineLabel}>Avoiding </span>
-                      {entry.avoiding}
-                    </div>
-                    <div style={styles.historyLine}>
-                      <span style={styles.historyLineLabel}>Move </span>
-                      {entry.move}
-                    </div>
-                    <div style={{ ...styles.historyLine, marginBottom: 0 }}>
-                      <span style={styles.historyLineLabel}>Feedback </span>
-                      {entry.feedback}
-                    </div>
+                    <div style={styles.historyLine}><span style={styles.historyLineLabel}>Mind </span>{entry.mind}</div>
+                    <div style={styles.historyLine}><span style={styles.historyLineLabel}>Avoiding </span>{entry.avoiding}</div>
+                    <div style={styles.historyLine}><span style={styles.historyLineLabel}>Move </span>{entry.move}</div>
+                    <div style={{ ...styles.historyLine, marginBottom: 0 }}><span style={styles.historyLineLabel}>Feedback </span>{entry.feedback}</div>
                   </div>
                 ))
               )}
             </div>
-
-            <button style={{ ...styles.ctaMuted, marginTop: 16 }} onClick={resetFlow}>
-              Back home
-            </button>
+            <button style={{ ...styles.ctaMuted, marginTop: 12 }} onClick={() => setScreen("start")}>← Back</button>
           </div>
         )}
 
-        {/* ── Regular result popup ── */}
+        {/* Regular result popup */}
         {showResultPopup && latestEntry && !showMilestone && (
           <div style={styles.modalBackdrop}>
             <div style={styles.modalCard}>
               <div style={styles.modalImage} />
               <div style={styles.modalBody}>
-                <div style={styles.modalTitle}>
-                  {latestEntry.status === "done"
-                    ? "Bravo. You did it."
-                    : "Not yet. Still counted."}
-                </div>
-
-                <div style={styles.modalText}>
-                  {latestEntry.status === "done"
-                    ? "That was a real reset. Small move, real evidence. This is exactly what the app is built for."
-                    : "You did not complete it yet, but now the pattern is visible. Shrink the move and try again."}
-                </div>
-
+                <div style={styles.modalTitle}>{latestEntry.status === "done" ? "Done." : "Not yet."}</div>
+                <div style={styles.modalText}>{latestEntry.status === "done" ? "The move is made. That's all it takes." : "Sit with it. Then make the move smaller."}</div>
                 <div style={styles.summaryGrid}>
                   {[
                     { num: totalResets, label: "Total resets" },
@@ -1926,31 +1072,21 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-
                 <div style={styles.modalDate}>Latest reset: {latestResetTime}</div>
-
-                <button style={styles.cta} onClick={() => setShowResultPopup(false)}>
-                  See my result
-                </button>
+                <button style={styles.cta} onClick={() => setShowResultPopup(false)}>Close</button>
               </div>
             </div>
           </div>
         )}
 
-        {/* ── Milestone popup (gold) ── */}
+        {/* Milestone popup */}
         {showMilestone && latestEntry && (
           <div style={styles.modalBackdrop}>
             <div style={styles.modalCardGold}>
               <div style={styles.modalImageGold}>★</div>
               <div style={styles.modalBody}>
-                <div style={styles.modalTitleGold}>
-                  {streak} days. Remarkable.
-                </div>
-
-                <div style={styles.modalTextGold}>
-                  {getMilestoneLabel(streak)}
-                </div>
-
+                <div style={styles.modalTitleGold}>{streak} days. Remarkable.</div>
+                <div style={styles.modalTextGold}>{getMilestoneLabel(streak)}</div>
                 <div style={styles.summaryGrid}>
                   {[
                     { num: streak, label: "Day streak" },
@@ -1964,22 +1100,14 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-
-                <div style={{ ...styles.modalDate, background: "rgba(232,160,0,0.1)", border: "1px solid rgba(232,160,0,0.3)", color: "#8B6300" }}>
-                  Latest reset: {latestResetTime}
-                </div>
-
-                <button style={styles.ctaGold} onClick={() => setShowMilestone(false)}>
-                  Keep going
-                </button>
+                <div style={{ ...styles.modalDate, background: "rgba(232,160,0,0.1)", border: "1px solid rgba(232,160,0,0.3)", color: "#8B6300" }}>Latest reset: {latestResetTime}</div>
+                <button style={styles.ctaGold} onClick={() => setShowMilestone(false)}>Keep going</button>
               </div>
             </div>
           </div>
         )}
 
-        <div style={styles.footer}>
-          For when your head is full and you still need to move.
-        </div>
+        <div style={styles.footer}>For when your head is full and you still need to move.</div>
       </div>
     </div>
   );
