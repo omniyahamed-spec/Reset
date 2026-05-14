@@ -3,6 +3,8 @@ import { supabase } from "./supabaseClient";
 
 type Screen =
   | "profile"
+  | "arrival"
+  | "presence"
   | "start"
   | "mind"
   | "avoid"
@@ -29,6 +31,7 @@ interface Entry {
   status: EntryStatus;
   feedback: string;
   createdAt: string;
+  presenceScore?: number;
 }
 
 const MIND_SUGGESTIONS = ["Work", "A person", "Money", "Health"];
@@ -38,6 +41,14 @@ const MOVE_SUGGESTIONS = ["Send it", "Open it", "Start 2 min"];
 const COMMIT_SECONDS = 5;
 const DAILY_REMINDER_HOUR = 12;
 const MILESTONE_DAYS = [7, 14, 30, 60, 100];
+
+const PRESENCE_LABELS: Record<number, { en: string; ar: string; color: string }> = {
+  1: { en: "Completely lost", ar: "مشتت تماماً", color: "#8B1E1E" },
+  2: { en: "Scattered", ar: "مشتت", color: "#B85C00" },
+  3: { en: "Halfway here", ar: "نصف حاضر", color: "#7A6200" },
+  4: { en: "Mostly present", ar: "حاضر غالباً", color: "#2E5E2E" },
+  5: { en: "Fully arrived", ar: "حاضر تماماً", color: "#1A3A5C" },
+};
 
 function makeProfileId(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, "-");
@@ -49,9 +60,7 @@ function startOfDay(d: Date): Date {
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
+    weekday: "short", month: "short", day: "numeric",
   });
 }
 
@@ -66,37 +75,26 @@ function getMilestoneLabel(streak: number): string | null {
 }
 
 function progressBarStyle(pct: number): CSSProperties {
-  return {
-    height: "100%",
-    width: `${pct}%`,
-    background: "#23201D",
-    borderRadius: 999,
-    transition: "width 0.4s ease",
-  };
+  return { height: "100%", width: `${pct}%`, background: "#23201D", borderRadius: 999, transition: "width 0.4s ease" };
 }
 
 async function getAIFeedback(
-  status: EntryStatus,
-  mind: string,
-  avoiding: string,
-  move: string,
-  name: string,
-  pastPatterns: string
+  status: EntryStatus, mind: string, avoiding: string, move: string,
+  name: string, pastPatterns: string, presenceScore: number
 ): Promise<string> {
-  const prompt = `You are the voice inside Reset — a brutally honest, warm focus app for busy professionals.
+  const prompt = `You are the voice inside Reset — a reconnection app for high performers in the Gulf region who have lost themselves in their work.
 
 User: ${name}
-They just completed a reset session.
+Presence score today: ${presenceScore}/5 (${PRESENCE_LABELS[presenceScore]?.en})
 Status: ${status === "done" ? "They DID the move" : "They did NOT do the move yet"}
 What was on their mind: "${mind}"
 What they were avoiding: "${avoiding}"
 Their committed move: "${move}"
 ${pastPatterns ? `Their recent patterns: ${pastPatterns}` : ""}
 
-Write 2-3 sentences of feedback. Be specific to EXACTLY what they wrote — not generic.
-If done: acknowledge the specific thing they did, note why it matters, one line of forward momentum.
-If not yet: don't shame them. Name the real reason this specific thing is hard. Make the move smaller in one concrete suggestion.
-Tone: like a sharp, caring friend who doesn't sugarcoat. Direct. Human. Never corporate.
+Write 2-3 sentences. Be specific to EXACTLY what they wrote.
+Reference their presence score naturally — someone at 1-2 needs gentleness, someone at 4-5 needs a push.
+Tone: like a wise, warm friend who has also been in high-pressure roles and knows what it costs. Never corporate. Never generic.
 Never start with "I" or the user's name. No emojis. No lists.`;
 
   try {
@@ -123,9 +121,7 @@ Never start with "I" or the user's name. No emojis. No lists.`;
 }
 
 function getFallbackFeedback(status: EntryStatus): string {
-  if (status === "done") {
-    return "You moved. That's the whole game — not perfection, just momentum. Do it again tomorrow.";
-  }
+  if (status === "done") return "You moved. That's the whole game — not perfection, just momentum. Do it again tomorrow.";
   return "Not yet is just data. The move was probably too big. Cut it in half and try the smaller door.";
 }
 
@@ -133,11 +129,9 @@ function analyzePatterns(entries: Entry[]): {
   topAvoiding: string | null;
   completionRate: number;
   mostProductiveDays: string[];
-  recurringMind: string | null;
+  avgPresence: number;
 } {
-  if (entries.length < 3) {
-    return { topAvoiding: null, completionRate: 0, mostProductiveDays: [], recurringMind: null };
-  }
+  if (entries.length < 3) return { topAvoiding: null, completionRate: 0, mostProductiveDays: [], avgPresence: 0 };
 
   const avoidingMap: Record<string, number> = {};
   entries.forEach((e) => {
@@ -162,23 +156,21 @@ function analyzePatterns(entries: Entry[]): {
     .slice(0, 2)
     .map(([day]) => day);
 
-  const mindMap: Record<string, number> = {};
-  entries.forEach((e) => {
-    const key = e.mind.toLowerCase().trim();
-    mindMap[key] = (mindMap[key] || 0) + 1;
-  });
-  const recurringMind = Object.entries(mindMap).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  const presenceEntries = entries.filter((e) => e.presenceScore);
+  const avgPresence = presenceEntries.length
+    ? Math.round((presenceEntries.reduce((sum, e) => sum + (e.presenceScore || 0), 0) / presenceEntries.length) * 10) / 10
+    : 0;
 
-  return { topAvoiding, completionRate, mostProductiveDays, recurringMind };
+  return { topAvoiding, completionRate, mostProductiveDays, avgPresence };
 }
 
-// ── THE FIX IS HERE — Array.from instead of spread ──
 function buildPastPatternsSummary(entries: Entry[]): string {
   if (entries.length < 3) return "";
   const recent = entries.slice(0, 7);
   const avoidingList = Array.from(new Set(recent.map((e) => e.avoiding))).slice(0, 3).join(", ");
   const doneCount = recent.filter((e) => e.status === "done").length;
-  return `Recently avoided: ${avoidingList}. Completed ${doneCount}/${recent.length} recent moves.`;
+  const avgPresence = recent.filter(e => e.presenceScore).reduce((s, e) => s + (e.presenceScore || 0), 0) / (recent.filter(e => e.presenceScore).length || 1);
+  return `Recently avoided: ${avoidingList}. Completed ${doneCount}/${recent.length} recent moves. Average presence: ${avgPresence.toFixed(1)}/5.`;
 }
 
 async function requestNotificationPermission(): Promise<boolean> {
@@ -208,8 +200,8 @@ function checkAndFireReminder(profileName: string, hasResetToday: boolean) {
   if (hour < DAILY_REMINDER_HOUR) return;
   if (hasResetToday) return;
   localStorage.setItem("reset_reminder_last_fired", today);
-  new Notification("Reset — your daily check-in", {
-    body: `Hey ${profileName}. Head full? Name the dodge. Make one move.`,
+  new Notification("Reset — time to arrive", {
+    body: `Hey ${profileName}. Before the noise takes over. One minute to come back to yourself.`,
     icon: "/favicon.ico",
     tag: "reset-daily",
   });
@@ -225,6 +217,7 @@ function mapEntry(row: any): Entry {
     status: row.status,
     feedback: row.feedback,
     createdAt: row.created_at,
+    presenceScore: row.presence_score,
   };
 }
 
@@ -238,10 +231,13 @@ export default function App() {
   const [mind, setMind] = useState("");
   const [avoiding, setAvoiding] = useState("");
   const [move, setMove] = useState("");
+  const [presenceScore, setPresenceScore] = useState<number>(0);
   const [countdown, setCountdown] = useState(COMMIT_SECONDS);
   const [latestId, setLatestId] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [breathePhase, setBreathePhase] = useState<"in" | "out">("in");
+  const [breatheCount, setBreatheCount] = useState(0);
+  const [arrivalUnlocked, setArrivalUnlocked] = useState(false);
   const [showResultPopup, setShowResultPopup] = useState(false);
   const [showMilestone, setShowMilestone] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(false);
@@ -255,31 +251,29 @@ export default function App() {
   const avoidRef = useRef<HTMLInputElement>(null);
   const moveRef = useRef<HTMLInputElement>(null);
 
+  // Arrival breathing cycle
+  useEffect(() => {
+    if (screen !== "arrival") return;
+    const timer = window.setInterval(() => {
+      setBreathePhase(p => p === "in" ? "out" : "in");
+      setBreatheCount(c => {
+        const next = c + 1;
+        if (next >= 3) setArrivalUnlocked(true);
+        return next;
+      });
+    }, 4000);
+    return () => window.clearInterval(timer);
+  }, [screen]);
+
   useEffect(() => {
     async function init() {
       const savedProfileId = localStorage.getItem("reset_profile_id");
       const reminderEnabled = localStorage.getItem("reset_reminder_enabled") === "true";
       setNotifEnabled(reminderEnabled);
       if ("Notification" in window) setNotifPermission(Notification.permission);
-
-      if (!savedProfileId) {
-        setScreen("profile");
-        setLoading(false);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", savedProfileId)
-        .single();
-
-      if (error || !data) {
-        setScreen("profile");
-        setLoading(false);
-        return;
-      }
-
+      if (!savedProfileId) { setScreen("profile"); setLoading(false); return; }
+      const { data, error } = await supabase.from("profiles").select("*").eq("id", savedProfileId).single();
+      if (error || !data) { setScreen("profile"); setLoading(false); return; }
       setProfile(data as Profile);
       setProfileName(data.name ?? "");
       await loadEntries(savedProfileId);
@@ -296,20 +290,17 @@ export default function App() {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const hadYesterday = entries.some(
-      (e) =>
-        e.status === "done" &&
-        startOfDay(new Date(e.createdAt)).getTime() === startOfDay(yesterday).getTime()
+      (e) => e.status === "done" && startOfDay(new Date(e.createdAt)).getTime() === startOfDay(yesterday).getTime()
     );
     if (hadYesterday && !hasResetToday) setStreakAtRisk(true);
-
     const yesterdayNotYet = entries.find(
-      (e) =>
-        e.status === "not_yet" &&
-        startOfDay(new Date(e.createdAt)).getTime() === startOfDay(yesterday).getTime()
+      (e) => e.status === "not_yet" && startOfDay(new Date(e.createdAt)).getTime() === startOfDay(yesterday).getTime()
     );
     if (yesterdayNotYet && !hasResetToday) {
       setCheckinEntry(yesterdayNotYet);
       setScreen("checkin");
+    } else if (!hasResetToday) {
+      setScreen("arrival");
     } else {
       setScreen("start");
     }
@@ -318,11 +309,8 @@ export default function App() {
 
   async function loadEntries(profileId: string) {
     const { data, error } = await supabase
-      .from("entries")
-      .select("*")
-      .eq("profile_id", profileId)
-      .order("created_at", { ascending: false })
-      .limit(50);
+      .from("entries").select("*").eq("profile_id", profileId)
+      .order("created_at", { ascending: false }).limit(50);
     if (!error && data) setEntries(data.map(mapEntry));
   }
 
@@ -359,19 +347,11 @@ export default function App() {
 
   const latestResetTime = latestEntry
     ? new Date(latestEntry.createdAt).toLocaleString(undefined, {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      })
-    : "";
+        weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+      }) : "";
 
   const hasResetToday = useMemo(
-    () =>
-      entries.some(
-        (e) => startOfDay(new Date(e.createdAt)).getTime() === startOfDay(new Date()).getTime()
-      ),
+    () => entries.some((e) => startOfDay(new Date(e.createdAt)).getTime() === startOfDay(new Date()).getTime()),
     [entries]
   );
 
@@ -381,28 +361,25 @@ export default function App() {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const has = entries.some(
-        (e) =>
-          e.status === "done" &&
-          startOfDay(new Date(e.createdAt)).getTime() === startOfDay(d).getTime()
+        (e) => e.status === "done" && startOfDay(new Date(e.createdAt)).getTime() === startOfDay(d).getTime()
       );
-      if (has) s++;
-      else break;
+      if (has) s++; else break;
     }
     return s;
   }, [entries]);
 
   const trackerDays = useMemo(() => {
-    const days: { label: string; active: boolean; isToday: boolean }[] = [];
+    const days: { label: string; active: boolean; isToday: boolean; presence?: number }[] = [];
     for (let i = 6; i >= 0; i--) {
       const day = new Date();
       day.setDate(day.getDate() - i);
       const label = day.toLocaleDateString(undefined, { weekday: "short" });
-      const active = entries.some(
-        (e) =>
-          e.status === "done" &&
-          startOfDay(new Date(e.createdAt)).getTime() === startOfDay(day).getTime()
+      const dayEntries = entries.filter(
+        (e) => startOfDay(new Date(e.createdAt)).getTime() === startOfDay(day).getTime()
       );
-      days.push({ label, active, isToday: i === 0 });
+      const active = dayEntries.some((e) => e.status === "done");
+      const presence = dayEntries[0]?.presenceScore;
+      days.push({ label, active, isToday: i === 0, presence });
     }
     return days;
   }, [entries]);
@@ -413,53 +390,33 @@ export default function App() {
 
   async function saveProfile() {
     setProfileError("");
-    if (!profileName.trim()) {
-      setProfileError("Name is required.");
-      return;
-    }
+    if (!profileName.trim()) { setProfileError("Name is required."); return; }
     const id = makeProfileId(profileName);
-    const payload = { id, name: profileName.trim() };
-    const { data, error } = await supabase
-      .from("profiles")
-      .upsert(payload, { onConflict: "id" })
-      .select()
-      .single();
-    if (error) {
-      setProfileError(error.message);
-      return;
-    }
+    const { data, error } = await supabase.from("profiles").upsert({ id, name: profileName.trim() }, { onConflict: "id" }).select().single();
+    if (error) { setProfileError(error.message); return; }
     localStorage.setItem("reset_profile_id", id);
     setProfile(data as Profile);
-    setScreen("start");
+    setScreen("arrival");
   }
 
   function changeName() {
     localStorage.removeItem("reset_profile_id");
     cancelLocalReminder();
-    setProfile(null);
-    setEntries([]);
-    setProfileName("");
-    setNotifEnabled(false);
+    setProfile(null); setEntries([]); setProfileName(""); setNotifEnabled(false);
     setScreen("profile");
   }
 
   function resetFlow() {
-    setMind("");
-    setAvoiding("");
-    setMove("");
-    setCountdown(COMMIT_SECONDS);
-    setLatestId(null);
-    setShareCopied(false);
-    setShowResultPopup(false);
-    setShowMilestone(false);
-    setAiFeedback("");
+    setMind(""); setAvoiding(""); setMove("");
+    setCountdown(COMMIT_SECONDS); setLatestId(null);
+    setShareCopied(false); setShowResultPopup(false);
+    setShowMilestone(false); setAiFeedback("");
     setScreen(profile ? "start" : "profile");
   }
 
   function beginCommit() {
     if (!mind.trim() || !avoiding.trim() || !move.trim()) return;
-    setCountdown(COMMIT_SECONDS);
-    setBreathePhase("in");
+    setCountdown(COMMIT_SECONDS); setBreathePhase("in");
     setScreen("commit");
   }
 
@@ -467,31 +424,19 @@ export default function App() {
     if (!profile) return;
     setAiFeedbackLoading(true);
     const pastPatterns = buildPastPatternsSummary(entries);
-    const payload = {
+    const { data, error } = await supabase.from("entries").insert({
       profile_id: profile.id,
-      mind: mind.trim(),
-      avoiding: avoiding.trim(),
-      move: move.trim(),
-      status,
-      feedback: "...",
-    };
-    const { data, error } = await supabase.from("entries").insert(payload).select().single();
-    if (error) {
-      alert("The entry did not save. Check Supabase table or policies.");
-      setAiFeedbackLoading(false);
-      return;
-    }
+      mind: mind.trim(), avoiding: avoiding.trim(), move: move.trim(),
+      status, feedback: "...", presence_score: presenceScore || null,
+    }).select().single();
+    if (error) { alert("The entry did not save. Check Supabase table or policies."); setAiFeedbackLoading(false); return; }
     const newEntry = mapEntry(data);
     setEntries((prev) => [newEntry, ...prev].slice(0, 50));
     setLatestId(newEntry.id);
     setScreen("result");
     const newStreak = status === "done" ? streak + 1 : streak;
-    if (status === "done" && MILESTONE_DAYS.includes(newStreak)) {
-      setShowMilestone(true);
-    } else {
-      setShowResultPopup(true);
-    }
-    const feedback = await getAIFeedback(status, mind, avoiding, move, profile.name, pastPatterns);
+    if (status === "done" && MILESTONE_DAYS.includes(newStreak)) { setShowMilestone(true); } else { setShowResultPopup(true); }
+    const feedback = await getAIFeedback(status, mind, avoiding, move, profile.name, pastPatterns, presenceScore);
     setAiFeedback(feedback);
     setAiFeedbackLoading(false);
     await supabase.from("entries").update({ feedback }).eq("id", newEntry.id);
@@ -499,61 +444,42 @@ export default function App() {
   }
 
   async function toggleNotifications() {
-    if (notifEnabled) {
-      cancelLocalReminder();
-      setNotifEnabled(false);
-      return;
-    }
+    if (notifEnabled) { cancelLocalReminder(); setNotifEnabled(false); return; }
     const granted = await requestNotificationPermission();
-    if (granted) {
-      setNotifPermission("granted");
-      scheduleLocalReminder(profile?.name ?? "");
-      setNotifEnabled(true);
-    } else {
-      setNotifPermission("denied");
-    }
+    if (granted) { setNotifPermission("granted"); scheduleLocalReminder(profile?.name ?? ""); setNotifEnabled(true); }
+    else { setNotifPermission("denied"); }
   }
 
   function resumeCheckin() {
     if (!checkinEntry) return;
-    setMind(checkinEntry.mind);
-    setAvoiding(checkinEntry.avoiding);
-    setMove(checkinEntry.move);
-    setCountdown(COMMIT_SECONDS);
-    setBreathePhase("in");
-    setScreen("commit");
+    setMind(checkinEntry.mind); setAvoiding(checkinEntry.avoiding); setMove(checkinEntry.move);
+    setCountdown(COMMIT_SECONDS); setBreathePhase("in"); setScreen("commit");
   }
 
   function resumeLastNotYet() {
     if (!lastNotYet) return;
-    setMind(lastNotYet.mind);
-    setAvoiding(lastNotYet.avoiding);
-    setMove(lastNotYet.move);
+    setMind(lastNotYet.mind); setAvoiding(lastNotYet.avoiding); setMove(lastNotYet.move);
     setScreen("move");
   }
 
   async function shareMove() {
     const text = `I said I would do this: ${move}. Check on me.`;
     try {
-      if (navigator.share) {
-        await navigator.share({ title: "Reset", text });
-        return;
-      }
+      if (navigator.share) { await navigator.share({ title: "Reset", text }); return; }
       await navigator.clipboard.writeText(text);
-      setShareCopied(true);
-      window.setTimeout(() => setShareCopied(false), 1800);
+      setShareCopied(true); window.setTimeout(() => setShareCopied(false), 1800);
     } catch {}
   }
 
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#F5F1EA" }}>
-        <div style={{ fontSize: 13, color: "#6F6861", letterSpacing: "0.1em" }}>Loading...</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#0D0B09" }}>
+        <div style={{ fontSize: 13, color: "#6F6861", letterSpacing: "0.15em" }}>...</div>
       </div>
     );
   }
 
-  const styles: Record<string, CSSProperties | any> = {
+  const S: Record<string, CSSProperties | any> = {
     page: { minHeight: "100vh", background: "#F5F1EA", padding: "0 0 40px" },
     wrap: { maxWidth: 480, margin: "0 auto", padding: "0 16px" },
     topRow: { display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 20, paddingBottom: 14 },
@@ -579,7 +505,7 @@ export default function App() {
     ctaMuted: { width: "100%", padding: "13px 18px", borderRadius: 18, border: "1px solid #DDD5CA", background: "transparent", color: "#6F6861", fontSize: 14, cursor: "pointer", fontFamily: "inherit", marginBottom: 8 },
     ctaGold: { width: "100%", padding: "15px 18px", borderRadius: 18, border: "none", background: "#E8A000", color: "#FFF8E1", fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" },
     trackerCard: { background: "#FFFDF9", border: "1px solid #DDD5CA", borderRadius: 22, padding: 16, marginBottom: 14, boxShadow: "0 14px 40px rgba(35,32,29,0.05)" },
-    trackerCardMilestone: { background: "linear-gradient(135deg,#FFF8E1 0%,#FFF3CC 50%,#FFFDF9 100%)", border: "1.5px solid #F0C040", borderRadius: 22, padding: 16, marginBottom: 14, boxShadow: "0 14px 40px rgba(240,192,64,0.18)", animation: "goldPulse 2s ease-in-out infinite" },
+    trackerCardMilestone: { background: "linear-gradient(135deg,#FFF8E1 0%,#FFF3CC 50%,#FFFDF9 100%)", border: "1.5px solid #F0C040", borderRadius: 22, padding: 16, marginBottom: 14, animation: "goldPulse 2s ease-in-out infinite" },
     trackerTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 },
     streakPill: { display: "inline-flex", alignItems: "center", gap: 5, background: "#23201D", color: "#F5F1EA", borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 700 },
     streakPillMilestone: { display: "inline-flex", alignItems: "center", gap: 5, background: "#E8A000", color: "#FFF8E1", borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 700 },
@@ -602,7 +528,7 @@ export default function App() {
     checkinCard: { background: "#FFFDF9", border: "1px solid #DDD5CA", borderRadius: 28, padding: 24, boxShadow: "0 18px 50px rgba(35,32,29,0.06)" },
     checkinBadge: { display: "inline-block", background: "#F7F1E6", border: "1px solid #DDD5CA", borderRadius: 999, padding: "5px 12px", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: "#6F6861", marginBottom: 14 },
     checkinMove: { fontSize: 24, lineHeight: 1.2, fontWeight: 500, fontFamily: 'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif', margin: "10px 0 6px", letterSpacing: "-0.03em" },
-    heroCard: { position: "relative", minHeight: 580, borderRadius: 28, overflow: "hidden", marginBottom: 14, backgroundImage: "url('/garden.png')", backgroundSize: "cover", backgroundPosition: "center" },
+    heroCard: { position: "relative", minHeight: 520, borderRadius: 28, overflow: "hidden", marginBottom: 14, backgroundImage: "url('/garden.png')", backgroundSize: "cover", backgroundPosition: "center" },
     heroOverlay: { position: "absolute", inset: 0, background: "linear-gradient(180deg,rgba(245,241,234,0.08) 0%,rgba(35,32,29,0.72) 100%)", padding: "32px 28px", display: "flex", flexDirection: "column" as const, justifyContent: "space-between" },
     heroTitle: { fontSize: 38, fontWeight: 500, lineHeight: 1.1, letterSpacing: "-0.04em", color: "#F5F1EA", fontFamily: 'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif', whiteSpace: "pre-line" as const, marginBottom: 10 },
     heroSub: { fontSize: 15, color: "rgba(245,241,234,0.72)", lineHeight: 1.5, maxWidth: 260 },
@@ -620,10 +546,9 @@ export default function App() {
     statusRow: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },
     statusPrimary: { padding: "14px 10px", borderRadius: 16, border: "none", background: "#F5F1EA", color: "#161413", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" },
     statusSecondary: { padding: "14px 10px", borderRadius: 16, border: "1px solid rgba(245,241,234,0.2)", background: "transparent", color: "rgba(245,241,234,0.6)", fontSize: 14, cursor: "pointer", fontFamily: "inherit" },
-    feedbackBox: { background: "#F7F3EC", border: "1px solid #DDD5CA", borderRadius: 16, padding: "14px 16px", marginBottom: 14 },
-    feedbackText: { fontSize: 14, color: "#2B2723", lineHeight: 1.6 },
     aiFeedbackBox: { background: "#F0EDE6", border: "1px solid #C8BFB4", borderRadius: 16, padding: "14px 16px", marginBottom: 14 },
     aiBadge: { fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#8A7F74", marginBottom: 6 },
+    feedbackText: { fontSize: 14, color: "#2B2723", lineHeight: 1.6 },
     resultBox: { background: "#F7F3EC", border: "1px solid #DDD5CA", borderRadius: 16, padding: "12px 14px", marginBottom: 14 },
     shareBox: { background: "#F7F3EC", border: "1px solid #DDD5CA", borderRadius: 16, padding: "14px 16px", marginBottom: 14 },
     shareTitle: { fontSize: 13, fontWeight: 700, marginBottom: 5 },
@@ -664,17 +589,161 @@ export default function App() {
   function renderStepCard(step: 1 | 2 | 3, content: React.ReactNode) {
     const pct = step === 1 ? 33 : step === 2 ? 66 : 100;
     return (
-      <div style={styles.card}>
-        <div style={styles.progressWrap}>
-          <div style={progressBarStyle(pct)} />
-        </div>
+      <div style={S.card}>
+        <div style={S.progressWrap}><div style={progressBarStyle(pct)} /></div>
         {content}
       </div>
     );
   }
 
+  // ── ARRIVAL SCREEN ──────────────────────────────────────────────────────
+  if (screen === "arrival") {
+    return (
+      <div style={{ minHeight: "100vh", background: "#0D0B09", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
+        <style>{`
+          @keyframes arrivalPulse {
+            0%, 100% { transform: scale(1); opacity: 0.15; }
+            50% { transform: scale(1.6); opacity: 0.04; }
+          }
+          @keyframes breatheIn {
+            0% { transform: scale(0.92); }
+            100% { transform: scale(1.12); }
+          }
+          @keyframes breatheOut {
+            0% { transform: scale(1.12); }
+            100% { transform: scale(0.92); }
+          }
+          @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+        `}</style>
+
+        {/* Background glow */}
+        <div style={{ position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+          <div style={{ width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(180,140,90,0.08) 0%, transparent 70%)", animation: "arrivalPulse 8s ease-in-out infinite" }} />
+        </div>
+
+        {/* Badge */}
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(245,241,234,0.3)", marginBottom: 60, animation: "fadeUp 1s ease forwards" }}>
+          Reset
+        </div>
+
+        {/* Breathing orb */}
+        <div style={{
+          width: 120, height: 120, borderRadius: "50%",
+          border: "1px solid rgba(245,241,234,0.15)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          marginBottom: 40,
+          animation: breathePhase === "in" ? "breatheIn 4s ease-in-out forwards" : "breatheOut 4s ease-in-out forwards",
+          boxShadow: breathePhase === "in" ? "0 0 60px rgba(180,140,90,0.12)" : "0 0 20px rgba(180,140,90,0.04)",
+          transition: "box-shadow 4s ease",
+        }}>
+          <div style={{ width: 60, height: 60, borderRadius: "50%", background: "radial-gradient(circle, rgba(180,140,90,0.3) 0%, rgba(180,140,90,0.05) 100%)" }} />
+        </div>
+
+        {/* Instruction */}
+        <div style={{ fontSize: 13, color: "rgba(245,241,234,0.5)", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 16, animation: "fadeUp 1.5s ease forwards" }}>
+          {breathePhase === "in" ? "Breathe in" : "Breathe out"}
+        </div>
+
+        {/* Main text */}
+        <div style={{ fontSize: 28, fontWeight: 500, color: "rgba(245,241,234,0.9)", fontFamily: 'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif', letterSpacing: "-0.03em", textAlign: "center", lineHeight: 1.3, marginBottom: 12, maxWidth: 280, animation: "fadeUp 2s ease forwards" }}>
+          Before anything else.{"\n"}Just arrive.
+        </div>
+
+        <div style={{ fontSize: 13, color: "rgba(245,241,234,0.3)", textAlign: "center", marginBottom: 60, fontStyle: "italic" }}>
+          قبل أي شيء. فقط اوصل.
+        </div>
+
+        {/* Continue button — unlocks after 3 breath cycles */}
+        <button
+          onClick={() => setScreen("presence")}
+          disabled={!arrivalUnlocked}
+          style={{
+            padding: "14px 32px", borderRadius: 999, border: "1px solid rgba(245,241,234,0.2)",
+            background: arrivalUnlocked ? "rgba(245,241,234,0.1)" : "transparent",
+            color: arrivalUnlocked ? "rgba(245,241,234,0.8)" : "rgba(245,241,234,0.2)",
+            fontSize: 14, cursor: arrivalUnlocked ? "pointer" : "default",
+            fontFamily: "inherit", letterSpacing: "0.05em",
+            transition: "all 0.8s ease",
+          }}
+        >
+          {arrivalUnlocked ? "I'm here" : "Breathe..."}
+        </button>
+      </div>
+    );
+  }
+
+  // ── PRESENCE SCORE SCREEN ───────────────────────────────────────────────
+  if (screen === "presence") {
+    return (
+      <div style={{ minHeight: "100vh", background: "#0D0B09", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
+        <style>{`
+          @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+        `}</style>
+        <div style={{ width: "100%", maxWidth: 400, animation: "fadeUp 0.6s ease forwards" }}>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(245,241,234,0.3)", marginBottom: 40, textAlign: "center" }}>Reset</div>
+
+          <div style={{ fontSize: 26, fontWeight: 500, color: "rgba(245,241,234,0.9)", fontFamily: 'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif', letterSpacing: "-0.03em", textAlign: "center", lineHeight: 1.3, marginBottom: 8 }}>
+            How present are you{"\n"}right now?
+          </div>
+          <div style={{ fontSize: 13, color: "rgba(245,241,234,0.35)", textAlign: "center", marginBottom: 48, fontStyle: "italic" }}>
+            كيف حضورك الآن؟
+          </div>
+
+          {/* Presence scale */}
+          <div style={{ display: "grid", gap: 10, marginBottom: 40 }}>
+            {[1, 2, 3, 4, 5].map((score) => {
+              const info = PRESENCE_LABELS[score];
+              const selected = presenceScore === score;
+              return (
+                <button
+                  key={score}
+                  onClick={() => setPresenceScore(score)}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "14px 18px", borderRadius: 16,
+                    border: selected ? `1px solid ${info.color}` : "1px solid rgba(245,241,234,0.08)",
+                    background: selected ? `${info.color}22` : "rgba(245,241,234,0.03)",
+                    cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s ease",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: selected ? info.color : "rgba(245,241,234,0.2)" }} />
+                    <span style={{ fontSize: 14, color: selected ? "rgba(245,241,234,0.9)" : "rgba(245,241,234,0.45)", fontWeight: selected ? 600 : 400 }}>
+                      {info.en}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: 12, color: "rgba(245,241,234,0.25)", fontStyle: "italic" }}>{info.ar}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            onClick={() => presenceScore > 0 && setScreen("start")}
+            disabled={presenceScore === 0}
+            style={{
+              width: "100%", padding: "15px 18px", borderRadius: 18,
+              border: "none", background: presenceScore > 0 ? "rgba(245,241,234,0.9)" : "rgba(245,241,234,0.1)",
+              color: presenceScore > 0 ? "#161413" : "rgba(245,241,234,0.3)",
+              fontSize: 15, fontWeight: 800, cursor: presenceScore > 0 ? "pointer" : "default",
+              fontFamily: "inherit", transition: "all 0.3s ease",
+            }}
+          >
+            Continue
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div style={styles.page}>
+    <div style={S.page}>
       <style>{`
         @keyframes goldPulse {
           0%,100% { box-shadow: 0 14px 40px rgba(240,192,64,0.18); }
@@ -687,367 +756,362 @@ export default function App() {
         .fade-in { animation: fadeIn 0.4s ease forwards; }
         button:active { transform: scale(0.98); }
       `}</style>
-      <div style={styles.wrap}>
+      <div style={S.wrap}>
 
-        <div style={styles.topRow}>
-          <div style={styles.badge}>Reset</div>
+        <div style={S.topRow}>
+          <div style={S.badge}>Reset</div>
           <div style={{ display: "flex", gap: 8 }}>
             {profile && entries.length >= 3 && (
-              <button style={styles.profileBtn} onClick={() => setScreen("insights")}>Insights</button>
+              <button style={S.profileBtn} onClick={() => setScreen("insights")}>Insights</button>
             )}
             {profile && (
-              <button style={styles.profileBtn} onClick={changeName}>{profile.name} ↩</button>
+              <button style={S.profileBtn} onClick={changeName}>{profile.name} ↩</button>
             )}
           </div>
         </div>
 
+        {/* Presence score pill on start screen */}
+        {screen === "start" && presenceScore > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: PRESENCE_LABELS[presenceScore]?.color }} />
+            <span style={{ fontSize: 12, color: "#6F6861" }}>
+              Today: {PRESENCE_LABELS[presenceScore]?.en} · {PRESENCE_LABELS[presenceScore]?.ar}
+            </span>
+          </div>
+        )}
+
         {screen !== "profile" && (
-          <div style={isMilestone ? styles.trackerCardMilestone : styles.trackerCard}>
-            <div style={styles.trackerTop}>
+          <div style={isMilestone ? S.trackerCardMilestone : S.trackerCard}>
+            <div style={S.trackerTop}>
               <div>
-                <div style={styles.label}>Momentum</div>
-                <div style={{ ...styles.trackerText, marginTop: 3 }}>
+                <div style={S.label}>Momentum</div>
+                <div style={{ ...S.trackerText, marginTop: 3 }}>
                   {streak > 0 ? `${streak} day${streak !== 1 ? "s" : ""} strong` : "Start today"}
                 </div>
               </div>
               {streakAtRisk && !hasResetToday ? (
-                <div style={styles.streakAtRiskPill}>⚠ Streak at risk</div>
+                <div style={S.streakAtRiskPill}>⚠ Streak at risk</div>
               ) : isMilestone ? (
-                <div style={styles.streakPillMilestone}>★ {streak} day streak</div>
+                <div style={S.streakPillMilestone}>★ {streak} day streak</div>
               ) : streak > 1 ? (
-                <div style={styles.streakPill}>{streak} day streak</div>
+                <div style={S.streakPill}>{streak} day streak</div>
               ) : (
-                <div style={styles.trackerText}>Last 7 days</div>
+                <div style={S.trackerText}>Last 7 days</div>
               )}
             </div>
-            <div style={styles.trackerRow}>
+            <div style={S.trackerRow}>
               {trackerDays.map((day, idx) => (
-                <div key={`${day.label}-${idx}`} style={styles.trackerDay}>
-                  <div style={{ ...styles.dot, ...(day.active ? styles.dotActive : {}), ...(day.isToday ? styles.dotToday : {}) }} />
+                <div key={`${day.label}-${idx}`} style={S.trackerDay}>
+                  <div style={{ ...S.dot, ...(day.active ? S.dotActive : {}), ...(day.isToday ? S.dotToday : {}) }} />
                   {day.label}
                 </div>
               ))}
             </div>
-            {isMilestone && <div style={styles.milestoneText}>{milestoneLabel}</div>}
+            {isMilestone && <div style={S.milestoneText}>{milestoneLabel}</div>}
           </div>
         )}
 
         {screen === "start" && streakAtRisk && !hasResetToday && (
-          <div style={styles.riskBanner}>
-            <div style={styles.riskText}>You had a streak going. You haven't moved today. One reset keeps it alive.</div>
-            <button style={styles.riskButton} onClick={() => setScreen("mind")}>Don't break it</button>
+          <div style={S.riskBanner}>
+            <div style={S.riskText}>You had a streak going. You haven't moved today. One reset keeps it alive.</div>
+            <button style={S.riskButton} onClick={() => setScreen("mind")}>Don't break it</button>
           </div>
         )}
 
         {screen === "checkin" && checkinEntry && (
-          <div style={styles.checkinCard}>
-            <div style={styles.checkinBadge}>Daily Check-in</div>
-            <div style={styles.title}>Yesterday you said "not yet."</div>
-            <div style={styles.sub}>You said you'd do this:</div>
-            <div style={styles.checkinMove}>{checkinEntry.move}</div>
-            <div style={{ ...styles.sub, marginBottom: 20 }}>Did it happen? Or are you still carrying it?</div>
-            <button style={styles.cta} onClick={resumeCheckin}>Commit to it now</button>
-            <button style={styles.ctaMuted} onClick={() => setScreen("start")}>Start fresh instead</button>
+          <div style={S.checkinCard}>
+            <div style={S.checkinBadge}>Daily Check-in</div>
+            <div style={S.title}>Yesterday you said "not yet."</div>
+            <div style={S.sub}>You said you'd do this:</div>
+            <div style={S.checkinMove}>{checkinEntry.move}</div>
+            <div style={{ ...S.sub, marginBottom: 20 }}>Did it happen? Or are you still carrying it?</div>
+            <button style={S.cta} onClick={resumeCheckin}>Commit to it now</button>
+            <button style={S.ctaMuted} onClick={() => setScreen("start")}>Start fresh instead</button>
           </div>
         )}
 
         {screen === "profile" && (
-          <div style={styles.card}>
-            <div style={styles.stepPill}>Name</div>
-            <div style={styles.title}>What do people call you?</div>
-            <div style={styles.sub}>Just your first name. This stays on your device.</div>
-            <input style={styles.input} placeholder="Your name" value={profileName} onChange={(e) => setProfileName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveProfile()} />
+          <div style={S.card}>
+            <div style={S.stepPill}>Name</div>
+            <div style={S.title}>What do people call you?</div>
+            <div style={S.sub}>Just your first name. This stays on your device.</div>
+            <input style={S.input} placeholder="Your name" value={profileName} onChange={(e) => setProfileName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveProfile()} />
             {profileError && <div style={{ color: "#C0392B", fontSize: 13, marginBottom: 10 }}>{profileError}</div>}
-            <button style={{ ...styles.cta, marginTop: 18 }} onClick={saveProfile}>Start</button>
+            <button style={{ ...S.cta, marginTop: 18 }} onClick={saveProfile}>Start</button>
           </div>
         )}
 
         {screen === "start" && (
           <>
-            <div style={styles.heroCard}>
-              <div style={styles.heroOverlay}>
+            <div style={S.heroCard}>
+              <div style={S.heroOverlay}>
                 <div>
-                  <div style={styles.heroTitle}>You don't stay stuck.{"\n"}You move.</div>
-                  <div style={styles.heroSub}>Empty the noise. Name the dodge. Make one clean move.</div>
+                  <div style={S.heroTitle}>You don't stay stuck.{"\n"}You move.</div>
+                  <div style={S.heroSub}>Empty the noise. Name the dodge. Make one clean move.</div>
                 </div>
-                <div style={styles.heroBottom}>
-                  <button style={styles.startButton} onClick={() => setScreen("mind")}>{hasResetToday ? "Reset again" : "Start Reset"}</button>
-                  <div style={styles.heroFoot}>This is saved to your reset record.</div>
+                <div style={S.heroBottom}>
+                  <button style={S.startButton} onClick={() => setScreen("mind")}>{hasResetToday ? "Reset again" : "Start Reset"}</button>
+                  <div style={S.heroFoot}>This is saved to your reset record.</div>
                 </div>
               </div>
             </div>
             {lastNotYet && !hasResetToday && (
-              <div style={styles.unfinishedCard}>
-                <div style={styles.label}>Unfinished business</div>
-                <div style={styles.unfinishedMove}>{lastNotYet.move}</div>
-                <div style={styles.trackerText}>You said "not yet." Respectfully, the task is still staring.</div>
-                <button style={{ ...styles.cta, marginTop: 12 }} onClick={resumeLastNotYet}>Resume</button>
+              <div style={S.unfinishedCard}>
+                <div style={S.label}>Unfinished business</div>
+                <div style={S.unfinishedMove}>{lastNotYet.move}</div>
+                <div style={S.trackerText}>You said "not yet." Respectfully, the task is still staring.</div>
+                <button style={{ ...S.cta, marginTop: 12 }} onClick={resumeLastNotYet}>Resume</button>
               </div>
             )}
-            <div style={styles.notifRow}>
+            <div style={S.notifRow}>
               <div>
-                <div style={styles.notifLabel}>Daily reminder at noon</div>
-                <div style={styles.notifSub}>{notifPermission === "denied" ? "Blocked in browser settings" : notifEnabled ? "You'll get a nudge if you haven't moved" : "Off — tap to enable"}</div>
+                <div style={S.notifLabel}>Daily reminder at noon</div>
+                <div style={S.notifSub}>{notifPermission === "denied" ? "Blocked in browser settings" : notifEnabled ? "You'll get a nudge if you haven't moved" : "Off — tap to enable"}</div>
               </div>
-              <div style={styles.toggleTrack(notifEnabled)} onClick={notifPermission !== "denied" ? toggleNotifications : undefined} role="switch" aria-checked={notifEnabled}>
-                <div style={styles.toggleThumb(notifEnabled)} />
+              <div style={S.toggleTrack(notifEnabled)} onClick={notifPermission !== "denied" ? toggleNotifications : undefined} role="switch" aria-checked={notifEnabled}>
+                <div style={S.toggleThumb(notifEnabled)} />
               </div>
             </div>
-            <button style={styles.ctaMuted} onClick={() => setScreen("history")}>View history</button>
+            <button style={S.ctaMuted} onClick={() => setScreen("history")}>View history</button>
           </>
         )}
 
         {screen === "mind" && renderStepCard(1, <>
-          <div style={styles.stepPill}>Step 1 / 3</div>
-          <div style={styles.title}>What's actually in your head?</div>
-          <div style={styles.sub}>Not everything. Just the loudest thing.</div>
-          <div style={styles.focusHint}>If you over-explain, you're avoiding.</div>
-          <div style={styles.chips}>
-            {MIND_SUGGESTIONS.map((opt) => (
-              <button key={opt} type="button" style={{ ...styles.chip, ...(mind === opt ? styles.chipActive : {}) }} onClick={() => setMind(opt)}>{opt}</button>
-            ))}
-          </div>
-          <input ref={mindRef} style={styles.input} placeholder="The loudest thing right now…" value={mind} maxLength={120} onChange={(e) => setMind(e.target.value)} onKeyDown={(e) => e.key === "Enter" && mind.trim() && setScreen("avoid")} />
-          <div style={styles.helperRow}><span style={styles.helper}>Be specific. Vague = stuck.</span><span style={styles.helper}>{mind.length}/120</span></div>
-          <button style={{ ...styles.cta, ...(mind.trim() ? {} : styles.ctaDisabled) }} disabled={!mind.trim()} onClick={() => setScreen("avoid")}>That's it. Continue.</button>
-          <button style={styles.ctaMuted} onClick={resetFlow}>Cancel</button>
+          <div style={S.stepPill}>Step 1 / 3</div>
+          <div style={S.title}>What's actually in your head?</div>
+          <div style={S.sub}>Not everything. Just the loudest thing.</div>
+          <div style={S.focusHint}>If you over-explain, you're avoiding.</div>
+          <div style={S.chips}>{MIND_SUGGESTIONS.map((opt) => (<button key={opt} type="button" style={{ ...S.chip, ...(mind === opt ? S.chipActive : {}) }} onClick={() => setMind(opt)}>{opt}</button>))}</div>
+          <input ref={mindRef} style={S.input} placeholder="The loudest thing right now…" value={mind} maxLength={120} onChange={(e) => setMind(e.target.value)} onKeyDown={(e) => e.key === "Enter" && mind.trim() && setScreen("avoid")} />
+          <div style={S.helperRow}><span style={S.helper}>Be specific. Vague = stuck.</span><span style={S.helper}>{mind.length}/120</span></div>
+          <button style={{ ...S.cta, ...(mind.trim() ? {} : S.ctaDisabled) }} disabled={!mind.trim()} onClick={() => setScreen("avoid")}>That's it. Continue.</button>
+          <button style={S.ctaMuted} onClick={resetFlow}>Cancel</button>
         </>)}
 
         {screen === "avoid" && renderStepCard(2, <>
-          <div style={styles.stepPill}>Step 2 / 3</div>
-          <div style={styles.title}>What are you avoiding?</div>
-          <div style={styles.sub}>Not the story. The thing itself.</div>
-          <div style={styles.focusHint}>If you soften it, you'll keep avoiding it.</div>
-          <div style={styles.chips}>
-            {AVOIDING_SUGGESTIONS.map((opt) => (
-              <button key={opt} type="button" style={{ ...styles.chip, ...(avoiding === opt ? styles.chipActive : {}) }} onClick={() => setAvoiding(opt)}>{opt}</button>
-            ))}
-          </div>
-          <input ref={avoidRef} style={styles.input} placeholder="What you keep not doing…" value={avoiding} maxLength={120} onChange={(e) => setAvoiding(e.target.value)} onKeyDown={(e) => e.key === "Enter" && avoiding.trim() && setScreen("move")} />
-          <div style={styles.helperRow}><span style={styles.helper}>Name it exactly.</span><span style={styles.helper}>{avoiding.length}/120</span></div>
-          <button style={{ ...styles.cta, ...(avoiding.trim() ? {} : styles.ctaDisabled) }} disabled={!avoiding.trim()} onClick={() => setScreen("move")}>Got it. Next.</button>
-          <button style={styles.ctaMuted} onClick={() => setScreen("mind")}>← Back</button>
+          <div style={S.stepPill}>Step 2 / 3</div>
+          <div style={S.title}>What are you avoiding?</div>
+          <div style={S.sub}>Not the story. The thing itself.</div>
+          <div style={S.focusHint}>If you soften it, you'll keep avoiding it.</div>
+          <div style={S.chips}>{AVOIDING_SUGGESTIONS.map((opt) => (<button key={opt} type="button" style={{ ...S.chip, ...(avoiding === opt ? S.chipActive : {}) }} onClick={() => setAvoiding(opt)}>{opt}</button>))}</div>
+          <input ref={avoidRef} style={S.input} placeholder="What you keep not doing…" value={avoiding} maxLength={120} onChange={(e) => setAvoiding(e.target.value)} onKeyDown={(e) => e.key === "Enter" && avoiding.trim() && setScreen("move")} />
+          <div style={S.helperRow}><span style={S.helper}>Name it exactly.</span><span style={S.helper}>{avoiding.length}/120</span></div>
+          <button style={{ ...S.cta, ...(avoiding.trim() ? {} : S.ctaDisabled) }} disabled={!avoiding.trim()} onClick={() => setScreen("move")}>Got it. Next.</button>
+          <button style={S.ctaMuted} onClick={() => setScreen("mind")}>← Back</button>
         </>)}
 
         {screen === "move" && renderStepCard(3, <>
-          <div style={styles.stepPill}>Step 3 / 3</div>
-          <div style={styles.title}>What's the smallest move?</div>
-          <div style={styles.sub}>Not the plan. Just the first step.</div>
-          <div style={styles.focusHint}>If it feels big, you won't do it.</div>
-          <div style={styles.chips}>
-            {MOVE_SUGGESTIONS.map((opt) => (
-              <button key={opt} type="button" style={{ ...styles.chip, ...(move === opt ? styles.chipActive : {}) }} onClick={() => setMove(opt)}>{opt}</button>
-            ))}
-          </div>
-          <input ref={moveRef} style={styles.input} placeholder="One tiny action…" value={move} maxLength={120} onChange={(e) => setMove(e.target.value)} onKeyDown={(e) => e.key === "Enter" && move.trim() && beginCommit()} />
-          <div style={styles.helperRow}><span style={styles.helper}>Embarrassingly small is right.</span><span style={styles.helper}>{move.length}/120</span></div>
-          <button style={{ ...styles.cta, ...(move.trim() ? {} : styles.ctaDisabled) }} disabled={!move.trim()} onClick={beginCommit}>Commit.</button>
-          <button style={styles.ctaMuted} onClick={() => setScreen("avoid")}>← Back</button>
+          <div style={S.stepPill}>Step 3 / 3</div>
+          <div style={S.title}>What's the smallest move?</div>
+          <div style={S.sub}>Not the plan. Just the first step.</div>
+          <div style={S.focusHint}>If it feels big, you won't do it.</div>
+          <div style={S.chips}>{MOVE_SUGGESTIONS.map((opt) => (<button key={opt} type="button" style={{ ...S.chip, ...(move === opt ? S.chipActive : {}) }} onClick={() => setMove(opt)}>{opt}</button>))}</div>
+          <input ref={moveRef} style={S.input} placeholder="One tiny action…" value={move} maxLength={120} onChange={(e) => setMove(e.target.value)} onKeyDown={(e) => e.key === "Enter" && move.trim() && beginCommit()} />
+          <div style={S.helperRow}><span style={S.helper}>Embarrassingly small is right.</span><span style={S.helper}>{move.length}/120</span></div>
+          <button style={{ ...S.cta, ...(move.trim() ? {} : S.ctaDisabled) }} disabled={!move.trim()} onClick={beginCommit}>Commit.</button>
+          <button style={S.ctaMuted} onClick={() => setScreen("avoid")}>← Back</button>
         </>)}
 
         {screen === "commit" && (
-          <div style={{ ...styles.card, ...styles.commitCard }}>
-            <div style={{ ...styles.stepPill, ...styles.stepPillDark }}>No more thinking.</div>
-            <div style={styles.title}>Do this now.</div>
-            <div style={{ ...styles.sub, ...styles.subDark }}>Start before you feel ready.</div>
-            <div style={styles.moveBox}>
-              <div style={{ ...styles.label, color: "#A79E93", marginBottom: 8 }}>Your move</div>
-              <div style={styles.moveBig}>{move}</div>
+          <div style={{ ...S.card, ...S.commitCard }}>
+            <div style={{ ...S.stepPill, ...S.stepPillDark }}>No more thinking.</div>
+            <div style={S.title}>Do this now.</div>
+            <div style={{ ...S.sub, ...S.subDark }}>Start before you feel ready.</div>
+            <div style={S.moveBox}>
+              <div style={{ ...S.label, color: "#A79E93", marginBottom: 8 }}>Your move</div>
+              <div style={S.moveBig}>{move}</div>
             </div>
             {countdown > 0 ? (
               <>
-                <div style={styles.breatheRing(breathePhase)}><div style={styles.breatheNum}>{countdown}</div></div>
-                <div style={styles.breatheLabel}>{breathePhase === "in" ? "BREATHE IN" : "BREATHE OUT"}</div>
+                <div style={S.breatheRing(breathePhase)}><div style={S.breatheNum}>{countdown}</div></div>
+                <div style={S.breatheLabel}>{breathePhase === "in" ? "BREATHE IN" : "BREATHE OUT"}</div>
               </>
             ) : (
-              <div style={styles.statusRow}>
-                <button style={styles.statusPrimary} onClick={() => saveResult("done")}>I did it</button>
-                <button style={styles.statusSecondary} onClick={() => saveResult("not_yet")}>I didn't</button>
+              <div style={S.statusRow}>
+                <button style={S.statusPrimary} onClick={() => saveResult("done")}>I did it</button>
+                <button style={S.statusSecondary} onClick={() => saveResult("not_yet")}>I didn't</button>
               </div>
             )}
           </div>
         )}
 
         {screen === "result" && latestEntry && (
-          <div style={styles.card}>
-            <div style={styles.stepPill}>Feedback</div>
-            <div style={styles.title}>{latestEntry.status === "done" ? "You moved." : "You're still avoiding."}</div>
-            <div style={styles.aiFeedbackBox}>
-              <div style={styles.aiBadge}>AI Insight</div>
+          <div style={S.card}>
+            <div style={S.stepPill}>Feedback</div>
+            <div style={S.title}>{latestEntry.status === "done" ? "You moved." : "You're still avoiding."}</div>
+            <div style={S.aiFeedbackBox}>
+              <div style={S.aiBadge}>AI Insight</div>
               {aiFeedbackLoading ? (
-                <div style={{ ...styles.feedbackText, color: "#A79E93", fontStyle: "italic" }}>Thinking about what you just did...</div>
+                <div style={{ ...S.feedbackText, color: "#A79E93", fontStyle: "italic" }}>Thinking about what you just did...</div>
               ) : (
-                <div style={styles.feedbackText}>{aiFeedback}</div>
+                <div style={S.feedbackText}>{aiFeedback}</div>
               )}
             </div>
             {latestEntry.status === "done" && streak > 0 && (
-              <div style={{ ...styles.resultBox, background: streak >= 7 ? "#FFF8E1" : "#F7F3EC", border: streak >= 7 ? "1px solid #F0C040" : "1px solid #DDD5CA", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ ...S.resultBox, background: streak >= 7 ? "#FFF8E1" : "#F7F3EC", border: streak >= 7 ? "1px solid #F0C040" : "1px solid #DDD5CA", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>
-                  <div style={styles.label}>Current streak</div>
-                  <div style={{ ...styles.unfinishedMove, marginBottom: 0, color: streak >= 7 ? "#7A5200" : "#161413" }}>{streak} day{streak !== 1 ? "s" : ""}</div>
+                  <div style={S.label}>Current streak</div>
+                  <div style={{ ...S.unfinishedMove, marginBottom: 0, color: streak >= 7 ? "#7A5200" : "#161413" }}>{streak} day{streak !== 1 ? "s" : ""}</div>
                 </div>
                 {streak >= 7 && <div style={{ fontSize: 28 }}>★</div>}
               </div>
             )}
-            <div style={styles.shareBox}>
-              <div style={styles.shareTitle}>Accountability</div>
-              <div style={styles.shareText}>Send it to one person. Make it harder to disappear.</div>
-              <button style={styles.cta} onClick={shareMove}>{shareCopied ? "Copied" : "Share my move"}</button>
+            <div style={S.shareBox}>
+              <div style={S.shareTitle}>Accountability</div>
+              <div style={S.shareText}>Send it to one person. Make it harder to disappear.</div>
+              <button style={S.cta} onClick={shareMove}>{shareCopied ? "Copied" : "Share my move"}</button>
             </div>
-            <button style={styles.ctaMuted} onClick={resetFlow}>Back to start</button>
+            <button style={S.ctaMuted} onClick={resetFlow}>Back to start</button>
           </div>
         )}
 
         {screen === "insights" && (
-          <div style={styles.card}>
-            <div style={styles.stepPill}>Your patterns</div>
-            <div style={styles.title}>What the data says.</div>
-            <div style={styles.sub}>Based on your last {Math.min(entries.length, 50)} resets.</div>
-            <div style={styles.summaryGrid}>
+          <div style={S.card}>
+            <div style={S.stepPill}>Your patterns</div>
+            <div style={S.title}>What the data says.</div>
+            <div style={S.sub}>Based on your last {Math.min(entries.length, 50)} resets.</div>
+            <div style={S.summaryGrid}>
               {[
                 { num: totalResets, label: "Total resets" },
                 { num: `${patterns.completionRate}%`, label: "Done rate" },
-                { num: doneCount, label: "Completed" },
                 { num: streak, label: "Day streak" },
+                { num: patterns.avgPresence > 0 ? `${patterns.avgPresence}/5` : "—", label: "Avg presence" },
               ].map(({ num, label }) => (
-                <div key={label} style={styles.summaryBox}>
-                  <div style={styles.summaryNum}>{num}</div>
-                  <div style={styles.summaryLabel}>{label}</div>
+                <div key={label} style={S.summaryBox}>
+                  <div style={S.summaryNum}>{num}</div>
+                  <div style={S.summaryLabel}>{label}</div>
                 </div>
               ))}
             </div>
             {patterns.topAvoiding && (
-              <div style={styles.insightRow}>
-                <div style={styles.insightIcon}>🔁</div>
+              <div style={S.insightRow}>
+                <div style={S.insightIcon}>🔁</div>
                 <div>
-                  <div style={styles.insightTitle}>You keep avoiding this</div>
-                  <div style={styles.insightBody}>"{patterns.topAvoiding}" shows up more than anything else. It's not a task problem — it's a resistance pattern.</div>
+                  <div style={S.insightTitle}>You keep avoiding this</div>
+                  <div style={S.insightBody}>"{patterns.topAvoiding}" shows up more than anything else. It's not a task problem — it's a resistance pattern.</div>
+                </div>
+              </div>
+            )}
+            {patterns.avgPresence > 0 && patterns.avgPresence < 3 && (
+              <div style={S.insightRow}>
+                <div style={S.insightIcon}>🌫️</div>
+                <div>
+                  <div style={S.insightTitle}>You're often scattered</div>
+                  <div style={S.insightBody}>Your average presence is {patterns.avgPresence}/5. The arrival practice matters most for you — don't skip it.</div>
+                </div>
+              </div>
+            )}
+            {patterns.avgPresence >= 4 && (
+              <div style={S.insightRow}>
+                <div style={S.insightIcon}>🎯</div>
+                <div>
+                  <div style={S.insightTitle}>You arrive well</div>
+                  <div style={S.insightBody}>Average presence {patterns.avgPresence}/5. You're doing the inner work. That's rare.</div>
                 </div>
               </div>
             )}
             {patterns.mostProductiveDays.length > 0 && (
-              <div style={styles.insightRow}>
-                <div style={styles.insightIcon}>📅</div>
+              <div style={S.insightRow}>
+                <div style={S.insightIcon}>📅</div>
                 <div>
-                  <div style={styles.insightTitle}>Your best days</div>
-                  <div style={styles.insightBody}>You complete moves most on {patterns.mostProductiveDays.join(" and ")}. Schedule your hardest tasks then.</div>
-                </div>
-              </div>
-            )}
-            {patterns.completionRate >= 70 && (
-              <div style={styles.insightRow}>
-                <div style={styles.insightIcon}>⚡</div>
-                <div>
-                  <div style={styles.insightTitle}>You follow through</div>
-                  <div style={styles.insightBody}>{patterns.completionRate}% completion rate. Most people are under 50%. You're not most people.</div>
+                  <div style={S.insightTitle}>Your best days</div>
+                  <div style={S.insightBody}>You complete moves most on {patterns.mostProductiveDays.join(" and ")}. Schedule your hardest tasks then.</div>
                 </div>
               </div>
             )}
             {patterns.completionRate < 50 && entries.length >= 5 && (
-              <div style={styles.insightRow}>
-                <div style={styles.insightIcon}>🎯</div>
+              <div style={S.insightRow}>
+                <div style={S.insightIcon}>🎯</div>
                 <div>
-                  <div style={styles.insightTitle}>Your moves are too big</div>
-                  <div style={styles.insightBody}>{100 - patterns.completionRate}% of the time you don't follow through. The task isn't the problem — the size is.</div>
+                  <div style={S.insightTitle}>Your moves are too big</div>
+                  <div style={S.insightBody}>{100 - patterns.completionRate}% of the time you don't follow through. Make the move smaller.</div>
                 </div>
               </div>
             )}
-            <button style={styles.ctaMuted} onClick={() => setScreen("start")}>← Back</button>
+            <button style={S.ctaMuted} onClick={() => setScreen("start")}>← Back</button>
           </div>
         )}
 
         {screen === "history" && (
-          <div style={styles.card}>
-            <div style={styles.stepPill}>History</div>
-            <div style={styles.title}>Here's what happened.</div>
-            <div style={styles.sub}>No story. Just the pattern.</div>
+          <div style={S.card}>
+            <div style={S.stepPill}>History</div>
+            <div style={S.title}>Here's what happened.</div>
+            <div style={S.sub}>No story. Just the pattern.</div>
             {entries.length > 0 && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 16 }}>
                 {[{ num: totalResets, label: "Total" }, { num: doneCount, label: "Done" }, { num: streak, label: "Streak" }].map(({ num, label }) => (
-                  <div key={label} style={styles.summaryBox}>
-                    <div style={styles.summaryNum}>{num}</div>
-                    <div style={styles.summaryLabel}>{label}</div>
-                  </div>
+                  <div key={label} style={S.summaryBox}><div style={S.summaryNum}>{num}</div><div style={S.summaryLabel}>{label}</div></div>
                 ))}
               </div>
             )}
-            <div style={styles.historyList}>
+            <div style={S.historyList}>
               {entries.length === 0 ? (
-                <div style={styles.emptyState}>No resets yet. Do your first one.</div>
+                <div style={S.emptyState}>No resets yet. Do your first one.</div>
               ) : (
                 entries.map((entry) => (
-                  <div key={entry.id} style={styles.historyCard}>
-                    <div style={styles.historyTop}>
-                      <span style={styles.historyDate}>{formatDate(entry.createdAt)}</span>
-                      <span style={styles.statusBadge(entry.status)}>{entry.status === "done" ? "Done" : "Not yet"}</span>
+                  <div key={entry.id} style={S.historyCard}>
+                    <div style={S.historyTop}>
+                      <span style={S.historyDate}>{formatDate(entry.createdAt)}</span>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        {entry.presenceScore && (
+                          <span style={{ fontSize: 11, color: PRESENCE_LABELS[entry.presenceScore]?.color, fontWeight: 700 }}>
+                            {entry.presenceScore}/5
+                          </span>
+                        )}
+                        <span style={S.statusBadge(entry.status)}>{entry.status === "done" ? "Done" : "Not yet"}</span>
+                      </div>
                     </div>
-                    <div style={styles.historyLine}><span style={styles.historyLineLabel}>Mind </span>{entry.mind}</div>
-                    <div style={styles.historyLine}><span style={styles.historyLineLabel}>Avoiding </span>{entry.avoiding}</div>
-                    <div style={styles.historyLine}><span style={styles.historyLineLabel}>Move </span>{entry.move}</div>
-                    <div style={{ ...styles.historyLine, marginBottom: 0 }}><span style={styles.historyLineLabel}>Feedback </span>{entry.feedback}</div>
+                    <div style={S.historyLine}><span style={S.historyLineLabel}>Mind </span>{entry.mind}</div>
+                    <div style={S.historyLine}><span style={S.historyLineLabel}>Avoiding </span>{entry.avoiding}</div>
+                    <div style={S.historyLine}><span style={S.historyLineLabel}>Move </span>{entry.move}</div>
+                    <div style={{ ...S.historyLine, marginBottom: 0 }}><span style={S.historyLineLabel}>Feedback </span>{entry.feedback}</div>
                   </div>
                 ))
               )}
             </div>
-            <button style={{ ...styles.ctaMuted, marginTop: 12 }} onClick={() => setScreen("start")}>← Back</button>
+            <button style={{ ...S.ctaMuted, marginTop: 12 }} onClick={() => setScreen("start")}>← Back</button>
           </div>
         )}
 
         {showResultPopup && latestEntry && !showMilestone && (
-          <div style={styles.modalBackdrop}>
-            <div style={styles.modalCard}>
-              <div style={styles.modalImage} />
-              <div style={styles.modalBody}>
-                <div style={styles.modalTitle}>{latestEntry.status === "done" ? "Done." : "Not yet."}</div>
-                <div style={styles.modalText}>{latestEntry.status === "done" ? "The move is made. That's all it takes." : "Sit with it. Then make the move smaller."}</div>
-                <div style={styles.summaryGrid}>
-                  {[
-                    { num: totalResets, label: "Total resets" },
-                    { num: doneCount, label: "Completed" },
-                    { num: notYetCount, label: "Not yet" },
-                    { num: streak, label: "Day streak" },
-                  ].map(({ num, label }) => (
-                    <div key={label} style={styles.summaryBox}>
-                      <div style={styles.summaryNum}>{num}</div>
-                      <div style={styles.summaryLabel}>{label}</div>
-                    </div>
+          <div style={S.modalBackdrop}>
+            <div style={S.modalCard}>
+              <div style={S.modalImage} />
+              <div style={S.modalBody}>
+                <div style={S.modalTitle}>{latestEntry.status === "done" ? "Done." : "Not yet."}</div>
+                <div style={S.modalText}>{latestEntry.status === "done" ? "The move is made. That's all it takes." : "Sit with it. Then make the move smaller."}</div>
+                <div style={S.summaryGrid}>
+                  {[{ num: totalResets, label: "Total resets" }, { num: doneCount, label: "Completed" }, { num: notYetCount, label: "Not yet" }, { num: streak, label: "Day streak" }].map(({ num, label }) => (
+                    <div key={label} style={S.summaryBox}><div style={S.summaryNum}>{num}</div><div style={S.summaryLabel}>{label}</div></div>
                   ))}
                 </div>
-                <div style={styles.modalDate}>Latest reset: {latestResetTime}</div>
-                <button style={styles.cta} onClick={() => setShowResultPopup(false)}>Close</button>
+                <div style={S.modalDate}>Latest reset: {latestResetTime}</div>
+                <button style={S.cta} onClick={() => setShowResultPopup(false)}>Close</button>
               </div>
             </div>
           </div>
         )}
 
         {showMilestone && latestEntry && (
-          <div style={styles.modalBackdrop}>
-            <div style={styles.modalCardGold}>
-              <div style={styles.modalImageGold}>★</div>
-              <div style={styles.modalBody}>
-                <div style={styles.modalTitleGold}>{streak} days. Remarkable.</div>
-                <div style={styles.modalTextGold}>{getMilestoneLabel(streak)}</div>
-                <div style={styles.summaryGrid}>
-                  {[
-                    { num: streak, label: "Day streak" },
-                    { num: doneCount, label: "Completed" },
-                    { num: totalResets, label: "Total resets" },
-                    { num: notYetCount, label: "Not yet" },
-                  ].map(({ num, label }) => (
-                    <div key={label} style={styles.summaryBoxGold}>
-                      <div style={styles.summaryNumGold}>{num}</div>
-                      <div style={styles.summaryLabelGold}>{label}</div>
-                    </div>
+          <div style={S.modalBackdrop}>
+            <div style={S.modalCardGold}>
+              <div style={S.modalImageGold}>★</div>
+              <div style={S.modalBody}>
+                <div style={S.modalTitleGold}>{streak} days. Remarkable.</div>
+                <div style={S.modalTextGold}>{getMilestoneLabel(streak)}</div>
+                <div style={S.summaryGrid}>
+                  {[{ num: streak, label: "Day streak" }, { num: doneCount, label: "Completed" }, { num: totalResets, label: "Total resets" }, { num: notYetCount, label: "Not yet" }].map(({ num, label }) => (
+                    <div key={label} style={S.summaryBoxGold}><div style={S.summaryNumGold}>{num}</div><div style={S.summaryLabelGold}>{label}</div></div>
                   ))}
                 </div>
-                <div style={{ ...styles.modalDate, background: "rgba(232,160,0,0.1)", border: "1px solid rgba(232,160,0,0.3)", color: "#8B6300" }}>Latest reset: {latestResetTime}</div>
-                <button style={styles.ctaGold} onClick={() => setShowMilestone(false)}>Keep going</button>
+                <div style={{ ...S.modalDate, background: "rgba(232,160,0,0.1)", border: "1px solid rgba(232,160,0,0.3)", color: "#8B6300" }}>Latest reset: {latestResetTime}</div>
+                <button style={S.ctaGold} onClick={() => setShowMilestone(false)}>Keep going</button>
               </div>
             </div>
           </div>
         )}
 
-        <div style={styles.footer}>For when your head is full and you still need to move.</div>
+        <div style={S.footer}>For when your head is full and you still need to move.</div>
       </div>
     </div>
   );
