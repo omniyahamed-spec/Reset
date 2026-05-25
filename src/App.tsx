@@ -45,12 +45,12 @@ const COMMIT_SECONDS = 5;
 const DAILY_REMINDER_HOUR = 12;
 const MILESTONE_DAYS = [7, 14, 30, 60, 100];
 
-const PRESENCE_LABELS: Record<number, { en: string; ar: string; color: string }> = {
-  1: { en: "Completely lost", ar: "مشتت تماماً", color: "#C0392B" },
-  2: { en: "Scattered", ar: "مشتت", color: "#D4630A" },
-  3: { en: "Halfway here", ar: "نصف حاضر", color: "#B8940A" },
-  4: { en: "Mostly present", ar: "حاضر غالباً", color: "#2E7D52" },
-  5: { en: "Fully arrived", ar: "حاضر تماماً", color: "#1A5276" },
+const PRESENCE_LABELS: Record<number, { en: string; sub: string; color: string }> = {
+  1: { en: "Completely lost", sub: "Can't land anywhere", color: "#E53E3E" },
+  2: { en: "Scattered", sub: "Head in 5 places", color: "#ED6C02" },
+  3: { en: "Halfway here", sub: "Part of me is missing", color: "#D4A017" },
+  4: { en: "Mostly present", sub: "Almost there", color: "#2E7D52" },
+  5: { en: "Fully here", sub: "Grounded and clear", color: "#0D7C6E" },
 };
 
 const PULSE_AVOIDANCES = [
@@ -283,7 +283,7 @@ function progressBarStyle(pct: number): CSSProperties {
 }
 
 async function getMindReflection(mind: string, name: string): Promise<string> {
-  const prompt = `You are the inner voice of Reset — a reconnection app for high performers in the Gulf who have lost themselves in their work.
+  const prompt = `You are the inner voice of Reset — a clarity app for anyone whose head is too full to think straight.
 
 The user just typed what's on their mind: "${mind}"
 
@@ -359,7 +359,7 @@ async function getPatternFlash(entries: Entry[], name: string): Promise<string> 
     )
     .join("\n");
 
-  const prompt = `You are the pattern-recognition voice of Reset — a reconnection app for Gulf high performers.
+  const prompt = `You are the pattern-recognition voice of Reset — a clarity app for busy, overloaded people everywhere.
 
 Here are ${name}'s last ${recent.length} resets:
 ${summary}
@@ -413,7 +413,7 @@ async function getAIFeedback(
   pastPatterns: string,
   presenceScore: number
 ): Promise<string> {
-  const prompt = `You are the voice inside Reset — a reconnection app for high performers in the Gulf region who have lost themselves in their work.
+  const prompt = `You are the voice inside Reset — a clarity app for anyone whose head is too full and who needs to move.
 
 User: ${name}
 Presence score today: ${presenceScore}/5 (${PRESENCE_LABELS[presenceScore]?.en})
@@ -425,7 +425,7 @@ ${pastPatterns ? `Their recent patterns: ${pastPatterns}` : ""}
 
 Write 2-3 sentences. Be specific to EXACTLY what they wrote.
 Reference their presence score naturally — someone at 1-2 needs gentleness, someone at 4-5 needs a push.
-Tone: like a wise, warm friend who has also been in high-pressure roles and knows what it costs. Never corporate. Never generic.
+Tone: like a wise, warm friend who has been in the thick of it and knows what it costs to stay stuck. Never corporate. Never generic.
 Never start with "I" or the user's name. No emojis. No lists.`;
 
   try {
@@ -567,25 +567,22 @@ function mapEntry(row: any): Entry {
 
 const ONBOARDING_SLIDES = [
   {
-    tag: "The problem",
-    tagAr: "المشكلة",
-    title: "You built everything.\nAnd lost yourself doing it.",
-    body: "High performers in the Gulf carry the weight of enormous ambition. And somewhere between the deals, the deadlines, and the expectations — they disappear from themselves.",
-    bodyAr: "بنيت كل شيء. وضعت نفسك في كل مكان. لكنك لم تعد تعرف من أنت خارج الإنجاز.",
+    tag: "Sound familiar?",
+    accent: "#E05D2A",
+    title: "Your head is full.\nYou can't start.",
+    body: "You know what you need to do. But something keeps you spinning — rehashing, overthinking, avoiding. It happens to everyone. Every day.",
   },
   {
-    tag: "The method",
-    tagAr: "الطريقة",
+    tag: "The fix",
+    accent: "#0D9488",
     title: "3 minutes.\nOne honest move.",
-    body: "Not a meditation app. Not a journal. Reset asks you three questions that cut through the noise — what's in your head, what you're avoiding, and what one move gets you unstuck.",
-    bodyAr: "ثلاث دقائق. سؤال واحد صادق. خطوة واحدة حقيقية.",
+    body: "Not therapy. Not a todo list. Just three questions that cut through the noise — name what's in your head, what you're avoiding, and the one small action that actually moves things.",
   },
   {
-    tag: "Built for you",
-    tagAr: "صُنع لك",
-    title: "For high performers\nin the Gulf who know\nthey're more than this.",
-    body: "Reset is the first reconnection practice built specifically for the Arab world's overachievers. The ones who have everything — and are quietly running on empty.",
-    bodyAr: "لأصحاب الإنجاز في الخليج الذين يعلمون أنهم أكثر من هذا.",
+    tag: "Just do it",
+    accent: "#7C3AED",
+    title: "Stop thinking.\nStart moving.",
+    body: "Reset turns the loop in your head into a single action. That's it. Do it daily and watch what shifts.",
   },
 ];
 
@@ -604,214 +601,134 @@ function OnboardingScreen({ onFinish }: { onFinish: () => void }) {
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#0A0807",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "0 28px",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
+    <div style={{
+      minHeight: "100vh",
+      background: "#0A0807",
+      display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center",
+      padding: "0 28px",
+      position: "relative", overflow: "hidden",
+      transition: "background 0.6s ease",
+    }}>
       <style>{`
         ${AVATAR_KEYFRAMES}
         @keyframes obFadeUp {
-          from { opacity: 0; transform: translateY(20px); }
+          from { opacity: 0; transform: translateY(22px); }
           to   { opacity: 1; transform: translateY(0); }
         }
         @keyframes obGlow {
-          0%,100% { opacity: 0.06; transform: scale(1); }
-          50%      { opacity: 0.13; transform: scale(1.18); }
+          0%,100% { opacity: 0.08; transform: scale(1); }
+          50%      { opacity: 0.18; transform: scale(1.22); }
+        }
+        @keyframes obSlideIn {
+          from { opacity: 0; transform: translateX(24px); }
+          to   { opacity: 1; transform: translateX(0); }
         }
       `}</style>
-      <div
-        style={{
-          position: "fixed",
-          inset: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          pointerEvents: "none",
-        }}
-      >
-        <div
-          style={{
-            width: 550,
-            height: 550,
-            borderRadius: "50%",
-            background:
-              "radial-gradient(circle, rgba(180,140,90,1) 0%, transparent 70%)",
-            animation: "obGlow 8s ease-in-out infinite",
-          }}
-        />
+
+      {/* Per-slide vivid color wash */}
+      <div style={{
+        position: "fixed", inset: 0,
+        background: `radial-gradient(ellipse at 50% 40%, ${current.accent}22 0%, transparent 65%)`,
+        transition: "background 0.7s ease",
+        pointerEvents: "none",
+      }} />
+      {/* Ambient orb */}
+      <div style={{
+        position: "fixed", inset: 0,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        pointerEvents: "none",
+      }}>
+        <div style={{
+          width: 500, height: 500, borderRadius: "50%",
+          background: `radial-gradient(circle, ${current.accent}33 0%, transparent 65%)`,
+          animation: "obGlow 7s ease-in-out infinite",
+          transition: "background 0.7s ease",
+        }} />
       </div>
-      <div
-        style={{
-          position: "fixed",
-          top: 24,
-          left: 0,
-          right: 0,
-          textAlign: "center",
-          fontSize: 11,
-          fontWeight: 800,
-          letterSpacing: "0.22em",
-          textTransform: "uppercase",
-          color: "rgba(245,241,234,0.25)",
-        }}
-      >
-        Reset
-      </div>
+
+      <div style={{
+        position: "fixed", top: 24, left: 0, right: 0,
+        textAlign: "center", fontSize: 11, fontWeight: 800,
+        letterSpacing: "0.22em", textTransform: "uppercase",
+        color: "rgba(245,241,234,0.22)",
+      }}>Reset</div>
+
       {slide > 0 && (
-        <button
-          onClick={() => {
-            localStorage.setItem("reset_onboarded", "true");
-            onFinish();
-          }}
+        <button onClick={() => { localStorage.setItem("reset_onboarded", "true"); onFinish(); }}
           style={{
-            position: "fixed",
-            top: 20,
-            right: 24,
-            fontSize: 12,
-            color: "rgba(245,241,234,0.3)",
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            fontFamily: "inherit",
-            letterSpacing: "0.05em",
-          }}
-        >
-          Skip
-        </button>
+            position: "fixed", top: 20, right: 24,
+            fontSize: 12, color: "rgba(245,241,234,0.28)",
+            background: "none", border: "none", cursor: "pointer",
+            fontFamily: "inherit", letterSpacing: "0.05em",
+          }}>Skip</button>
       )}
-      <div
-        key={slide}
-        style={{
-          width: "100%",
-          maxWidth: 400,
-          animation: "obFadeUp 0.6s ease forwards",
-          textAlign: "center",
-        }}
-      >
-        <div
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 40,
-          }}
-        >
-          <div
-            style={{
-              width: 20,
-              height: 1,
-              background: "rgba(180,140,90,0.5)",
-            }}
-          />
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: "0.18em",
-              textTransform: "uppercase",
-              color: "rgba(180,140,90,0.7)",
-            }}
-          >
-            {current.tag}
-          </span>
-          <div
-            style={{
-              width: 20,
-              height: 1,
-              background: "rgba(180,140,90,0.5)",
-            }}
-          />
+
+      <div key={slide} style={{
+        width: "100%", maxWidth: 420,
+        animation: "obSlideIn 0.5s ease forwards",
+        textAlign: "center",
+      }}>
+        {/* Vivid tag pill */}
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 8,
+          marginBottom: 36,
+          background: `${current.accent}22`,
+          border: `1px solid ${current.accent}55`,
+          borderRadius: 999,
+          padding: "6px 16px",
+        }}>
+          <div style={{
+            width: 6, height: 6, borderRadius: "50%",
+            background: current.accent,
+            boxShadow: `0 0 8px ${current.accent}`,
+          }} />
+          <span style={{
+            fontSize: 11, fontWeight: 800, letterSpacing: "0.16em",
+            textTransform: "uppercase", color: current.accent,
+          }}>{current.tag}</span>
         </div>
-        <div
-          style={{
-            fontSize: slide === 2 ? 28 : 32,
-            fontWeight: 500,
-            color: "rgba(245,241,234,0.92)",
-            fontFamily:
-              'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
-            letterSpacing: "-0.03em",
-            lineHeight: 1.2,
-            marginBottom: 24,
-            whiteSpace: "pre-line",
-          }}
-        >
-          {current.title}
-        </div>
-        <div
-          style={{
-            fontSize: 14,
-            color: "rgba(245,241,234,0.45)",
-            lineHeight: 1.7,
-            marginBottom: 12,
-            maxWidth: 340,
-            margin: "0 auto 12px",
-          }}
-        >
-          {current.body}
-        </div>
-        <div
-          style={{
-            fontSize: 13,
-            color: "rgba(245,241,234,0.22)",
-            fontStyle: "italic",
-            marginBottom: 56,
-            direction: "rtl",
-          }}
-        >
-          {current.bodyAr}
-        </div>
-        <button
-          onClick={next}
-          style={{
-            padding: "15px 40px",
-            borderRadius: 999,
-            border: "1px solid rgba(245,241,234,0.18)",
-            background: isLast
-              ? "rgba(245,241,234,0.92)"
-              : "rgba(245,241,234,0.08)",
-            color: isLast ? "#161413" : "rgba(245,241,234,0.75)",
-            fontSize: 14,
-            fontWeight: isLast ? 800 : 400,
-            cursor: "pointer",
-            fontFamily: "inherit",
-            letterSpacing: isLast ? "0.02em" : "0.05em",
-            transition: "all 0.3s ease",
-          }}
-        >
-          {isLast ? "Begin" : "Continue →"}
-        </button>
+
+        <div style={{
+          fontSize: 36, fontWeight: 700,
+          color: "rgba(245,241,234,0.95)",
+          fontFamily: 'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
+          letterSpacing: "-0.04em", lineHeight: 1.1,
+          marginBottom: 22, whiteSpace: "pre-line",
+        }}>{current.title}</div>
+
+        <div style={{
+          fontSize: 15, color: "rgba(245,241,234,0.5)",
+          lineHeight: 1.7, marginBottom: 52,
+          maxWidth: 360, margin: "0 auto 52px",
+        }}>{current.body}</div>
+
+        <button onClick={next} style={{
+          padding: "16px 44px", borderRadius: 999,
+          border: isLast ? "none" : `1px solid ${current.accent}44`,
+          background: isLast ? current.accent : `${current.accent}18`,
+          color: "rgba(245,241,234,0.92)",
+          fontSize: 15, fontWeight: isLast ? 800 : 500,
+          cursor: "pointer", fontFamily: "inherit",
+          letterSpacing: isLast ? "0.01em" : "0.05em",
+          transition: "all 0.3s ease",
+          boxShadow: isLast ? `0 8px 32px ${current.accent}44` : "none",
+        }}>{isLast ? "Let's go →" : "Continue →"}</button>
       </div>
-      <div
-        style={{
-          position: "fixed",
-          bottom: 40,
-          display: "flex",
-          gap: 8,
-          alignItems: "center",
-        }}
-      >
-        {ONBOARDING_SLIDES.map((_, i) => (
-          <div
-            key={i}
-            style={{
-              width: i === slide ? 20 : 6,
-              height: 6,
-              borderRadius: 999,
-              background:
-                i === slide
-                  ? "rgba(180,140,90,0.7)"
-                  : "rgba(245,241,234,0.15)",
-              transition: "all 0.35s ease",
-            }}
-          />
+
+      {/* Slide dots */}
+      <div style={{
+        position: "fixed", bottom: 40,
+        display: "flex", gap: 8, alignItems: "center",
+      }}>
+        {ONBOARDING_SLIDES.map((s, i) => (
+          <div key={i} style={{
+            width: i === slide ? 22 : 6, height: 6,
+            borderRadius: 999,
+            background: i === slide ? s.accent : "rgba(245,241,234,0.12)",
+            transition: "all 0.35s ease",
+            boxShadow: i === slide ? `0 0 8px ${s.accent}` : "none",
+          }} />
         ))}
       </div>
     </div>
@@ -2124,13 +2041,15 @@ export default function App() {
       padding: "15px 18px",
       borderRadius: 18,
       border: "none",
-      background: "#23201D",
-      color: "#F5F1EA",
+      background: "linear-gradient(135deg, #D4521A 0%, #E06B30 100%)",
+      color: "#FFF8F5",
       fontSize: 15,
       fontWeight: 800,
       cursor: "pointer",
       fontFamily: "inherit",
       marginBottom: 10,
+      boxShadow: "0 4px 20px rgba(212,82,26,0.35)",
+      transition: "all 0.2s ease",
     },
     ctaDisabled: { opacity: 0.38, cursor: "not-allowed" },
     ctaMuted: {
@@ -2150,12 +2069,13 @@ export default function App() {
       padding: "15px 18px",
       borderRadius: 18,
       border: "none",
-      background: "#E8A000",
+      background: "linear-gradient(135deg, #D4A017 0%, #E8B830 100%)",
       color: "#FFF8E1",
       fontSize: 15,
       fontWeight: 800,
       cursor: "pointer",
       fontFamily: "inherit",
+      boxShadow: "0 4px 20px rgba(212,160,23,0.4)",
     },
     trackerCard: {
       background: "#FFFDF9",
@@ -2372,13 +2292,15 @@ export default function App() {
       padding: "18px 20px",
       borderRadius: 20,
       border: "none",
-      background: "#F5F1EA",
-      color: "#23201D",
+      background: "linear-gradient(135deg, #D4521A 0%, #E06B30 100%)",
+      color: "#FFF8F5",
       fontSize: 16,
       fontWeight: 800,
       cursor: "pointer",
       fontFamily: "inherit",
       marginBottom: 10,
+      boxShadow: "0 6px 28px rgba(212,82,26,0.5)",
+      letterSpacing: "0.01em",
     },
     heroFoot: {
       fontSize: 12,
@@ -2718,7 +2640,7 @@ export default function App() {
             position: "fixed",
             inset: 0,
             background:
-              "radial-gradient(ellipse at 50% 45%, rgba(140,90,30,0.12) 0%, rgba(10,8,7,0) 65%)",
+              "radial-gradient(ellipse at 50% 45%, rgba(212,82,26,0.14) 0%, rgba(10,8,7,0) 65%)",
             pointerEvents: "none",
           }}
         />
@@ -2739,7 +2661,7 @@ export default function App() {
               height: 600,
               borderRadius: "50%",
               background:
-                "radial-gradient(circle, rgba(180,120,50,0.06) 0%, transparent 65%)",
+                "radial-gradient(circle, rgba(212,82,26,0.1) 0%, transparent 65%)",
               animation: "arrivalBgPulse 10s ease-in-out infinite",
             }}
           />
@@ -2770,7 +2692,7 @@ export default function App() {
             zIndex: 1,
           }}
         >
-          <CalmAvatar phase={breathePhase} size={160} accentHex="#B47832" />
+          <CalmAvatar phase={breathePhase} size={160} accentHex="#D4521A" />
         </div>
 
         {/* Breathe label */}
@@ -2808,20 +2730,21 @@ export default function App() {
             zIndex: 1,
           }}
         >
-          Before anything else.{"\n"}Just arrive.
+          Stop. Breathe.{"\n"}You're already here.
         </div>
         <div
           style={{
             fontSize: 13,
-            color: "rgba(245,241,234,0.22)",
+            color: "rgba(245,241,234,0.28)",
             textAlign: "center",
             marginBottom: 56,
             fontStyle: "italic",
             position: "relative",
             zIndex: 1,
+            letterSpacing: "0.04em",
           }}
         >
-          قبل أي شيء. فقط اوصل.
+          Three minutes. One move. Done.
         </div>
 
         <button
@@ -2963,13 +2886,13 @@ export default function App() {
           <div
             style={{
               fontSize: 13,
-              color: "rgba(245,241,234,0.3)",
+              color: "rgba(245,241,234,0.28)",
               textAlign: "center",
               marginBottom: 36,
-              fontStyle: "italic",
+              letterSpacing: "0.04em",
             }}
           >
-            كيف حضورك الآن؟
+            Be honest. No one's watching.
           </div>
           <div style={{ display: "grid", gap: 10, marginBottom: 36, width: "100%" }}>
             {[1, 2, 3, 4, 5].map((score) => {
@@ -2986,60 +2909,52 @@ export default function App() {
                     padding: "14px 18px",
                     borderRadius: 16,
                     border: selected
-                      ? `1px solid ${info.color}55`
-                      : "1px solid rgba(245,241,234,0.08)",
+                      ? `1px solid ${info.color}66`
+                      : "1px solid rgba(245,241,234,0.07)",
                     background: selected
-                      ? `${info.color}1A`
-                      : "rgba(245,241,234,0.025)",
+                      ? `${info.color}20`
+                      : "rgba(245,241,234,0.02)",
                     cursor: "pointer",
                     fontFamily: "inherit",
-                    transition: "all 0.25s ease",
+                    transition: "all 0.22s ease",
                     boxShadow: selected
-                      ? `0 0 20px ${info.color}18`
+                      ? `0 0 24px ${info.color}20, inset 0 0 0 1px ${info.color}22`
                       : "none",
                   }}
                 >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 9,
-                        height: 9,
-                        borderRadius: "50%",
-                        background: selected
-                          ? info.color
-                          : "rgba(245,241,234,0.18)",
-                        boxShadow: selected ? `0 0 8px ${info.color}` : "none",
-                        transition: "all 0.25s ease",
-                      }}
-                    />
-                    <span
-                      style={{
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{
+                      width: 10, height: 10, borderRadius: "50%",
+                      background: selected ? info.color : "rgba(245,241,234,0.15)",
+                      boxShadow: selected ? `0 0 10px ${info.color}` : "none",
+                      transition: "all 0.22s ease",
+                      flexShrink: 0,
+                    }} />
+                    <div>
+                      <div style={{
                         fontSize: 14,
-                        color: selected
-                          ? "rgba(245,241,234,0.95)"
-                          : "rgba(245,241,234,0.42)",
+                        color: selected ? "rgba(245,241,234,0.95)" : "rgba(245,241,234,0.45)",
                         fontWeight: selected ? 600 : 400,
-                        transition: "all 0.25s ease",
-                      }}
-                    >
-                      {info.en}
-                    </span>
+                        transition: "all 0.22s ease",
+                        lineHeight: 1.2,
+                      }}>{info.en}</div>
+                      {selected && (
+                        <div style={{
+                          fontSize: 11,
+                          color: `${info.color}CC`,
+                          marginTop: 2,
+                          transition: "all 0.3s ease",
+                        }}>{info.sub}</div>
+                      )}
+                    </div>
                   </div>
-                  <span
-                    style={{
-                      fontSize: 12,
-                      color: "rgba(245,241,234,0.2)",
-                      fontStyle: "italic",
-                    }}
-                  >
-                    {info.ar}
-                  </span>
+                  <div style={{
+                    fontSize: 11,
+                    fontWeight: 800,
+                    color: selected ? info.color : "rgba(245,241,234,0.15)",
+                    transition: "color 0.22s ease",
+                    letterSpacing: "0.05em",
+                  }}>{score}/5</div>
                 </button>
               );
             })}
@@ -3125,7 +3040,7 @@ export default function App() {
               height: 520,
               borderRadius: "50%",
               background:
-                "radial-gradient(circle, rgba(120,80,40,1) 0%, transparent 70%)",
+                "radial-gradient(circle, rgba(212,82,26,0.12) 0%, transparent 70%)",
               animation: "reflectBg 12s ease-in-out infinite",
             }}
           />
@@ -3162,7 +3077,7 @@ export default function App() {
               animation: "fadeUpSlow 0.6s ease forwards",
             }}
           >
-            <CalmAvatar phase="reflect" size={100} accentHex="#A06828" />
+            <CalmAvatar phase="reflect" size={100} accentHex="#D4521A" />
           </div>
 
           {/* What they typed */}
@@ -3298,9 +3213,7 @@ export default function App() {
             )}
           </div>
           <PulseScreen onBack={() => setScreen("start")} />
-          <div style={S.footer}>
-            For when your head is full and you still need to move.
-          </div>
+          <div style={S.footer}>Stop thinking. Start moving.</div>
         </div>
       </div>
     );
@@ -3368,8 +3281,7 @@ export default function App() {
               }}
             />
             <span style={{ fontSize: 12, color: "#6F6861" }}>
-              Today: {PRESENCE_LABELS[presenceScore]?.en} ·{" "}
-              {PRESENCE_LABELS[presenceScore]?.ar}
+              Today: {PRESENCE_LABELS[presenceScore]?.en} — {PRESENCE_LABELS[presenceScore]?.sub}
             </span>
           </div>
         )}
@@ -3770,7 +3682,7 @@ export default function App() {
         {screen === "commit" && (
           <div style={{ ...S.card, ...S.commitCard }}>
             <div style={{ ...S.stepPill, ...S.stepPillDark }}>
-              No more thinking.
+              Just do it.
             </div>
             <div
               style={{
@@ -3778,10 +3690,10 @@ export default function App() {
                 color: "rgba(245,241,234,0.88)",
               }}
             >
-              Do this now.
+              Do it. Right now.
             </div>
             <div style={{ ...S.sub, ...S.subDark }}>
-              Start before you feel ready.
+              Not when you feel ready. Now.
             </div>
             <div style={S.moveBox}>
               <div
@@ -3815,7 +3727,7 @@ export default function App() {
                   <CalmAvatar
                     phase={breathePhase}
                     size={110}
-                    accentHex="#B47832"
+                    accentHex="#D4521A"
                   />
                   {/* Countdown number overlaid on avatar */}
                   <div
@@ -4625,7 +4537,7 @@ export default function App() {
         )}
 
         <div style={S.footer}>
-          For when your head is full and you still need to move.
+          Stop thinking. Start moving.
         </div>
       </div>
     </div>
