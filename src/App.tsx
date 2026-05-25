@@ -8,6 +8,7 @@ type Screen =
   | "presence"
   | "start"
   | "mind"
+  | "mindreflect"
   | "avoid"
   | "move"
   | "commit"
@@ -52,7 +53,6 @@ const PRESENCE_LABELS: Record<number, { en: string; ar: string; color: string }>
   5: { en: "Fully arrived", ar: "حاضر تماماً", color: "#1A3A5C" },
 };
 
-// ── SEEDED PULSE DATA ──────────────────────────────────────────────────────
 const PULSE_AVOIDANCES = [
   { label: "Starting a difficult task", pct: 71 },
   { label: "Sending a message", pct: 54 },
@@ -104,6 +104,50 @@ function getMilestoneLabel(streak: number): string | null {
 
 function progressBarStyle(pct: number): CSSProperties {
   return { height: "100%", width: `${pct}%`, background: "#23201D", borderRadius: 999, transition: "width 0.4s ease" };
+}
+
+// ── NEW: MIND REFLECTION — fires after Q1, before Q2 ──────────────────────
+async function getMindReflection(mind: string, name: string): Promise<string> {
+  const prompt = `You are the inner voice of Reset — a reconnection app for high performers in the Gulf who have lost themselves in their work.
+
+The user just typed what's on their mind: "${mind}"
+
+Write exactly ONE sentence that cuts beneath the surface of what they wrote.
+Be specific to their exact words. Not generic. Not motivational.
+The sentence should make them think "how did it know that."
+Tone: direct, warm, a little sharp. Like someone who's been there.
+Do NOT start with "I". No emojis. No explanation. Just the one sentence.`;
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.REACT_APP_ANTHROPIC_API_KEY || "",
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 120,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    const data = await response.json();
+    const text = data.content?.find((b: any) => b.type === "text")?.text ?? "";
+    return text.trim() || getFallbackReflection(mind);
+  } catch {
+    return getFallbackReflection(mind);
+  }
+}
+
+function getFallbackReflection(mind: string): string {
+  const m = mind.toLowerCase();
+  if (m.includes("work") || m.includes("job") || m.includes("meeting")) return "It's not really about the work — it's about what the work means about you.";
+  if (m.includes("money") || m.includes("finance") || m.includes("debt")) return "The number isn't the fear — the story about what it says about you is.";
+  if (m.includes("person") || m.includes("people") || m.includes("someone")) return "You're carrying someone else's weight as if it were yours to fix.";
+  if (m.includes("health") || m.includes("body") || m.includes("tired")) return "Your body is telling you something your mind keeps dismissing.";
+  return "That thing you keep thinking about — it's not the real problem, it's the signal.";
 }
 
 async function getAIFeedback(
@@ -249,7 +293,6 @@ function mapEntry(row: any): Entry {
   };
 }
 
-// ── PULSE TEASER COMPONENT ─────────────────────────────────────────────────
 const ONBOARDING_SLIDES = [
   {
     tag: "The problem",
@@ -306,8 +349,6 @@ function OnboardingScreen({ onFinish }: { onFinish: () => void }) {
           50% { opacity: 0.12; transform: scale(1.15); }
         }
       `}</style>
-
-      {/* Background glow */}
       <div style={{
         position: "fixed", inset: 0, display: "flex",
         alignItems: "center", justifyContent: "center", pointerEvents: "none",
@@ -318,16 +359,12 @@ function OnboardingScreen({ onFinish }: { onFinish: () => void }) {
           animation: "obGlow 8s ease-in-out infinite",
         }} />
       </div>
-
-      {/* Logo */}
       <div style={{
         position: "fixed", top: 24, left: 0, right: 0,
         textAlign: "center",
         fontSize: 11, fontWeight: 800, letterSpacing: "0.22em",
         textTransform: "uppercase", color: "rgba(245,241,234,0.25)",
       }}>Reset</div>
-
-      {/* Skip */}
       {slide > 0 && (
         <button
           onClick={() => { localStorage.setItem("reset_onboarded", "true"); onFinish(); }}
@@ -339,14 +376,11 @@ function OnboardingScreen({ onFinish }: { onFinish: () => void }) {
           }}
         >Skip</button>
       )}
-
-      {/* Content */}
       <div key={slide} style={{
         width: "100%", maxWidth: 400,
         animation: "obFadeUp 0.6s ease forwards",
         textAlign: "center",
       }}>
-        {/* Tag */}
         <div style={{
           display: "inline-flex", alignItems: "center", gap: 8,
           marginBottom: 40,
@@ -357,8 +391,6 @@ function OnboardingScreen({ onFinish }: { onFinish: () => void }) {
           </span>
           <div style={{ width: 20, height: 1, background: "rgba(180,140,90,0.5)" }} />
         </div>
-
-        {/* Title */}
         <div style={{
           fontSize: slide === 2 ? 28 : 32,
           fontWeight: 500,
@@ -371,16 +403,12 @@ function OnboardingScreen({ onFinish }: { onFinish: () => void }) {
         }}>
           {current.title}
         </div>
-
-        {/* Body */}
         <div style={{
           fontSize: 14, color: "rgba(245,241,234,0.45)",
           lineHeight: 1.7, marginBottom: 12, maxWidth: 340, margin: "0 auto 12px",
         }}>
           {current.body}
         </div>
-
-        {/* Arabic */}
         <div style={{
           fontSize: 13, color: "rgba(245,241,234,0.22)",
           fontStyle: "italic", marginBottom: 56,
@@ -388,8 +416,6 @@ function OnboardingScreen({ onFinish }: { onFinish: () => void }) {
         }}>
           {current.bodyAr}
         </div>
-
-        {/* CTA */}
         <button
           onClick={next}
           style={{
@@ -406,8 +432,6 @@ function OnboardingScreen({ onFinish }: { onFinish: () => void }) {
           {isLast ? "Begin" : "Continue →"}
         </button>
       </div>
-
-      {/* Dot indicators */}
       <div style={{
         position: "fixed", bottom: 40,
         display: "flex", gap: 8, alignItems: "center",
@@ -443,15 +467,12 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
       position: "relative",
       overflow: "hidden",
     }}>
-      {/* Subtle warm glow top-right */}
       <div style={{
         position: "absolute", top: -40, right: -40,
         width: 160, height: 160, borderRadius: "50%",
         background: "radial-gradient(circle, rgba(180,120,50,0.08) 0%, transparent 70%)",
         pointerEvents: "none",
       }} />
-
-      {/* Header row */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
         <div>
           <div style={{
@@ -468,7 +489,6 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
             What others are doing right now
           </div>
         </div>
-        {/* Live indicator */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
           <div style={{
             width: 6, height: 6, borderRadius: "50%", background: "#4CAF50",
@@ -478,8 +498,6 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
           <span style={{ fontSize: 11, color: "rgba(245,241,234,0.4)", letterSpacing: "0.04em" }}>1,240 today</span>
         </div>
       </div>
-
-      {/* Stat row */}
       <div style={{
         display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 20,
       }}>
@@ -502,8 +520,6 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
           </div>
         ))}
       </div>
-
-      {/* Avoidance bars */}
       <div style={{ marginBottom: 18 }}>
         <div style={{
           fontSize: 10, fontWeight: 700, letterSpacing: "0.14em",
@@ -534,11 +550,7 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
           ))}
         </div>
       </div>
-
-      {/* Divider */}
       <div style={{ height: 1, background: "rgba(245,241,234,0.06)", marginBottom: 16 }} />
-
-      {/* One insight teaser */}
       <div style={{
         display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 18,
       }}>
@@ -559,8 +571,6 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
           </div>
         </div>
       </div>
-
-      {/* Expand CTA */}
       <button
         onClick={onExpand}
         style={{
@@ -588,7 +598,6 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
   );
 }
 
-// ── PULSE FULL SCREEN ──────────────────────────────────────────────────────
 function PulseScreen({ onBack }: { onBack: () => void }) {
   const [barsVisible, setBarsVisible] = useState(false);
 
@@ -609,8 +618,6 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
         background: "radial-gradient(circle, rgba(180,120,50,0.06) 0%, transparent 70%)",
         pointerEvents: "none",
       }} />
-
-      {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24 }}>
         <div>
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(245,241,234,0.3)", marginBottom: 6 }}>
@@ -632,8 +639,6 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
           <span style={{ fontSize: 11, color: "rgba(245,241,234,0.35)" }}>Live</span>
         </div>
       </div>
-
-      {/* Big stats */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
         {[
           { num: "1,240", label: "Resets today", sub: "across all users" },
@@ -656,8 +661,6 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
           </div>
         ))}
       </div>
-
-      {/* Avoidance bars */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(245,241,234,0.3)", marginBottom: 14 }}>
           Most avoided this week
@@ -684,11 +687,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
           ))}
         </div>
       </div>
-
-      {/* Divider */}
       <div style={{ height: 1, background: "rgba(245,241,234,0.06)", marginBottom: 20 }} />
-
-      {/* Insights */}
       <div style={{ marginBottom: 22 }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(245,241,234,0.3)", marginBottom: 14 }}>
           Behavioural patterns
@@ -711,8 +710,6 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
           ))}
         </div>
       </div>
-
-      {/* Presence breakdown */}
       <div style={{ marginBottom: 22 }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(245,241,234,0.3)", marginBottom: 12 }}>
           How people arrive
@@ -746,13 +743,10 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
           })}
         </div>
       </div>
-
       <div style={{ height: 1, background: "rgba(245,241,234,0.06)", marginBottom: 16 }} />
-
       <div style={{ fontSize: 11, color: "rgba(245,241,234,0.2)", lineHeight: 1.6, marginBottom: 18, fontStyle: "italic", textAlign: "center" }}>
         Data is anonymous and aggregated. No individual entries are visible to others.
       </div>
-
       <button
         onClick={onBack}
         style={{
@@ -797,6 +791,10 @@ export default function App() {
   const [followUpSeconds, setFollowUpSeconds] = useState<number | null>(null);
   const [showFollowUp, setShowFollowUp] = useState(false);
   const [followUpAnswer, setFollowUpAnswer] = useState<"confirmed" | "slipped" | null>(null);
+
+  // ── NEW: mind reflection state ──────────────────────────────────────────
+  const [mindReflection, setMindReflection] = useState<string>("");
+  const [mindReflectionLoading, setMindReflectionLoading] = useState(false);
 
   const mindRef = useRef<HTMLInputElement>(null);
   const avoidRef = useRef<HTMLInputElement>(null);
@@ -974,6 +972,7 @@ export default function App() {
     setCountdown(COMMIT_SECONDS); setLatestId(null);
     setShareCopied(false); setShowResultPopup(false);
     setShowMilestone(false); setAiFeedback("");
+    setMindReflection(""); setMindReflectionLoading(false);
     setFollowUpSeconds(null); setShowFollowUp(false); setFollowUpAnswer(null);
     setScreen(profile ? "start" : "profile");
   }
@@ -982,6 +981,17 @@ export default function App() {
     if (!mind.trim() || !avoiding.trim() || !move.trim()) return;
     setCountdown(COMMIT_SECONDS); setBreathePhase("in");
     setScreen("commit");
+  }
+
+  // ── NEW: submit mind and fire AI reflection ────────────────────────────
+  async function submitMind() {
+    if (!mind.trim()) return;
+    setMindReflection("");
+    setMindReflectionLoading(true);
+    setScreen("mindreflect");
+    const reflection = await getMindReflection(mind, profile?.name ?? "");
+    setMindReflection(reflection);
+    setMindReflectionLoading(false);
   }
 
   async function saveResult(status: EntryStatus) {
@@ -1161,7 +1171,6 @@ export default function App() {
     );
   }
 
-  // ── ARRIVAL SCREEN ──────────────────────────────────────────────────────
   if (screen === "onboarding") {
     return <OnboardingScreen onFinish={() => setScreen("profile")} />;
   }
@@ -1226,7 +1235,6 @@ export default function App() {
     );
   }
 
-  // ── PRESENCE SCREEN ─────────────────────────────────────────────────────
   if (screen === "presence") {
     return (
       <div style={{ minHeight: "100vh", background: "#0D0B09", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
@@ -1274,7 +1282,131 @@ export default function App() {
     );
   }
 
-  // ── PULSE FULL SCREEN ────────────────────────────────────────────────────
+  // ── NEW: MIND REFLECTION SCREEN ─────────────────────────────────────────
+  if (screen === "mindreflect") {
+    return (
+      <div style={{
+        minHeight: "100vh", background: "#0D0B09",
+        display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+        padding: "0 28px",
+        position: "relative", overflow: "hidden",
+      }}>
+        <style>{`
+          @keyframes reflectGlow {
+            0%,100% { opacity: 0.05; transform: scale(1); }
+            50% { opacity: 0.1; transform: scale(1.2); }
+          }
+          @keyframes fadeUpSlow {
+            from { opacity: 0; transform: translateY(24px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes shimmer {
+            0% { opacity: 0.3; }
+            50% { opacity: 0.6; }
+            100% { opacity: 0.3; }
+          }
+          @keyframes dotPulse {
+            0%,80%,100% { opacity: 0.2; transform: scale(0.8); }
+            40% { opacity: 1; transform: scale(1); }
+          }
+        `}</style>
+
+        {/* Background glow */}
+        <div style={{
+          position: "fixed", inset: 0, display: "flex",
+          alignItems: "center", justifyContent: "center", pointerEvents: "none",
+        }}>
+          <div style={{
+            width: 500, height: 500, borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(140,100,60,1) 0%, transparent 70%)",
+            animation: "reflectGlow 10s ease-in-out infinite",
+          }} />
+        </div>
+
+        <div style={{ width: "100%", maxWidth: 380, textAlign: "center" }}>
+
+          {/* Logo */}
+          <div style={{
+            fontSize: 10, fontWeight: 800, letterSpacing: "0.22em",
+            textTransform: "uppercase", color: "rgba(245,241,234,0.2)",
+            marginBottom: 64,
+          }}>Reset</div>
+
+          {/* What they typed */}
+          <div style={{
+            fontSize: 12, fontWeight: 700, letterSpacing: "0.14em",
+            textTransform: "uppercase", color: "rgba(245,241,234,0.2)",
+            marginBottom: 16,
+          }}>On your mind</div>
+          <div style={{
+            fontSize: 18, color: "rgba(245,241,234,0.55)",
+            fontFamily: 'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
+            fontStyle: "italic", lineHeight: 1.4, marginBottom: 48,
+            padding: "0 8px",
+          }}>
+            "{mind}"
+          </div>
+
+          {/* The reflection */}
+          <div style={{
+            minHeight: 80, display: "flex", alignItems: "center", justifyContent: "center",
+            marginBottom: 56,
+          }}>
+            {mindReflectionLoading ? (
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                {[0, 1, 2].map(i => (
+                  <div key={i} style={{
+                    width: 7, height: 7, borderRadius: "50%",
+                    background: "rgba(180,140,90,0.6)",
+                    animation: `dotPulse 1.4s ease-in-out ${i * 0.2}s infinite`,
+                  }} />
+                ))}
+              </div>
+            ) : (
+              <div style={{
+                fontSize: 22, fontWeight: 500, lineHeight: 1.35,
+                color: "rgba(245,241,234,0.88)",
+                fontFamily: 'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
+                letterSpacing: "-0.02em",
+                animation: "fadeUpSlow 0.8s ease forwards",
+              }}>
+                {mindReflection}
+              </div>
+            )}
+          </div>
+
+          {/* CTA — only show after reflection loads */}
+          {!mindReflectionLoading && mindReflection && (
+            <button
+              onClick={() => setScreen("avoid")}
+              style={{
+                padding: "15px 40px", borderRadius: 999,
+                border: "1px solid rgba(245,241,234,0.18)",
+                background: "rgba(245,241,234,0.08)",
+                color: "rgba(245,241,234,0.75)",
+                fontSize: 14, cursor: "pointer",
+                fontFamily: "inherit", letterSpacing: "0.05em",
+                transition: "all 0.3s ease",
+                animation: "fadeUpSlow 0.6s ease 0.3s both",
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLButtonElement).style.background = "rgba(245,241,234,0.14)";
+                (e.currentTarget as HTMLButtonElement).style.color = "rgba(245,241,234,0.9)";
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLButtonElement).style.background = "rgba(245,241,234,0.08)";
+                (e.currentTarget as HTMLButtonElement).style.color = "rgba(245,241,234,0.75)";
+              }}
+            >
+              Keep going →
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (screen === "pulse") {
     return (
       <div style={S.page}>
@@ -1410,7 +1542,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* ── COMMUNITY PULSE TEASER ── */}
             <PulseTeaser onExpand={() => setScreen("pulse")} />
 
             {lastNotYet && !hasResetToday && (
@@ -1434,22 +1565,33 @@ export default function App() {
           </>
         )}
 
+        {/* ── MIND: now calls submitMind() instead of going directly to avoid ── */}
         {screen === "mind" && renderStepCard(1, <>
           <div style={S.stepPill}>Step 1 / 3</div>
           <div style={S.title}>What's actually in your head?</div>
           <div style={S.sub}>Not everything. Just the loudest thing.</div>
           <div style={S.focusHint}>If you over-explain, you're avoiding.</div>
           <div style={S.chips}>{MIND_SUGGESTIONS.map((opt) => (<button key={opt} type="button" style={{ ...S.chip, ...(mind === opt ? S.chipActive : {}) }} onClick={() => setMind(opt)}>{opt}</button>))}</div>
-          <input ref={mindRef} style={S.input} placeholder="The loudest thing right now…" value={mind} maxLength={120} onChange={(e) => setMind(e.target.value)} onKeyDown={(e) => e.key === "Enter" && mind.trim() && setScreen("avoid")} />
+          <input ref={mindRef} style={S.input} placeholder="The loudest thing right now…" value={mind} maxLength={120} onChange={(e) => setMind(e.target.value)} onKeyDown={(e) => e.key === "Enter" && mind.trim() && submitMind()} />
           <div style={S.helperRow}><span style={S.helper}>Be specific. Vague = stuck.</span><span style={S.helper}>{mind.length}/120</span></div>
-          <button style={{ ...S.cta, ...(mind.trim() ? {} : S.ctaDisabled) }} disabled={!mind.trim()} onClick={() => setScreen("avoid")}>That's it. Continue.</button>
+          <button style={{ ...S.cta, ...(mind.trim() ? {} : S.ctaDisabled) }} disabled={!mind.trim()} onClick={submitMind}>That's it. Continue.</button>
           <button style={S.ctaMuted} onClick={resetFlow}>Cancel</button>
         </>)}
 
+        {/* ── AVOID: now references what they said in step 1 ── */}
         {screen === "avoid" && renderStepCard(2, <>
           <div style={S.stepPill}>Step 2 / 3</div>
           <div style={S.title}>What are you avoiding?</div>
-          <div style={S.sub}>Not the story. The thing itself.</div>
+          <div style={{ ...S.sub, marginBottom: 6 }}>Not the story. The thing itself.</div>
+          {mind && (
+            <div style={{
+              fontSize: 12, color: "#A79E93", fontStyle: "italic",
+              marginBottom: 14, padding: "8px 12px",
+              background: "#F7F3EC", borderRadius: 10, borderLeft: "2px solid #DDD5CA",
+            }}>
+              You said: "{mind}"
+            </div>
+          )}
           <div style={S.focusHint}>If you soften it, you'll keep avoiding it.</div>
           <div style={S.chips}>{AVOIDING_SUGGESTIONS.map((opt) => (<button key={opt} type="button" style={{ ...S.chip, ...(avoiding === opt ? S.chipActive : {}) }} onClick={() => setAvoiding(opt)}>{opt}</button>))}</div>
           <input ref={avoidRef} style={S.input} placeholder="What you keep not doing…" value={avoiding} maxLength={120} onChange={(e) => setAvoiding(e.target.value)} onKeyDown={(e) => e.key === "Enter" && avoiding.trim() && setScreen("move")} />
@@ -1506,7 +1648,6 @@ export default function App() {
               )}
             </div>
 
-            {/* 5-minute follow-up countdown — only for "done" */}
             {latestEntry.status === "done" && followUpSeconds !== null && !showFollowUp && !followUpAnswer && (
               <div style={{
                 background: "#0D0B09", border: "1px solid #2A2520",
@@ -1550,7 +1691,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ── FOLLOW-UP POPUP ── */}
         {showFollowUp && !followUpAnswer && latestEntry && (
           <div style={S.modalBackdrop}>
             <div style={{
@@ -1608,7 +1748,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ── FOLLOW-UP ANSWER RESPONSE ── */}
         {followUpAnswer && (
           <div style={S.modalBackdrop}>
             <div style={{
