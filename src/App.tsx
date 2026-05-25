@@ -141,6 +141,75 @@ Do NOT start with "I". No emojis. No explanation. Just the one sentence.`;
   }
 }
 
+// ── HOOKED: TIME-BASED TRIGGER COPY ────────────────────────────────────────
+function getTimeBasedHero(): { title: string; sub: string } {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 9) return {
+    title: "The day hasn't taken you yet.\nGet ahead of it.",
+    sub: "You have clarity right now that won't last. Use it.",
+  };
+  if (h >= 9 && h < 12) return {
+    title: "Mid-morning. The noise\nis building.",
+    sub: "Before it takes over — name the one thing and move.",
+  };
+  if (h >= 12 && h < 15) return {
+    title: "You've been in it\nfor hours.",
+    sub: "Step out for 3 minutes. Come back knowing what actually matters.",
+  };
+  if (h >= 15 && h < 18) return {
+    title: "The afternoon dip\nis real.",
+    sub: "Not energy — clarity. One honest reset before the day closes.",
+  };
+  if (h >= 18 && h < 22) return {
+    title: "Day's done.\nAre you?",
+    sub: "Name what you're still carrying before you take it to bed.",
+  };
+  return {
+    title: "You're awake\nwhen most aren't.",
+    sub: "Something's on your mind. Let's look at it.",
+  };
+}
+
+// ── HOOKED: PATTERN FLASH — variable reward every 3rd reset ───────────────
+async function getPatternFlash(entries: Entry[], name: string): Promise<string> {
+  if (entries.length < 3) return "";
+  const recent = entries.slice(0, 6);
+  const summary = recent.map((e, i) =>
+    `Reset ${i + 1}: mind="${e.mind}", avoiding="${e.avoiding}", move="${e.move}", status=${e.status}`
+  ).join("\n");
+
+  const prompt = `You are the pattern-recognition voice of Reset — a reconnection app for Gulf high performers.
+
+Here are ${name}'s last ${recent.length} resets:
+${summary}
+
+Surface ONE unexpected pattern, connection, or truth you see across these entries.
+Not what they told you — what the pattern reveals that they probably haven't said out loud.
+1-2 sentences max. Sharp. Specific. Make them feel seen in a way that's slightly uncomfortable.
+No lists. No generic advice. No emojis. Don't start with "I".`;
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.REACT_APP_ANTHROPIC_API_KEY || "",
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 150,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    const data = await response.json();
+    return data.content?.find((b: any) => b.type === "text")?.text?.trim() ?? "";
+  } catch {
+    return "";
+  }
+}
+
 function getFallbackReflection(mind: string): string {
   const m = mind.toLowerCase();
   if (m.includes("work") || m.includes("job") || m.includes("meeting")) return "It's not really about the work — it's about what the work means about you.";
@@ -796,6 +865,10 @@ export default function App() {
   const [mindReflection, setMindReflection] = useState<string>("");
   const [mindReflectionLoading, setMindReflectionLoading] = useState(false);
 
+  // ── HOOKED: pattern flash state ─────────────────────────────────────────
+  const [patternFlash, setPatternFlash] = useState<string>("");
+  const [showPatternFlash, setShowPatternFlash] = useState(false);
+
   const mindRef = useRef<HTMLInputElement>(null);
   const avoidRef = useRef<HTMLInputElement>(null);
   const moveRef = useRef<HTMLInputElement>(null);
@@ -973,6 +1046,7 @@ export default function App() {
     setShareCopied(false); setShowResultPopup(false);
     setShowMilestone(false); setAiFeedback("");
     setMindReflection(""); setMindReflectionLoading(false);
+    setPatternFlash(""); setShowPatternFlash(false);
     setFollowUpSeconds(null); setShowFollowUp(false); setFollowUpAnswer(null);
     setScreen(profile ? "start" : "profile");
   }
@@ -1005,12 +1079,22 @@ export default function App() {
     }).select().single();
     if (error) { alert("The entry did not save. Check Supabase table or policies."); setAiFeedbackLoading(false); return; }
     const newEntry = mapEntry(data);
-    setEntries((prev) => [newEntry, ...prev].slice(0, 50));
+    const updatedEntries = [newEntry, ...entries].slice(0, 50);
+    setEntries(updatedEntries);
     setLatestId(newEntry.id);
     setScreen("result");
     const newStreak = status === "done" ? streak + 1 : streak;
     if (status === "done") setFollowUpSeconds(300);
     if (status === "done" && MILESTONE_DAYS.includes(newStreak)) { setShowMilestone(true); } else { setShowResultPopup(true); }
+
+    // ── HOOKED: Variable Reward — Pattern Flash every 3rd reset ───────────
+    const isPatternFlashReset = updatedEntries.length >= 3 && updatedEntries.length % 3 === 0;
+    if (isPatternFlashReset) {
+      getPatternFlash(updatedEntries, profile.name).then(flash => {
+        if (flash) { setPatternFlash(flash); setShowPatternFlash(true); }
+      });
+    }
+
     const feedback = await getAIFeedback(status, mind, avoiding, move, profile.name, pastPatterns, presenceScore);
     setAiFeedback(feedback);
     setAiFeedbackLoading(false);
@@ -1532,8 +1616,8 @@ export default function App() {
             <div style={S.heroCard}>
               <div style={S.heroOverlay}>
                 <div>
-                  <div style={S.heroTitle}>You don't stay stuck.{"\n"}You move.</div>
-                  <div style={S.heroSub}>Empty the noise. Name the dodge. Make one clean move.</div>
+                  <div style={S.heroTitle}>{getTimeBasedHero().title}</div>
+                  <div style={S.heroSub}>{getTimeBasedHero().sub}</div>
                 </div>
                 <div style={S.heroBottom}>
                   <button style={S.startButton} onClick={() => setScreen("mind")}>{hasResetToday ? "Reset again" : "Start Reset"}</button>
@@ -1647,6 +1731,28 @@ export default function App() {
                 <div style={S.feedbackText}>{aiFeedback}</div>
               )}
             </div>
+
+            {/* ── HOOKED: Investment Signal — data compounding message ── */}
+            {totalResets >= 5 && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "10px 14px", marginBottom: 14,
+                background: "rgba(35,32,29,0.04)",
+                border: "1px solid rgba(35,32,29,0.08)",
+                borderRadius: 12,
+              }}>
+                <div style={{
+                  width: 6, height: 6, borderRadius: "50%",
+                  background: "#23201D", flexShrink: 0,
+                  boxShadow: "0 0 0 3px rgba(35,32,29,0.1)",
+                }} />
+                <div style={{ fontSize: 12, color: "#6F6861", fontStyle: "italic", lineHeight: 1.4 }}>
+                  {totalResets} resets in. Reset is starting to know you.
+                  {totalResets >= 20 && " The patterns are getting clearer."}
+                  {totalResets >= 50 && " This data is yours — no one else has it."}
+                </div>
+              </div>
+            )}
 
             {latestEntry.status === "done" && followUpSeconds !== null && !showFollowUp && !followUpAnswer && (
               <div style={{
@@ -1784,6 +1890,58 @@ export default function App() {
                   fontSize: 14, cursor: "pointer", fontFamily: "inherit",
                 }}
               >Back to start</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── HOOKED: Variable Reward — Pattern Flash modal ── */}
+        {showPatternFlash && patternFlash && !showMilestone && (
+          <div style={S.modalBackdrop}>
+            <div style={{
+              width: "100%", maxWidth: 420,
+              background: "#0D0B09",
+              borderRadius: 28,
+              border: "1px solid rgba(180,140,90,0.25)",
+              boxShadow: "0 25px 80px rgba(0,0,0,0.7)",
+              padding: 28, overflow: "hidden", position: "relative",
+            }}>
+              <div style={{
+                position: "absolute", top: -60, left: -60, width: 240, height: 240,
+                borderRadius: "50%",
+                background: "radial-gradient(circle, rgba(180,140,90,0.08) 0%, transparent 70%)",
+                pointerEvents: "none",
+              }} />
+              <div style={{
+                fontSize: 10, fontWeight: 800, letterSpacing: "0.2em",
+                textTransform: "uppercase" as const,
+                color: "rgba(180,140,90,0.6)", marginBottom: 20,
+                display: "flex", alignItems: "center", gap: 8,
+              }}>
+                <div style={{ width: 16, height: 1, background: "rgba(180,140,90,0.4)" }} />
+                Pattern recognised
+                <div style={{ width: 16, height: 1, background: "rgba(180,140,90,0.4)" }} />
+              </div>
+              <div style={{
+                fontSize: 22, fontWeight: 500, lineHeight: 1.4,
+                color: "rgba(245,241,234,0.9)",
+                fontFamily: 'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
+                letterSpacing: "-0.02em", marginBottom: 28,
+              }}>
+                {patternFlash}
+              </div>
+              <div style={{ fontSize: 11, color: "rgba(245,241,234,0.2)", marginBottom: 20, fontStyle: "italic" }}>
+                From your last {Math.min(totalResets, 6)} resets
+              </div>
+              <button
+                onClick={() => { setShowPatternFlash(false); }}
+                style={{
+                  width: "100%", padding: "14px 18px", borderRadius: 16,
+                  border: "1px solid rgba(180,140,90,0.2)",
+                  background: "transparent",
+                  color: "rgba(245,241,234,0.45)", fontSize: 14,
+                  cursor: "pointer", fontFamily: "inherit",
+                }}
+              >Noted</button>
             </div>
           </div>
         )}
