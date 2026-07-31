@@ -17,7 +17,8 @@ type Screen =
   | "checkin"
   | "insights"
   | "reflect"
-  | "pulse";
+  | "pulse"
+  | "training";
 
 type EntryStatus = "done" | "not_yet";
 
@@ -38,6 +39,46 @@ interface Entry {
   presenceScore?: number;
 }
 
+interface ResetGuidance {
+  coachInsight: string;
+  chiefDecision: string;
+  mentalityRep: string;
+}
+
+const EMPTY_GUIDANCE: ResetGuidance = {
+  coachInsight: "",
+  chiefDecision: "",
+  mentalityRep: "",
+};
+
+const MENTALITY_TRAINING = [
+  {
+    title: "Decide before confidence",
+    trigger: "You keep researching a reversible decision.",
+    rep: "Choose one option, define the downside, and act for ten minutes.",
+  },
+  {
+    title: "Start before motivation",
+    trigger: "You understand the task but keep delaying the beginning.",
+    rep: "Open the task and complete only the first visible step.",
+  },
+  {
+    title: "Say the clean sentence",
+    trigger: "You are avoiding a message or difficult conversation.",
+    rep: "Write the honest sentence without defending or overexplaining it.",
+  },
+  {
+    title: "Protect one focus block",
+    trigger: "Your attention is fragmented and everything feels equally urgent.",
+    rep: "Remove one distraction and work on one outcome for ten minutes.",
+  },
+  {
+    title: "Keep one promise",
+    trigger: "Planning is high but completion is low.",
+    rep: "Choose one promise small enough to finish today, then record the evidence.",
+  },
+];
+
 const MIND_SUGGESTIONS = ["Work", "A person", "Money", "Health"];
 const AVOIDING_SUGGESTIONS = ["Starting", "A message", "A decision"];
 const MOVE_SUGGESTIONS = ["Send it", "Open it", "Start 2 min"];
@@ -50,59 +91,39 @@ const MILESTONE_DAYS = [7, 14, 30, 60, 100];
 // Paraphrased principles associated with each source. Not quotes.
 const DAILY_LENSES = [
   {
-    source: "Simon Sinek",
-    tag: "Start with why",
-    body: "The task isn't the point. Ask what today's move is in service of — the move gets easier when it means something.",
+    source: "Reset principle",
+    tag: "Name the truth",
+    body: "Clarity begins when you stop describing the situation politely and name what is actually happening.",
   },
   {
-    source: "Satya Nadella",
-    tag: "Learn-it-all",
-    body: "Not yet is data, never a verdict. The learn-it-all beats the know-it-all every single time.",
+    source: "Reset principle",
+    tag: "Reduce the move",
+    body: "If the action still feels heavy, it is not small enough. Shrink it until starting takes less than two minutes.",
   },
   {
-    source: "Arianna Huffington",
-    tag: "Recovery is strategy",
-    body: "You can't out-hustle an empty battery. Rest is part of the move, not a reward for finishing it.",
+    source: "Reset principle",
+    tag: "Decide before confidence",
+    body: "Confidence usually follows evidence. Make the smallest sound decision, then let action create the proof.",
   },
   {
-    source: "Jeff Weiner",
-    tag: "Compassionate directness",
-    body: "Be honest with yourself the way you'd be with someone you respect — completely clear, and kind about it.",
+    source: "Reset principle",
+    tag: "Close one open loop",
+    body: "Mental noise grows around unfinished decisions. Close one loop before opening another.",
   },
   {
-    source: "Richard Branson",
-    tag: "Screw it, do it",
-    body: "You don't need to feel ready. Start, then learn. Boldness compounds faster than planning ever will.",
+    source: "Reset principle",
+    tag: "Protect attention",
+    body: "Your next move needs a protected window, not more motivation. Remove one source of friction now.",
   },
   {
-    source: "Shopify",
-    tag: "One thing, obsessively",
-    body: "Depth beats breadth. One small move done daily outperforms ten plans that never leave your head.",
+    source: "Reset principle",
+    tag: "Make avoidance measurable",
+    body: "Replace 'later' with a time, a verb and a visible finish line. Vagueness is where avoidance hides.",
   },
   {
-    source: "Uber",
-    tag: "Remove the friction",
-    body: "Make the next step so easy it's harder not to do it. One tap. One message. Two minutes.",
-  },
-  {
-    source: "Careem",
-    tag: "Win one street first",
-    body: "A region is won one city block at a time. Win today completely before you plan the month.",
-  },
-  {
-    source: "Aramex",
-    tag: "Build where others won't",
-    body: "World-class things get built where the map says impossible. Constraints are the brief, not the excuse.",
-  },
-  {
-    source: "Dubai",
-    tag: "Ambition as a habit",
-    body: "A skyline isn't declared — it's built one unreasonable decision at a time. So is a life.",
-  },
-  {
-    source: "The Diary of a CEO",
-    tag: "The unglamorous rep",
-    body: "Every builder's story is the same underneath: the boring rep, repeated. Today's reset is your rep.",
+    source: "Reset principle",
+    tag: "Review the evidence",
+    body: "Judge yourself by repeated behaviour, not by today's mood. Your record is more accurate than your fear.",
   },
 ];
 
@@ -476,49 +497,62 @@ async function getAIFeedback(
   pastPatterns: string,
   presenceScore: number,
   userWhy: string
-): Promise<string> {
-  const prompt = `You are the voice inside Reset — a clarity app for anyone whose head is too full and who needs to move.
+): Promise<ResetGuidance> {
+  const prompt = `You are Reset, a personal execution coach. Return ONLY valid JSON with exactly these keys: coachInsight, chiefDecision, mentalityRep.
 
 User: ${name}
-Presence score today: ${presenceScore}/5 (${PRESENCE_LABELS[presenceScore]?.en})
-Status: ${status === "done" ? "They DID the move" : "They did NOT do the move yet"}
-What was on their mind: "${mind}"
-What they were avoiding: "${avoiding}"
-Their committed move: "${move}"
-${userWhy ? `Their deeper why — what all of this is in service of: "${userWhy}". Connect the move to it only if it fits naturally.` : ""}
-${pastPatterns ? `Their recent patterns: ${pastPatterns}` : ""}
+Presence: ${presenceScore}/5
+Status: ${status === "done" ? "completed the move" : "did not complete the move yet"}
+On their mind: "${mind}"
+Avoiding: "${avoiding}"
+Committed move: "${move}"
+${userWhy ? `Deeper why: "${userWhy}"` : ""}
+${pastPatterns ? `Recent behavioural evidence: ${pastPatterns}` : ""}
 
-Write 2-3 sentences. Be specific to EXACTLY what they wrote.
-Reference their presence score naturally — someone at 1-2 needs gentleness and permission to rest, someone at 4-5 needs a push toward the bolder version.
-Growth mindset: treat "not yet" as data and learning, never as failure or a character flaw.
-Compassionate directness: completely honest, zero sugarcoating, but on their side.
-Tone: like a wise, warm friend who has been in the thick of it and knows what it costs to stay stuck. Never corporate. Never generic.
-Never start with "I" or the user's name. No emojis. No lists.`;
+COACH INSIGHT: Identify the emotional or behavioural mechanism behind the avoidance. Be specific, direct and non-diagnostic. Maximum 2 sentences.
+CHIEF DECISION: Give one operational decision that begins with a verb and can start immediately. If they did not act, reduce the move. Maximum 1 sentence.
+MENTALITY REP: Teach one reusable principle demonstrated by this situation. Maximum 15 words.
+No motivational filler, no emojis, no markdown.`;
 
   try {
     const response = await fetch("/api/claude", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
+        max_tokens: 450,
         messages: [{ role: "user", content: prompt }],
       }),
     });
     const data = await response.json();
-    const text = data.content?.find((b: any) => b.type === "text")?.text ?? "";
-    return text.trim() || getFallbackFeedback(status);
+    const raw = data.content?.find((b: any) => b.type === "text")?.text?.trim() ?? "";
+    const cleaned = raw.replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
+    const parsed = JSON.parse(cleaned);
+    if (parsed.coachInsight && parsed.chiefDecision && parsed.mentalityRep) {
+      return {
+        coachInsight: String(parsed.coachInsight),
+        chiefDecision: String(parsed.chiefDecision),
+        mentalityRep: String(parsed.mentalityRep),
+      };
+    }
+    return getFallbackFeedback(status, move);
   } catch {
-    return getFallbackFeedback(status);
+    return getFallbackFeedback(status, move);
   }
 }
 
-function getFallbackFeedback(status: EntryStatus): string {
-  if (status === "done")
-    return "You moved. That's the whole game — not perfection, just momentum. Do it again tomorrow.";
-  return "Not yet is just data. The move was probably too big. Cut it in half and try the smaller door.";
+function getFallbackFeedback(status: EntryStatus, move: string): ResetGuidance {
+  return status === "done"
+    ? {
+        coachInsight: "You stopped negotiating with the discomfort long enough to create evidence.",
+        chiefDecision: `Repeat this behaviour: ${move}`,
+        mentalityRep: "Action creates self-trust faster than private intention.",
+      }
+    : {
+        coachInsight: "The move was still carrying too much friction, uncertainty or emotional cost.",
+        chiefDecision: `Reduce and begin: ${move}`,
+        mentalityRep: "A smaller completed move beats an impressive avoided plan.",
+      };
 }
 
 function analyzePatterns(entries: Entry[]): {
@@ -1627,7 +1661,7 @@ export default function App() {
   const [notifPermission, setNotifPermission] = useState<string>("default");
   const [streakAtRisk, setStreakAtRisk] = useState(false);
   const [checkinEntry, setCheckinEntry] = useState<Entry | null>(null);
-  const [aiFeedback, setAiFeedback] = useState<string>("");
+  const [aiFeedback, setAiFeedback] = useState<ResetGuidance>(EMPTY_GUIDANCE);
   const [aiFeedbackLoading, setAiFeedbackLoading] = useState(false);
   const [followUpSeconds, setFollowUpSeconds] = useState<number | null>(null);
   const [showFollowUp, setShowFollowUp] = useState(false);
@@ -2029,7 +2063,7 @@ export default function App() {
     setShareCopied(false);
     setShowResultPopup(false);
     setShowMilestone(false);
-    setAiFeedback("");
+    setAiFeedback(EMPTY_GUIDANCE);
     setMindReflection("");
     setMindReflectionLoading(false);
     setPatternFlash("");
@@ -2113,10 +2147,11 @@ export default function App() {
     );
     setAiFeedback(feedback);
     setAiFeedbackLoading(false);
-    await supabase.from("entries").update({ feedback }).eq("id", newEntry.id);
+    const feedbackJson = JSON.stringify(feedback);
+    await supabase.from("entries").update({ feedback: feedbackJson }).eq("id", newEntry.id);
     setEntries((prev) =>
       prev.map((e) =>
-        e.id === newEntry.id ? { ...e, feedback } : e
+        e.id === newEntry.id ? { ...e, feedback: feedbackJson } : e
       )
     );
   }
@@ -3619,6 +3654,11 @@ export default function App() {
               </button>
             )}
             {profile && (
+              <button style={S.profileBtn} onClick={() => setScreen("training")}>
+                Training
+              </button>
+            )}
+            {profile && (
               <button style={S.profileBtn} onClick={changeName}>
                 {profile.name} ↩
               </button>
@@ -4016,7 +4056,18 @@ export default function App() {
               </div>
             )}
 
-            <PulseTeaser onExpand={() => setScreen("pulse")} />
+            <div style={{ ...S.trackerCard, border: "1px solid #CDBB9D" }}>
+              <div style={S.label}>Current mentality training</div>
+              <div style={{ ...S.unfinishedMove, marginTop: 7 }}>
+                {MENTALITY_TRAINING[totalResets % MENTALITY_TRAINING.length].title}
+              </div>
+              <div style={{ ...S.trackerText, margin: "6px 0 12px", lineHeight: 1.55 }}>
+                {MENTALITY_TRAINING[totalResets % MENTALITY_TRAINING.length].trigger}
+              </div>
+              <button style={{ ...S.ctaMuted, marginBottom: 0 }} onClick={() => setScreen("training")}>
+                Complete today's rep
+              </button>
+            </div>
 
             {lastNotYet && !hasResetToday && (
               <div style={S.unfinishedCard}>
@@ -4389,22 +4440,31 @@ export default function App() {
                 ? "You moved."
                 : "Not yet. That's data."}
             </div>
-            <div style={S.aiFeedbackBox}>
-              <div style={S.aiBadge}>AI Insight</div>
-              {aiFeedbackLoading ? (
-                <div
-                  style={{
-                    ...S.feedbackText,
-                    color: "#A79E93",
-                    fontStyle: "italic",
-                  }}
-                >
-                  Thinking about what you just did...
+            {aiFeedbackLoading ? (
+              <div style={S.aiFeedbackBox}>
+                <div style={S.aiBadge}>Reset is reading the pattern</div>
+                <div style={{ ...S.feedbackText, color: "#A79E93", fontStyle: "italic" }}>
+                  Separating the story from the next decision...
                 </div>
-              ) : (
-                <div style={S.feedbackText}>{aiFeedback}</div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <>
+                <div style={S.aiFeedbackBox}>
+                  <div style={S.aiBadge}>Your coach sees</div>
+                  <div style={S.feedbackText}>{aiFeedback.coachInsight}</div>
+                </div>
+                <div style={{ ...S.aiFeedbackBox, background: "#161413", borderColor: "#2A2520" }}>
+                  <div style={{ ...S.aiBadge, color: "rgba(214,174,104,0.9)" }}>Your chief decides</div>
+                  <div style={{ ...S.feedbackText, color: "rgba(245,241,234,0.9)", fontSize: 18 }}>
+                    {aiFeedback.chiefDecision}
+                  </div>
+                </div>
+                <div style={{ ...S.resultBox, border: "1px solid #CDBB9D", background: "#FBF6EC" }}>
+                  <div style={S.label}>Mentality rep</div>
+                  <div style={{ ...S.unfinishedMove, margin: "6px 0 0" }}>{aiFeedback.mentalityRep}</div>
+                </div>
+              </>
+            )}
 
             {totalResets >= 5 && (
               <div
@@ -4543,6 +4603,31 @@ export default function App() {
             </div>
             <button style={S.ctaMuted} onClick={resetFlow}>
               Back to start
+            </button>
+          </div>
+        )}
+
+        {screen === "training" && (
+          <div style={S.card}>
+            <div style={S.stepPill}>Mentality training</div>
+            <div style={S.title}>Train the response, not the mood.</div>
+            <div style={{ ...S.sub, marginBottom: 20 }}>
+              These are short behavioural repetitions. Each one ends in a real-world action.
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {MENTALITY_TRAINING.map((item, index) => (
+                <div key={item.title} style={{ ...S.resultBox, marginBottom: 0 }}>
+                  <div style={S.label}>Rep {index + 1}</div>
+                  <div style={{ ...S.unfinishedMove, margin: "5px 0 6px" }}>{item.title}</div>
+                  <div style={{ ...S.trackerText, lineHeight: 1.5, marginBottom: 10 }}>{item.trigger}</div>
+                  <div style={{ fontSize: 14, color: "#23201D", fontWeight: 650, lineHeight: 1.5 }}>
+                    {item.rep}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button style={{ ...S.ctaMuted, marginTop: 18 }} onClick={() => setScreen("start")}>
+              ← Back to Reset
             </button>
           </div>
         )}
@@ -4744,7 +4829,14 @@ export default function App() {
                           marginTop: 6,
                         }}
                       >
-                        {e.feedback}
+                        {(() => {
+                          try {
+                            const parsed = JSON.parse(e.feedback) as ResetGuidance;
+                            return parsed.coachInsight || e.feedback;
+                          } catch {
+                            return e.feedback;
+                          }
+                        })()}
                       </div>
                     )}
                   </div>
