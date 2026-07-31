@@ -374,6 +374,23 @@ function progressBarStyle(pct: number): CSSProperties {
   };
 }
 
+function suggestNextMove(avoiding: string): string {
+  const a = avoiding.toLowerCase();
+  if (/study|exam|read|assignment|course|homework/.test(a))
+    return "Open the material and study one page for five minutes.";
+  if (/message|email|reply|call|conversation|apolog/.test(a))
+    return "Open the conversation and write the first honest sentence.";
+  if (/clean|chore|laundry|dishes|room|house|tidy/.test(a))
+    return "Clear one visible surface or put away five items.";
+  if (/decision|choose|decide|option/.test(a))
+    return "Choose the reversible option and test it for ten minutes.";
+  if (/work|report|proposal|presentation|task|project|file/.test(a))
+    return "Open the file and complete the first visible step for five minutes.";
+  if (/gym|workout|walk|exercise/.test(a))
+    return "Put on your shoes and begin two minutes of movement.";
+  return "Open it and do the smallest visible part for five minutes.";
+}
+
 async function getMindReflection(mind: string, name: string): Promise<string> {
   const prompt = `You are the inner voice of Reset — a clarity app for anyone whose head is too full to think straight.
 
@@ -1711,10 +1728,10 @@ export default function App() {
       setBreathePhase((p) => (p === "in" ? "out" : "in"));
       setBreatheCount((c) => {
         const next = c + 1;
-        if (next >= 3) setArrivalUnlocked(true);
+        if (next >= 4) setArrivalUnlocked(true);
         return next;
       });
-    }, 4000);
+    }, 5000);
     return () => window.clearInterval(timer);
   }, [screen]);
 
@@ -2101,7 +2118,7 @@ export default function App() {
       .from("entries")
       .insert({
         profile_id: profile.id,
-        mind: mind.trim(),
+        mind: (mind.trim() || avoiding.trim()),
         avoiding: avoiding.trim(),
         move: move.trim(),
         status,
@@ -2121,14 +2138,9 @@ export default function App() {
     setLatestId(newEntry.id);
     setScreen("result");
     const newStreak = status === "done" ? streak + 1 : streak;
-    if (status === "done") setFollowUpSeconds(300);
-    if (status === "done" && MILESTONE_DAYS.includes(newStreak)) {
-      setShowMilestone(true);
-    } else {
-      setShowResultPopup(true);
-    }
-    const isPatternFlashReset =
-      updatedEntries.length >= 3 && updatedEntries.length % 3 === 0;
+    if (status === "done") setFollowUpSeconds(null);
+    // Keep completion quiet: the reward is visible evidence, not another modal.
+    const isPatternFlashReset = false;
     if (isPatternFlashReset) {
       getPatternFlash(updatedEntries, profile.name).then((flash) => {
         if (flash) {
@@ -2368,14 +2380,14 @@ export default function App() {
       padding: "15px 18px",
       borderRadius: 18,
       border: "none",
-      background: "linear-gradient(135deg, #D4521A 0%, #E06B30 100%)",
+      background: "linear-gradient(135deg, #16B8A6 0%, #35D0BA 100%)",
       color: "#FFF8F5",
       fontSize: 15,
       fontWeight: 800,
       cursor: "pointer",
       fontFamily: "inherit",
       marginBottom: 10,
-      boxShadow: "0 4px 20px rgba(212,82,26,0.35)",
+      boxShadow: "0 4px 20px rgba(22,184,166,0.30)",
       transition: "all 0.2s ease",
     },
     ctaDisabled: { opacity: 0.38, cursor: "not-allowed" },
@@ -2673,7 +2685,7 @@ export default function App() {
       padding: "18px 20px",
       borderRadius: 20,
       border: "none",
-      background: "linear-gradient(135deg, #D4521A 0%, #E06B30 100%)",
+      background: "linear-gradient(135deg, #16B8A6 0%, #35D0BA 100%)",
       color: "#FFF8F5",
       fontSize: 16,
       fontWeight: 800,
@@ -3028,7 +3040,7 @@ export default function App() {
             position: "fixed",
             inset: 0,
             background:
-              "radial-gradient(ellipse at 50% 45%, rgba(212,82,26,0.14) 0%, rgba(10,8,7,0) 65%)",
+              "radial-gradient(ellipse at 50% 45%, rgba(53,208,186,0.18) 0%, rgba(10,8,7,0) 65%)",
             pointerEvents: "none",
           }}
         />
@@ -3045,11 +3057,11 @@ export default function App() {
         >
           <div
             style={{
-              width: 600,
-              height: 600,
+              width: 760,
+              height: 760,
               borderRadius: "50%",
               background:
-                "radial-gradient(circle, rgba(212,82,26,0.1) 0%, transparent 65%)",
+                "radial-gradient(circle, rgba(255,181,71,0.12) 0%, transparent 65%)",
               animation: "arrivalBgPulse 10s ease-in-out infinite",
             }}
           />
@@ -3080,7 +3092,7 @@ export default function App() {
             zIndex: 1,
           }}
         >
-          <CalmAvatar phase={breathePhase} size={160} accentHex="#D4521A" />
+          <CalmAvatar phase={breathePhase} size={280} accentHex="#35D0BA" />
         </div>
 
         {/* Breathe label */}
@@ -3118,7 +3130,7 @@ export default function App() {
             zIndex: 1,
           }}
         >
-          Stop. Breathe.{"\n"}You're already here.
+          Follow the light.{"\n"}Slow the noise.
         </div>
         <div
           style={{
@@ -3145,11 +3157,11 @@ export default function App() {
             letterSpacing: "0.04em",
           }}
         >
-          Three minutes. One move. Done.
+          20 seconds to arrive. One move to leave with.
         </div>
 
         <button
-          onClick={() => setScreen("presence")}
+          onClick={() => setScreen("coach")}
           disabled={!arrivalUnlocked}
           style={{
             padding: "14px 36px",
@@ -3177,7 +3189,7 @@ export default function App() {
               : "none",
           }}
         >
-          {arrivalUnlocked ? "I'm here" : "Breathe..."}
+          {arrivalUnlocked ? "Clear the noise →" : "Follow the light"}
         </button>
       </div>
     );
@@ -3614,7 +3626,7 @@ export default function App() {
             )}
           </div>
           <PulseScreen onBack={() => setScreen("start")} />
-          <div style={S.footer}>Stop thinking. Start moving.</div>
+          <div style={S.footer}>Breathe. Clear. Move.</div>
         </div>
       </div>
     );
@@ -4089,100 +4101,100 @@ export default function App() {
 
         {screen === "coach" &&
           renderStepCard(
-            1,
+            2,
             <>
-              <div style={S.stepPill}>Step 1 / 3 · Coach</div>
-              <div style={S.title}>See what is actually stopping you.</div>
-              <div style={S.sub}>Name the noise, then name the avoided action. No diagnosis. No life story.</div>
-
-              <div style={{ ...S.label, marginBottom: 7 }}>What is occupying your mind?</div>
+              <div style={S.stepPill}>Step 2 / 3 · Clear</div>
+              <div style={S.title}>What are you avoiding?</div>
+              <div style={S.sub}>One sentence. Name the thing creating the noise—not the whole story.</div>
               <div style={S.chips}>
-                {MIND_SUGGESTIONS.map((opt) => (
-                  <button key={opt} type="button" style={{ ...S.chip, ...(mind === opt ? S.chipActive : {}) }} onClick={() => setMind(opt)}>
-                    {opt}
-                  </button>
-                ))}
-              </div>
-              <input
-                ref={mindRef}
-                style={S.input}
-                placeholder="The loudest thing right now…"
-                value={mind}
-                maxLength={120}
-                onChange={(e) => setMind(e.target.value)}
-              />
-
-              <div style={{ ...S.label, margin: "14px 0 7px" }}>What are you actually avoiding?</div>
-              <div style={S.chips}>
-                {AVOIDING_SUGGESTIONS.map((opt) => (
-                  <button key={opt} type="button" style={{ ...S.chip, ...(avoiding === opt ? S.chipActive : {}) }} onClick={() => setAvoiding(opt)}>
+                {["Start", "Study", "Reply", "Decide", "Chore"].map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    style={{ ...S.chip, ...(avoiding === opt ? S.chipActive : {}) }}
+                    onClick={() => setAvoiding(opt)}
+                  >
                     {opt}
                   </button>
                 ))}
               </div>
               <input
                 ref={avoidRef}
-                style={S.input}
-                placeholder="The action, conversation or decision…"
+                style={{ ...S.input, fontSize: 18, padding: "17px 18px" }}
+                placeholder="The email, chapter, decision or chore…"
                 value={avoiding}
                 maxLength={120}
                 onChange={(e) => setAvoiding(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && mind.trim() && avoiding.trim() && setScreen("chief")}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && avoiding.trim()) {
+                    setMind(avoiding.trim());
+                    setMove(suggestNextMove(avoiding));
+                    setScreen("chief");
+                  }
+                }}
               />
-              <div style={S.focusHint}>Coach principle: clarity starts when the story and the avoided behaviour are separated.</div>
+              <div style={S.focusHint}>Naming the avoided behaviour reduces ambiguity. Do not explain it—expose it.</div>
               <button
-                style={{ ...S.cta, ...(mind.trim() && avoiding.trim() ? {} : S.ctaDisabled) }}
-                disabled={!mind.trim() || !avoiding.trim()}
-                onClick={() => setScreen("chief")}
+                style={{ ...S.cta, ...(avoiding.trim() ? {} : S.ctaDisabled) }}
+                disabled={!avoiding.trim()}
+                onClick={() => {
+                  setMind(avoiding.trim());
+                  setMove(suggestNextMove(avoiding));
+                  setScreen("chief");
+                }}
               >
-                See it clearly →
+                Find my next move →
               </button>
-              <button style={S.ctaMuted} onClick={resetFlow}>Cancel</button>
             </>
           )}
 
         {screen === "chief" &&
           renderStepCard(
-            2,
+            3,
             <>
-              <div style={S.stepPill}>Step 2 / 3 · Chief</div>
-              <div style={S.title}>Make one executable decision.</div>
-              <div style={S.sub}>Not a plan. Not advice. One move that can begin now.</div>
-              <div style={S.focusHint}>Chief principle: reversible decisions do not deserve endless thinking.</div>
-              <div style={S.chips}>
-                {MOVE_SUGGESTIONS.map((opt) => (
-                  <button key={opt} type="button" style={{ ...S.chip, ...(move === opt ? S.chipActive : {}) }} onClick={() => setMove(opt)}>
-                    {opt}
-                  </button>
-                ))}
+              <div style={S.stepPill}>Step 3 / 3 · Move</div>
+              <div style={S.title}>Do the next visible action.</div>
+              <div style={S.sub}>Reset has removed the plan. You only need the first physical step.</div>
+              <div style={{
+                background: "linear-gradient(135deg,#0F2E2A 0%,#123A35 100%)",
+                border: "1px solid rgba(53,208,186,0.32)",
+                borderRadius: 22,
+                padding: "20px 18px",
+                marginBottom: 14,
+                boxShadow: "0 18px 50px rgba(15,46,42,0.18)",
+              }}>
+                <div style={{ ...S.label, color: "#79E5D5" }}>Your next best action</div>
+                <input
+                  ref={moveRef}
+                  style={{
+                    ...S.input,
+                    background: "rgba(255,255,255,0.07)",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    color: "#F7FFFD",
+                    fontSize: 19,
+                    lineHeight: 1.45,
+                    margin: "8px 0 0",
+                  }}
+                  value={move}
+                  maxLength={140}
+                  onChange={(e) => setMove(e.target.value)}
+                />
               </div>
-              <input
-                ref={moveRef}
-                style={S.input}
-                placeholder="Start with a verb…"
-                value={move}
-                maxLength={120}
-                onChange={(e) => setMove(e.target.value)}
-              />
-              <div style={S.helperRow}>
-                <span style={S.helper}>Small enough to start. Specific enough to verify.</span>
-                <span style={S.helper}>{move.length}/120</span>
-              </div>
+              <div style={S.focusHint}>Specific. Visible. Small enough to begin before motivation arrives.</div>
               <button
-                style={{ ...S.cta, ...(move.trim() ? {} : S.ctaDisabled) }}
+                style={{ ...S.cta, ...(move.trim() ? {} : S.ctaDisabled), background: "linear-gradient(135deg,#FF7A45 0%,#FF9B45 100%)", boxShadow: "0 10px 30px rgba(255,122,69,0.3)" }}
                 disabled={!move.trim() || aiFeedbackLoading}
                 onClick={() => saveResult("done")}
               >
-                I did this move
+                I started it
               </button>
               <button
-                style={{ ...S.ctaMuted, ...(move.trim() ? {} : S.ctaDisabled) }}
+                style={{ ...S.ctaMuted, border: "none", padding: "9px 12px", marginBottom: 0 }}
                 disabled={!move.trim() || aiFeedbackLoading}
                 onClick={() => saveResult("not_yet")}
               >
-                Make this my next move
+                Save this move for later
               </button>
-              <button style={S.ctaMuted} onClick={() => setScreen("coach")}>← Back to Coach</button>
             </>
           )}
 
@@ -4503,11 +4515,11 @@ export default function App() {
 
         {screen === "result" && latestEntry && (
           <div style={S.card}>
-            <div style={S.stepPill}>Step 3 / 3 · Train</div>
+            <div style={S.stepPill}>Your Reset · Proof</div>
             <div style={S.title}>
               {latestEntry.status === "done"
-                ? "Build the response you want to repeat."
-                : "Train a smaller response, not a harsher story."}
+                ? "Evidence added. This is how self-trust is built."
+                : "The move is clear. Return when you are ready to create evidence."}
             </div>
             {aiFeedbackLoading ? (
               <div style={S.aiFeedbackBox}>
@@ -4529,7 +4541,7 @@ export default function App() {
                   </div>
                 </div>
                 <div style={{ ...S.resultBox, border: "1px solid #CDBB9D", background: "#FBF6EC" }}>
-                  <div style={S.label}>Train · Install the principle</div>
+                  <div style={S.label}>Discipline cue</div>
                   <div style={{ ...S.unfinishedMove, margin: "6px 0 0" }}>{aiFeedback.mentalityRep}</div>
                 </div>
               </>
@@ -4645,7 +4657,7 @@ export default function App() {
                 }}
               >
                 <div>
-                  <div style={S.label}>Current streak</div>
+                  <div style={S.label}>Action evidence</div>
                   <div
                     style={{
                       ...S.unfinishedMove,
@@ -4653,7 +4665,7 @@ export default function App() {
                       color: streak >= 7 ? "#7A5200" : "#161413",
                     }}
                   >
-                    {streak} day{streak !== 1 ? "s" : ""}
+                    {doneCount} move{doneCount !== 1 ? "s" : ""} started
                   </div>
                 </div>
                 {streak >= 7 && (
@@ -4661,17 +4673,18 @@ export default function App() {
                 )}
               </div>
             )}
-            <div style={S.shareBox}>
-              <div style={S.shareTitle}>Accountability</div>
-              <div style={S.shareText}>
-                Send it to one person. Make it harder to disappear.
-              </div>
-              <button style={S.cta} onClick={shareMove}>
-                {shareCopied ? "Copied" : "Share my move"}
-              </button>
-            </div>
-            <button style={S.ctaMuted} onClick={resetFlow}>
-              Back to start
+            <button
+              style={{ ...S.cta, background: "linear-gradient(135deg,#16B8A6 0%,#35D0BA 100%)" }}
+              onClick={() => {
+                setMind("");
+                setAvoiding("");
+                setMove("");
+                setLatestId(null);
+                setAiFeedback(EMPTY_GUIDANCE);
+                setScreen("coach");
+              }}
+            >
+              Clear the next noise →
             </button>
           </div>
         )}
@@ -5101,7 +5114,7 @@ export default function App() {
           </div>
         )}
 
-        <div style={S.footer}>Stop thinking. Start moving.</div>
+        <div style={S.footer}>Breathe. Clear. Move.</div>
       </div>
     </div>
   );
