@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 
 /* ============================================================================
    RESET v3 — the noise between knowing and doing
@@ -52,9 +52,10 @@ const MOVE_RULES = [
 ];
 const DEFAULT_MOVE = "Do the smallest visible first step for five minutes.";
 
-function suggestMove(avoiding) {
+function suggestMove(avoiding: string): string {
   const s = avoiding.toLowerCase();
-  for (const r of MOVE_RULES) if (r.k.some((w) => s.includes(w))) return r.move;
+  for (const r of MOVE_RULES)
+    if (r.k.some((w: string) => s.includes(w))) return r.move;
   return DEFAULT_MOVE;
 }
 
@@ -68,12 +69,22 @@ const REWARDS = [
   "The gap between knowing and doing just shrank.",
 ];
 
-function pick(arr, seed) {
+function pick<T>(arr: T[], seed: number): T {
   return arr[Math.abs(seed) % arr.length];
 }
 
 // ── Breathing orb (signature) ──────────────────────────────────────────────
-function BreathOrb({ phase, hue, size = 300, dim = false }) {
+function BreathOrb({
+  phase,
+  hue,
+  size = 300,
+  dim = false,
+}: {
+  phase: "in" | "out" | "idle";
+  hue: string;
+  size?: number;
+  dim?: boolean;
+}) {
   const scale = phase === "in" ? 1.16 : phase === "out" ? 0.84 : 1;
   const dur = phase === "idle" ? "6s" : "5s";
   return (
@@ -82,7 +93,7 @@ function BreathOrb({ phase, hue, size = 300, dim = false }) {
       <div style={{ position: "absolute", width: size * 1.9, height: size * 1.9,
         borderRadius: "50%", background: `radial-gradient(circle, ${hue}22 0%, transparent 62%)`,
         filter: "blur(8px)", animation: "orbHalo 7s ease-in-out infinite" }} />
-      {[1.5, 1.24, 1.05].map((m, i) => (
+      {[1.5, 1.24, 1.05].map((m: number, i: number) => (
         <div key={i} style={{ position: "absolute", width: size * m, height: size * m,
           borderRadius: "50%", border: `1px solid ${hue}${i === 2 ? "3a" : "20"}`,
           transition: `transform ${dur} cubic-bezier(.37,0,.63,1), opacity ${dur} ease`,
@@ -102,7 +113,7 @@ function BreathOrb({ phase, hue, size = 300, dim = false }) {
   );
 }
 
-const btn = (grad, glow) => ({
+const btn = (grad: string, glow: string): React.CSSProperties => ({
   width: "100%", maxWidth: 360, padding: "17px", borderRadius: 999, border: "none",
   background: grad, color: "#04121A", fontSize: 16, fontWeight: 800, cursor: "pointer",
   boxShadow: `0 12px 40px ${glow}`,
@@ -110,14 +121,23 @@ const btn = (grad, glow) => ({
 
 export default function App() {
   // welcome | breathe | clear | move | commit | done | followup | evidence
-  const [screen, setScreen] = useState("welcome");
+  type ScreenName =
+    | "welcome"
+    | "breathe"
+    | "clear"
+    | "move"
+    | "commit"
+    | "done"
+    | "followup"
+    | "evidence";
+  const [screen, setScreen] = useState<ScreenName>("welcome");
   const [avoiding, setAvoiding] = useState("");
   const [move, setMove] = useState("");
   const [loopCount, setLoopCount] = useState(0);
   const [evidence, setEvidence] = useState(0);
   const [reward, setReward] = useState("");
   const seed = useMemo(() => Date.now() % 997, []);
-  const inputRef = useRef(null);
+  const inputRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (screen === "clear" || screen === "move") {
@@ -144,7 +164,7 @@ export default function App() {
   }
 
   // breathe controller (~5s each phase, ~2 cycles ≈ 20s)
-  const [phase, setPhase] = useState("in");
+  const [phase, setPhase] = useState<"in" | "out" | "idle">("in");
   const [breaths, setBreaths] = useState(0);
   useEffect(() => {
     if (screen !== "breathe") return;
