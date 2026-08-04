@@ -138,7 +138,7 @@ const PRESENCE_LABELS: Record<number, { en: string; sub: string; color: string }
   1: { en: "Completely lost", sub: "Can't land anywhere", color: "#E53E3E" },
   2: { en: "Scattered", sub: "Head in 5 places", color: "#ED6C02" },
   3: { en: "Halfway here", sub: "Part of me is missing", color: "#D4A017" },
-  4: { en: "Mostly present", sub: "Almost there", color: "#2E7D52" },
+  4: { en: "Mostly present", sub: "Almost there", color: "#1E8C82" },
   5: { en: "Fully here", sub: "Grounded and clear", color: "#0D7C6E" },
 };
 
@@ -412,7 +412,7 @@ function progressBarStyle(pct: number): CSSProperties {
   return {
     height: "100%",
     width: `${pct}%`,
-    background: "#23201D",
+    background: "#1B2340",
     borderRadius: 999,
     transition: "width 0.4s ease",
   };
@@ -825,7 +825,7 @@ function OnboardingScreen({ onFinish }: { onFinish: () => void }) {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "#0A0807",
+      background: "#0B1020",
       display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center",
       padding: "0 28px",
@@ -873,14 +873,14 @@ function OnboardingScreen({ onFinish }: { onFinish: () => void }) {
         position: "fixed", top: 24, left: 0, right: 0,
         textAlign: "center", fontSize: 11, fontWeight: 800,
         letterSpacing: "0.22em", textTransform: "uppercase",
-        color: "rgba(245,241,234,0.22)",
+        color: "rgba(234,240,255,0.22)",
       }}>Reset</div>
 
       {slide > 0 && (
         <button onClick={() => { localStorage.setItem("reset_onboarded", "true"); onFinish(); }}
           style={{
             position: "fixed", top: 20, right: 24,
-            fontSize: 12, color: "rgba(245,241,234,0.28)",
+            fontSize: 12, color: "rgba(234,240,255,0.28)",
             background: "none", border: "none", cursor: "pointer",
             fontFamily: "inherit", letterSpacing: "0.05em",
           }}>Skip</button>
@@ -913,14 +913,14 @@ function OnboardingScreen({ onFinish }: { onFinish: () => void }) {
 
         <div style={{
           fontSize: 36, fontWeight: 700,
-          color: "rgba(245,241,234,0.95)",
+          color: "rgba(234,240,255,0.95)",
           fontFamily: 'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
           letterSpacing: "-0.04em", lineHeight: 1.1,
           marginBottom: 22, whiteSpace: "pre-line",
         }}>{current.title}</div>
 
         <div style={{
-          fontSize: 15, color: "rgba(245,241,234,0.5)",
+          fontSize: 15, color: "rgba(234,240,255,0.5)",
           lineHeight: 1.7, marginBottom: 52,
           maxWidth: 360, margin: "0 auto 52px",
         }}>{current.body}</div>
@@ -929,7 +929,7 @@ function OnboardingScreen({ onFinish }: { onFinish: () => void }) {
           padding: "16px 44px", borderRadius: 999,
           border: isLast ? "none" : `1px solid ${current.accent}44`,
           background: isLast ? current.accent : `${current.accent}18`,
-          color: "rgba(245,241,234,0.92)",
+          color: "rgba(234,240,255,0.92)",
           fontSize: 15, fontWeight: isLast ? 800 : 500,
           cursor: "pointer", fontFamily: "inherit",
           letterSpacing: isLast ? "0.01em" : "0.05em",
@@ -947,7 +947,7 @@ function OnboardingScreen({ onFinish }: { onFinish: () => void }) {
           <div key={i} style={{
             width: i === slide ? 22 : 6, height: 6,
             borderRadius: 999,
-            background: i === slide ? s.accent : "rgba(245,241,234,0.12)",
+            background: i === slide ? s.accent : "rgba(234,240,255,0.12)",
             transition: "all 0.35s ease",
             boxShadow: i === slide ? `0 0 8px ${s.accent}` : "none",
           }} />
@@ -968,11 +968,11 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
   return (
     <div
       style={{
-        background: "#161413",
+        background: "#0F1730",
         borderRadius: 24,
         padding: "20px 22px",
         marginBottom: 14,
-        border: "1px solid #2A2520",
+        border: "1px solid #232C4D",
         position: "relative",
         overflow: "hidden",
       }}
@@ -986,7 +986,7 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
           height: 160,
           borderRadius: "50%",
           background:
-            "radial-gradient(circle, rgba(180,120,50,0.08) 0%, transparent 70%)",
+            "radial-gradient(circle, rgba(61,217,196,0.08) 0%, transparent 70%)",
           pointerEvents: "none",
         }}
       />
@@ -1005,7 +1005,7 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
               fontWeight: 800,
               letterSpacing: "0.18em",
               textTransform: "uppercase",
-              color: "rgba(245,241,234,0.35)",
+              color: "rgba(234,240,255,0.35)",
               marginBottom: 4,
             }}
           >
@@ -1015,7 +1015,7 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
             style={{
               fontSize: 18,
               fontWeight: 500,
-              color: "rgba(245,241,234,0.88)",
+              color: "rgba(234,240,255,0.88)",
               fontFamily:
                 'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
               letterSpacing: "-0.02em",
@@ -1038,15 +1038,15 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
               width: 6,
               height: 6,
               borderRadius: "50%",
-              background: "#4CAF50",
-              boxShadow: "0 0 6px rgba(76,175,80,0.6)",
+              background: "#3DD9C4",
+              boxShadow: "0 0 6px rgba(61,217,196,0.6)",
               animation: "pulseLive 2s ease-in-out infinite",
             }}
           />
           <span
             style={{
               fontSize: 11,
-              color: "rgba(245,241,234,0.4)",
+              color: "rgba(234,240,255,0.4)",
               letterSpacing: "0.04em",
             }}
           >
@@ -1070,8 +1070,8 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
           <div
             key={label}
             style={{
-              background: "rgba(245,241,234,0.04)",
-              border: "1px solid rgba(245,241,234,0.07)",
+              background: "rgba(234,240,255,0.04)",
+              border: "1px solid rgba(234,240,255,0.07)",
               borderRadius: 14,
               padding: "10px 12px",
             }}
@@ -1080,7 +1080,7 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
               style={{
                 fontSize: 20,
                 fontWeight: 500,
-                color: "rgba(245,241,234,0.85)",
+                color: "rgba(234,240,255,0.85)",
                 letterSpacing: "-0.03em",
                 lineHeight: 1,
                 fontFamily:
@@ -1092,7 +1092,7 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
             <div
               style={{
                 fontSize: 10,
-                color: "rgba(245,241,234,0.3)",
+                color: "rgba(234,240,255,0.3)",
                 marginTop: 4,
                 letterSpacing: "0.06em",
                 textTransform: "uppercase",
@@ -1110,7 +1110,7 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
             fontWeight: 700,
             letterSpacing: "0.14em",
             textTransform: "uppercase",
-            color: "rgba(245,241,234,0.3)",
+            color: "rgba(234,240,255,0.3)",
             marginBottom: 12,
           }}
         >
@@ -1127,14 +1127,14 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
                 }}
               >
                 <span
-                  style={{ fontSize: 12, color: "rgba(245,241,234,0.55)" }}
+                  style={{ fontSize: 12, color: "rgba(234,240,255,0.55)" }}
                 >
                   {item.label}
                 </span>
                 <span
                   style={{
                     fontSize: 12,
-                    color: "rgba(245,241,234,0.3)",
+                    color: "rgba(234,240,255,0.3)",
                     fontVariantNumeric: "tabular-nums",
                   }}
                 >
@@ -1144,7 +1144,7 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
               <div
                 style={{
                   height: 3,
-                  background: "rgba(245,241,234,0.07)",
+                  background: "rgba(234,240,255,0.07)",
                   borderRadius: 999,
                   overflow: "hidden",
                 }}
@@ -1155,10 +1155,10 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
                     borderRadius: 999,
                     background:
                       i === 0
-                        ? "rgba(180,120,50,0.7)"
+                        ? "rgba(61,217,196,0.7)"
                         : i === 1
-                        ? "rgba(245,241,234,0.25)"
-                        : "rgba(245,241,234,0.13)",
+                        ? "rgba(234,240,255,0.25)"
+                        : "rgba(234,240,255,0.13)",
                     width: barsVisible ? `${item.pct}%` : "0%",
                     transition: `width 0.9s ease ${i * 0.12}s`,
                   }}
@@ -1171,7 +1171,7 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
       <div
         style={{
           height: 1,
-          background: "rgba(245,241,234,0.06)",
+          background: "rgba(234,240,255,0.06)",
           marginBottom: 16,
         }}
       />
@@ -1188,14 +1188,14 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
             width: 28,
             height: 28,
             borderRadius: 8,
-            background: "rgba(180,120,50,0.12)",
-            border: "1px solid rgba(180,120,50,0.2)",
+            background: "rgba(61,217,196,0.12)",
+            border: "1px solid rgba(61,217,196,0.2)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             flexShrink: 0,
             fontSize: 13,
-            color: "rgba(200,150,70,0.8)",
+            color: "rgba(255,178,62,0.8)",
           }}
         >
           ↑
@@ -1205,7 +1205,7 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
             style={{
               fontSize: 13,
               fontWeight: 600,
-              color: "rgba(245,241,234,0.75)",
+              color: "rgba(234,240,255,0.75)",
               marginBottom: 3,
             }}
           >
@@ -1214,7 +1214,7 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
           <div
             style={{
               fontSize: 12,
-              color: "rgba(245,241,234,0.35)",
+              color: "rgba(234,240,255,0.35)",
               lineHeight: 1.55,
             }}
           >
@@ -1229,9 +1229,9 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
           width: "100%",
           padding: "12px 16px",
           borderRadius: 14,
-          border: "1px solid rgba(245,241,234,0.1)",
-          background: "rgba(245,241,234,0.04)",
-          color: "rgba(245,241,234,0.5)",
+          border: "1px solid rgba(234,240,255,0.1)",
+          background: "rgba(234,240,255,0.04)",
+          color: "rgba(234,240,255,0.5)",
           fontSize: 13,
           cursor: "pointer",
           fontFamily: "inherit",
@@ -1243,15 +1243,15 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
         }}
         onMouseEnter={(e) => {
           (e.currentTarget as HTMLButtonElement).style.background =
-            "rgba(245,241,234,0.08)";
+            "rgba(234,240,255,0.08)";
           (e.currentTarget as HTMLButtonElement).style.color =
-            "rgba(245,241,234,0.75)";
+            "rgba(234,240,255,0.75)";
         }}
         onMouseLeave={(e) => {
           (e.currentTarget as HTMLButtonElement).style.background =
-            "rgba(245,241,234,0.04)";
+            "rgba(234,240,255,0.04)";
           (e.currentTarget as HTMLButtonElement).style.color =
-            "rgba(245,241,234,0.5)";
+            "rgba(234,240,255,0.5)";
         }}
       >
         See full community map
@@ -1272,10 +1272,10 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
   return (
     <div
       style={{
-        background: "#161413",
+        background: "#0F1730",
         borderRadius: 28,
         padding: "24px 22px",
-        border: "1px solid #2A2520",
+        border: "1px solid #232C4D",
         marginBottom: 14,
         position: "relative",
         overflow: "hidden",
@@ -1290,7 +1290,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
           height: 220,
           borderRadius: "50%",
           background:
-            "radial-gradient(circle, rgba(180,120,50,0.06) 0%, transparent 70%)",
+            "radial-gradient(circle, rgba(61,217,196,0.06) 0%, transparent 70%)",
           pointerEvents: "none",
         }}
       />
@@ -1309,7 +1309,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
               fontWeight: 800,
               letterSpacing: "0.18em",
               textTransform: "uppercase",
-              color: "rgba(245,241,234,0.3)",
+              color: "rgba(234,240,255,0.3)",
               marginBottom: 6,
             }}
           >
@@ -1319,7 +1319,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
             style={{
               fontSize: 26,
               fontWeight: 500,
-              color: "rgba(245,241,234,0.9)",
+              color: "rgba(234,240,255,0.9)",
               fontFamily:
                 'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
               letterSpacing: "-0.03em",
@@ -1331,7 +1331,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
           <div
             style={{
               fontSize: 13,
-              color: "rgba(245,241,234,0.3)",
+              color: "rgba(234,240,255,0.3)",
               fontStyle: "italic",
               marginTop: 4,
             }}
@@ -1352,12 +1352,12 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
               width: 6,
               height: 6,
               borderRadius: "50%",
-              background: "#4CAF50",
-              boxShadow: "0 0 6px rgba(76,175,80,0.6)",
+              background: "#3DD9C4",
+              boxShadow: "0 0 6px rgba(61,217,196,0.6)",
               animation: "pulseLive 2s ease-in-out infinite",
             }}
           />
-          <span style={{ fontSize: 11, color: "rgba(245,241,234,0.35)" }}>
+          <span style={{ fontSize: 11, color: "rgba(234,240,255,0.35)" }}>
             Live
           </span>
         </div>
@@ -1387,8 +1387,8 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
           <div
             key={label}
             style={{
-              background: "rgba(245,241,234,0.03)",
-              border: "1px solid rgba(245,241,234,0.07)",
+              background: "rgba(234,240,255,0.03)",
+              border: "1px solid rgba(234,240,255,0.07)",
               borderRadius: 16,
               padding: "14px 16px",
             }}
@@ -1397,7 +1397,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
               style={{
                 fontSize: 24,
                 fontWeight: 500,
-                color: "rgba(245,241,234,0.88)",
+                color: "rgba(234,240,255,0.88)",
                 fontFamily:
                   'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
                 letterSpacing: "-0.04em",
@@ -1409,7 +1409,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
             <div
               style={{
                 fontSize: 12,
-                color: "rgba(245,241,234,0.6)",
+                color: "rgba(234,240,255,0.6)",
                 marginTop: 5,
                 fontWeight: 600,
               }}
@@ -1419,7 +1419,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
             <div
               style={{
                 fontSize: 11,
-                color: "rgba(245,241,234,0.25)",
+                color: "rgba(234,240,255,0.25)",
                 marginTop: 2,
               }}
             >
@@ -1435,7 +1435,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
             fontWeight: 700,
             letterSpacing: "0.14em",
             textTransform: "uppercase",
-            color: "rgba(245,241,234,0.3)",
+            color: "rgba(234,240,255,0.3)",
             marginBottom: 14,
           }}
         >
@@ -1452,7 +1452,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
                 }}
               >
                 <span
-                  style={{ fontSize: 13, color: "rgba(245,241,234,0.6)" }}
+                  style={{ fontSize: 13, color: "rgba(234,240,255,0.6)" }}
                 >
                   {item.label}
                 </span>
@@ -1461,8 +1461,8 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
                     fontSize: 13,
                     color:
                       i === 0
-                        ? "rgba(200,150,70,0.8)"
-                        : "rgba(245,241,234,0.3)",
+                        ? "rgba(255,178,62,0.8)"
+                        : "rgba(234,240,255,0.3)",
                     fontVariantNumeric: "tabular-nums",
                     fontWeight: i === 0 ? 700 : 400,
                   }}
@@ -1473,7 +1473,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
               <div
                 style={{
                   height: 4,
-                  background: "rgba(245,241,234,0.06)",
+                  background: "rgba(234,240,255,0.06)",
                   borderRadius: 999,
                   overflow: "hidden",
                 }}
@@ -1484,12 +1484,12 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
                     borderRadius: 999,
                     background:
                       i === 0
-                        ? "linear-gradient(90deg,rgba(180,120,50,0.8),rgba(220,160,60,0.6))"
+                        ? "linear-gradient(90deg,rgba(61,217,196,0.8),rgba(220,160,60,0.6))"
                         : i === 1
-                        ? "rgba(245,241,234,0.22)"
+                        ? "rgba(234,240,255,0.22)"
                         : i === 2
-                        ? "rgba(245,241,234,0.14)"
-                        : "rgba(245,241,234,0.08)",
+                        ? "rgba(234,240,255,0.14)"
+                        : "rgba(234,240,255,0.08)",
                     width: barsVisible ? `${item.pct}%` : "0%",
                     transition: `width 1s ease ${i * 0.15}s`,
                   }}
@@ -1502,7 +1502,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
       <div
         style={{
           height: 1,
-          background: "rgba(245,241,234,0.06)",
+          background: "rgba(234,240,255,0.06)",
           marginBottom: 20,
         }}
       />
@@ -1513,7 +1513,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
             fontWeight: 700,
             letterSpacing: "0.14em",
             textTransform: "uppercase",
-            color: "rgba(245,241,234,0.3)",
+            color: "rgba(234,240,255,0.3)",
             marginBottom: 14,
           }}
         >
@@ -1530,14 +1530,14 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
                   width: 30,
                   height: 30,
                   borderRadius: 9,
-                  background: "rgba(180,120,50,0.1)",
-                  border: "1px solid rgba(180,120,50,0.18)",
+                  background: "rgba(61,217,196,0.1)",
+                  border: "1px solid rgba(61,217,196,0.18)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   flexShrink: 0,
                   fontSize: 14,
-                  color: "rgba(200,150,70,0.75)",
+                  color: "rgba(255,178,62,0.75)",
                 }}
               >
                 {ins.icon}
@@ -1547,7 +1547,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
                   style={{
                     fontSize: 13,
                     fontWeight: 600,
-                    color: "rgba(245,241,234,0.78)",
+                    color: "rgba(234,240,255,0.78)",
                     marginBottom: 3,
                   }}
                 >
@@ -1556,7 +1556,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
                 <div
                   style={{
                     fontSize: 12,
-                    color: "rgba(245,241,234,0.38)",
+                    color: "rgba(234,240,255,0.38)",
                     lineHeight: 1.6,
                   }}
                 >
@@ -1574,7 +1574,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
             fontWeight: 700,
             letterSpacing: "0.14em",
             textTransform: "uppercase",
-            color: "rgba(245,241,234,0.3)",
+            color: "rgba(234,240,255,0.3)",
             marginBottom: 12,
           }}
         >
@@ -1604,7 +1604,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
                   style={{
                     width: 90,
                     fontSize: 11,
-                    color: "rgba(245,241,234,0.4)",
+                    color: "rgba(234,240,255,0.4)",
                     textAlign: "right",
                   }}
                 >
@@ -1614,7 +1614,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
                   style={{
                     flex: 1,
                     height: 6,
-                    background: "rgba(245,241,234,0.06)",
+                    background: "rgba(234,240,255,0.06)",
                     borderRadius: 999,
                     overflow: "hidden",
                   }}
@@ -1633,7 +1633,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
                   style={{
                     width: 28,
                     fontSize: 11,
-                    color: "rgba(245,241,234,0.3)",
+                    color: "rgba(234,240,255,0.3)",
                     fontVariantNumeric: "tabular-nums",
                   }}
                 >
@@ -1647,14 +1647,14 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
       <div
         style={{
           height: 1,
-          background: "rgba(245,241,234,0.06)",
+          background: "rgba(234,240,255,0.06)",
           marginBottom: 16,
         }}
       />
       <div
         style={{
           fontSize: 11,
-          color: "rgba(245,241,234,0.2)",
+          color: "rgba(234,240,255,0.2)",
           lineHeight: 1.6,
           marginBottom: 18,
           fontStyle: "italic",
@@ -1670,9 +1670,9 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
           width: "100%",
           padding: "13px 16px",
           borderRadius: 14,
-          border: "1px solid rgba(245,241,234,0.12)",
+          border: "1px solid rgba(234,240,255,0.12)",
           background: "transparent",
-          color: "rgba(245,241,234,0.45)",
+          color: "rgba(234,240,255,0.45)",
           fontSize: 14,
           cursor: "pointer",
           fontFamily: "inherit",
@@ -2280,14 +2280,14 @@ export default function App() {
           alignItems: "center",
           justifyContent: "center",
           height: "100vh",
-          background: "#0A0807",
+          background: "#0B1020",
         }}
       >
         <style>{AVATAR_KEYFRAMES}</style>
         <div
           style={{
             fontSize: 13,
-            color: "#6F6861",
+            color: "#7B87A8",
             letterSpacing: "0.15em",
           }}
         >
@@ -2298,7 +2298,7 @@ export default function App() {
   }
 
   const S: Record<string, CSSProperties | any> = {
-    page: { minHeight: "100vh", background: "#F5F1EA", padding: "0 0 40px" },
+    page: { minHeight: "100vh", background: "#EAF0FF", padding: "0 0 40px" },
     wrap: { maxWidth: 480, margin: "0 auto", padding: "0 16px" },
     topRow: {
       display: "flex",
@@ -2312,45 +2312,45 @@ export default function App() {
       fontWeight: 800,
       letterSpacing: "0.12em",
       textTransform: "uppercase",
-      color: "#23201D",
+      color: "#1B2340",
     },
     profileBtn: {
       fontSize: 12,
-      color: "#6F6861",
+      color: "#7B87A8",
       background: "none",
       border: "none",
       cursor: "pointer",
       padding: "4px 8px",
     },
     card: {
-      background: "#FFFDF9",
-      border: "1px solid #DDD5CA",
+      background: "#EAF0FF",
+      border: "1px solid #C7D0EC",
       borderRadius: 28,
       padding: 24,
       marginBottom: 14,
-      boxShadow: "0 18px 50px rgba(35,32,29,0.06)",
+      boxShadow: "0 18px 50px rgba(27,35,64,0.06)",
     },
     progressWrap: {
       height: 3,
-      background: "#E8E2D9",
+      background: "#D4DCF5",
       borderRadius: 999,
       marginBottom: 20,
       overflow: "hidden",
     },
     stepPill: {
       display: "inline-block",
-      background: "#F7F1E6",
-      border: "1px solid #DDD5CA",
+      background: "#EAF0FF",
+      border: "1px solid #C7D0EC",
       borderRadius: 999,
       padding: "5px 12px",
       fontSize: 11,
       fontWeight: 700,
       letterSpacing: "0.1em",
       textTransform: "uppercase" as const,
-      color: "#6F6861",
+      color: "#7B87A8",
       marginBottom: 14,
     },
-    stepPillDark: { background: "#23201D", color: "#F5F1EA", border: "none" },
+    stepPillDark: { background: "#1B2340", color: "#EAF0FF", border: "none" },
     title: {
       fontSize: 28,
       lineHeight: 1.15,
@@ -2359,25 +2359,25 @@ export default function App() {
         'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
       marginBottom: 6,
       letterSpacing: "-0.03em",
-      color: "#161413",
+      color: "#0F1730",
     },
     sub: {
       fontSize: 14,
-      color: "#6F6861",
+      color: "#7B87A8",
       lineHeight: 1.5,
       marginBottom: 14,
     },
-    subDark: { color: "#A79E93" },
+    subDark: { color: "#9AA6C4" },
     label: {
       fontSize: 11,
       fontWeight: 700,
       letterSpacing: "0.1em",
       textTransform: "uppercase" as const,
-      color: "#6F6861",
+      color: "#7B87A8",
     },
     focusHint: {
       fontSize: 12,
-      color: "#6F6861",
+      color: "#7B87A8",
       marginBottom: 16,
       fontStyle: "italic",
     },
@@ -2397,26 +2397,26 @@ export default function App() {
     chip: {
       padding: "7px 14px",
       borderRadius: 999,
-      border: "1px solid #DDD5CA",
-      background: "#F7F1E6",
+      border: "1px solid #C7D0EC",
+      background: "#EAF0FF",
       fontSize: 13,
       cursor: "pointer",
       color: "#4A4540",
       fontFamily: "inherit",
     },
     chipActive: {
-      background: "#23201D",
-      color: "#F5F1EA",
-      border: "1px solid #23201D",
+      background: "#1B2340",
+      color: "#EAF0FF",
+      border: "1px solid #1B2340",
     },
     input: {
       width: "100%",
       padding: "13px 14px",
       borderRadius: 16,
-      border: "1px solid #DDD5CA",
-      background: "#F7F1E6",
+      border: "1px solid #C7D0EC",
+      background: "#EAF0FF",
       fontSize: 15,
-      color: "#161413",
+      color: "#0F1730",
       fontFamily: "inherit",
       outline: "none",
       boxSizing: "border-box" as const,
@@ -2435,14 +2435,14 @@ export default function App() {
       padding: "15px 18px",
       borderRadius: 18,
       border: "none",
-      background: "linear-gradient(135deg, #D4521A 0%, #E06B30 100%)",
+      background: "linear-gradient(135deg, #FFB23E 0%, #FF7A45 100%)",
       color: "#FFF8F5",
       fontSize: 15,
       fontWeight: 800,
       cursor: "pointer",
       fontFamily: "inherit",
       marginBottom: 10,
-      boxShadow: "0 4px 20px rgba(212,82,26,0.35)",
+      boxShadow: "0 4px 20px rgba(255,178,62,0.35)",
       transition: "all 0.2s ease",
     },
     ctaDisabled: { opacity: 0.38, cursor: "not-allowed" },
@@ -2450,9 +2450,9 @@ export default function App() {
       width: "100%",
       padding: "13px 18px",
       borderRadius: 18,
-      border: "1px solid #DDD5CA",
+      border: "1px solid #C7D0EC",
       background: "transparent",
-      color: "#6F6861",
+      color: "#7B87A8",
       fontSize: 14,
       cursor: "pointer",
       fontFamily: "inherit",
@@ -2464,7 +2464,7 @@ export default function App() {
       borderRadius: 18,
       border: "none",
       background: "linear-gradient(135deg, #D4A017 0%, #E8B830 100%)",
-      color: "#FFF8E1",
+      color: "#EAF0FF",
       fontSize: 15,
       fontWeight: 800,
       cursor: "pointer",
@@ -2472,16 +2472,16 @@ export default function App() {
       boxShadow: "0 4px 20px rgba(212,160,23,0.4)",
     },
     trackerCard: {
-      background: "#FFFDF9",
-      border: "1px solid #DDD5CA",
+      background: "#EAF0FF",
+      border: "1px solid #C7D0EC",
       borderRadius: 22,
       padding: 16,
       marginBottom: 14,
-      boxShadow: "0 14px 40px rgba(35,32,29,0.05)",
+      boxShadow: "0 14px 40px rgba(27,35,64,0.05)",
     },
     trackerCardMilestone: {
       background:
-        "linear-gradient(135deg,#FFF8E1 0%,#FFF3CC 50%,#FFFDF9 100%)",
+        "linear-gradient(135deg,#EAF0FF 0%,#FFF3CC 50%,#EAF0FF 100%)",
       border: "1.5px solid #F0C040",
       borderRadius: 22,
       padding: 16,
@@ -2498,8 +2498,8 @@ export default function App() {
       display: "inline-flex",
       alignItems: "center",
       gap: 5,
-      background: "#23201D",
-      color: "#F5F1EA",
+      background: "#1B2340",
+      color: "#EAF0FF",
       borderRadius: 999,
       padding: "4px 10px",
       fontSize: 11,
@@ -2509,8 +2509,8 @@ export default function App() {
       display: "inline-flex",
       alignItems: "center",
       gap: 5,
-      background: "#E8A000",
-      color: "#FFF8E1",
+      background: "#FFB23E",
+      color: "#EAF0FF",
       borderRadius: 999,
       padding: "4px 10px",
       fontSize: 11,
@@ -2519,7 +2519,7 @@ export default function App() {
     streakAtRiskPill: {
       display: "inline-block",
       background: "#8B1E1E",
-      color: "#FFFDF9",
+      color: "#EAF0FF",
       borderRadius: 999,
       padding: "4px 10px",
       fontSize: 11,
@@ -2533,17 +2533,17 @@ export default function App() {
     },
     trackerDay: {
       fontSize: 10,
-      color: "#6F6861",
+      color: "#7B87A8",
       display: "flex",
       flexDirection: "column" as const,
       alignItems: "center",
       gap: 5,
     },
-    trackerText: { fontSize: 12, color: "#6F6861" },
-    dot: { width: 10, height: 10, borderRadius: "50%", background: "#E8E2D9" },
-    dotActive: { background: "#23201D" },
+    trackerText: { fontSize: 12, color: "#7B87A8" },
+    dot: { width: 10, height: 10, borderRadius: "50%", background: "#D4DCF5" },
+    dotActive: { background: "#1B2340" },
     dotToday: {
-      boxShadow: "0 0 0 2px #F5F1EA, 0 0 0 3.5px #23201D",
+      boxShadow: "0 0 0 2px #EAF0FF, 0 0 0 3.5px #1B2340",
     },
     milestoneText: {
       fontSize: 13,
@@ -2574,16 +2574,16 @@ export default function App() {
       borderRadius: 999,
       border: "none",
       background: "#8B1E1E",
-      color: "#FFFDF9",
+      color: "#EAF0FF",
       fontSize: 12,
       fontWeight: 700,
       cursor: "pointer",
       whiteSpace: "nowrap" as const,
     },
     recoveryBanner: {
-      background: "#FFFDF9",
+      background: "#EAF0FF",
       border: "1px solid #C9D8CE",
-      borderLeft: "3px solid #2E7D52",
+      borderLeft: "3px solid #1E8C82",
       borderRadius: 16,
       padding: "13px 16px",
       marginBottom: 12,
@@ -2593,7 +2593,7 @@ export default function App() {
       fontWeight: 700,
       letterSpacing: "0.08em",
       textTransform: "uppercase" as const,
-      color: "#2E7D52",
+      color: "#1E8C82",
       marginBottom: 4,
     },
     recoveryText: {
@@ -2602,12 +2602,12 @@ export default function App() {
       lineHeight: 1.55,
     },
     lensCard: {
-      background: "#FFFDF9",
-      border: "1px solid #DDD5CA",
+      background: "#EAF0FF",
+      border: "1px solid #C7D0EC",
       borderRadius: 22,
       padding: "16px 18px",
       marginBottom: 14,
-      boxShadow: "0 14px 40px rgba(35,32,29,0.05)",
+      boxShadow: "0 14px 40px rgba(27,35,64,0.05)",
     },
     lensTop: {
       display: "flex",
@@ -2617,13 +2617,13 @@ export default function App() {
     },
     lensSource: {
       fontSize: 11,
-      color: "#A79E93",
+      color: "#9AA6C4",
       fontStyle: "italic",
     },
     lensTag: {
       fontSize: 17,
       fontWeight: 500,
-      color: "#23201D",
+      color: "#1B2340",
       fontFamily:
         'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
       letterSpacing: "-0.02em",
@@ -2631,7 +2631,7 @@ export default function App() {
     },
     lensBody: {
       fontSize: 13,
-      color: "#6F6861",
+      color: "#7B87A8",
       lineHeight: 1.55,
     },
     notifRow: {
@@ -2639,19 +2639,19 @@ export default function App() {
       alignItems: "center",
       justifyContent: "space-between",
       gap: 10,
-      background: "#FFFDF9",
-      border: "1px solid #DDD5CA",
+      background: "#EAF0FF",
+      border: "1px solid #C7D0EC",
       borderRadius: 16,
       padding: "12px 16px",
       marginBottom: 10,
     },
-    notifLabel: { fontSize: 13, color: "#23201D", fontWeight: 600 },
-    notifSub: { fontSize: 11, color: "#6F6861", marginTop: 2 },
+    notifLabel: { fontSize: 13, color: "#1B2340", fontWeight: 600 },
+    notifSub: { fontSize: 11, color: "#7B87A8", marginTop: 2 },
     toggleTrack: (on: boolean): CSSProperties => ({
       width: 44,
       height: 26,
       borderRadius: 999,
-      background: on ? "#23201D" : "#DDD5CA",
+      background: on ? "#1B2340" : "#C7D0EC",
       position: "relative",
       cursor: "pointer",
       transition: "background 0.2s",
@@ -2664,28 +2664,28 @@ export default function App() {
       width: 20,
       height: 20,
       borderRadius: "50%",
-      background: "#FFFDF9",
+      background: "#EAF0FF",
       transition: "left 0.2s",
       boxShadow: "0 1px 4px rgba(0,0,0,0.18)",
     }),
     checkinCard: {
-      background: "#FFFDF9",
-      border: "1px solid #DDD5CA",
+      background: "#EAF0FF",
+      border: "1px solid #C7D0EC",
       borderRadius: 28,
       padding: 24,
-      boxShadow: "0 18px 50px rgba(35,32,29,0.06)",
+      boxShadow: "0 18px 50px rgba(27,35,64,0.06)",
     },
     checkinBadge: {
       display: "inline-block",
-      background: "#F7F1E6",
-      border: "1px solid #DDD5CA",
+      background: "#EAF0FF",
+      border: "1px solid #C7D0EC",
       borderRadius: 999,
       padding: "5px 12px",
       fontSize: 11,
       fontWeight: 700,
       letterSpacing: "0.1em",
       textTransform: "uppercase" as const,
-      color: "#6F6861",
+      color: "#7B87A8",
       marginBottom: 14,
     },
     checkinMove: {
@@ -2711,7 +2711,7 @@ export default function App() {
       position: "absolute",
       inset: 0,
       background:
-        "linear-gradient(180deg,rgba(245,241,234,0.08) 0%,rgba(35,32,29,0.72) 100%)",
+        "linear-gradient(180deg,rgba(234,240,255,0.08) 0%,rgba(27,35,64,0.72) 100%)",
       padding: "32px 28px",
       display: "flex",
       flexDirection: "column" as const,
@@ -2722,7 +2722,7 @@ export default function App() {
       fontWeight: 500,
       lineHeight: 1.1,
       letterSpacing: "-0.04em",
-      color: "#F5F1EA",
+      color: "#EAF0FF",
       fontFamily:
         'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
       whiteSpace: "pre-line" as const,
@@ -2730,7 +2730,7 @@ export default function App() {
     },
     heroSub: {
       fontSize: 15,
-      color: "rgba(245,241,234,0.72)",
+      color: "rgba(234,240,255,0.72)",
       lineHeight: 1.5,
       maxWidth: 260,
     },
@@ -2740,25 +2740,25 @@ export default function App() {
       padding: "18px 20px",
       borderRadius: 20,
       border: "none",
-      background: "linear-gradient(135deg, #D4521A 0%, #E06B30 100%)",
+      background: "linear-gradient(135deg, #FFB23E 0%, #FF7A45 100%)",
       color: "#FFF8F5",
       fontSize: 16,
       fontWeight: 800,
       cursor: "pointer",
       fontFamily: "inherit",
       marginBottom: 10,
-      boxShadow: "0 6px 28px rgba(212,82,26,0.5)",
+      boxShadow: "0 6px 28px rgba(255,178,62,0.5)",
       letterSpacing: "0.01em",
     },
     heroFoot: {
       fontSize: 12,
-      color: "rgba(245,241,234,0.5)",
+      color: "rgba(234,240,255,0.5)",
       textAlign: "center" as const,
       marginTop: 8,
     },
     unfinishedCard: {
-      background: "#FFFDF9",
-      border: "1px solid #DDD5CA",
+      background: "#EAF0FF",
+      border: "1px solid #C7D0EC",
       borderRadius: 22,
       padding: 18,
       marginBottom: 12,
@@ -2773,27 +2773,27 @@ export default function App() {
     },
     commitCard: {
       background: "#0E0C0A",
-      border: "1px solid #2A2520",
+      border: "1px solid #232C4D",
     },
     moveBox: {
-      background: "rgba(245,241,234,0.05)",
+      background: "rgba(234,240,255,0.05)",
       borderRadius: 16,
       padding: "16px 18px",
       marginBottom: 24,
-      border: "1px solid rgba(245,241,234,0.07)",
+      border: "1px solid rgba(234,240,255,0.07)",
     },
     moveBig: {
       fontSize: 26,
       fontWeight: 500,
       lineHeight: 1.2,
-      color: "#F5F1EA",
+      color: "#EAF0FF",
       fontFamily:
         'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
       letterSpacing: "-0.03em",
     },
     moveWhy: {
       fontSize: 12,
-      color: "rgba(245,241,234,0.38)",
+      color: "rgba(234,240,255,0.38)",
       marginTop: 10,
       fontStyle: "italic",
       lineHeight: 1.45,
@@ -2803,8 +2803,8 @@ export default function App() {
       padding: "14px 10px",
       borderRadius: 16,
       border: "none",
-      background: "#F5F1EA",
-      color: "#161413",
+      background: "#EAF0FF",
+      color: "#0F1730",
       fontSize: 14,
       fontWeight: 800,
       cursor: "pointer",
@@ -2813,9 +2813,9 @@ export default function App() {
     statusSecondary: {
       padding: "14px 10px",
       borderRadius: 16,
-      border: "1px solid rgba(245,241,234,0.2)",
+      border: "1px solid rgba(234,240,255,0.2)",
       background: "transparent",
-      color: "rgba(245,241,234,0.6)",
+      color: "rgba(234,240,255,0.6)",
       fontSize: 14,
       cursor: "pointer",
       fontFamily: "inherit",
@@ -2837,15 +2837,15 @@ export default function App() {
     },
     feedbackText: { fontSize: 14, color: "#2B2723", lineHeight: 1.6 },
     resultBox: {
-      background: "#F7F3EC",
-      border: "1px solid #DDD5CA",
+      background: "#EAF0FF",
+      border: "1px solid #C7D0EC",
       borderRadius: 16,
       padding: "12px 14px",
       marginBottom: 14,
     },
     shareBox: {
-      background: "#F7F3EC",
-      border: "1px solid #DDD5CA",
+      background: "#EAF0FF",
+      border: "1px solid #C7D0EC",
       borderRadius: 16,
       padding: "14px 16px",
       marginBottom: 14,
@@ -2853,7 +2853,7 @@ export default function App() {
     shareTitle: { fontSize: 13, fontWeight: 700, marginBottom: 5 },
     shareText: {
       fontSize: 13,
-      color: "#6F6861",
+      color: "#7B87A8",
       lineHeight: 1.5,
       marginBottom: 11,
     },
@@ -2861,7 +2861,7 @@ export default function App() {
     historyCard: {
       padding: 14,
       borderRadius: 16,
-      border: "1px solid #E8E2D9",
+      border: "1px solid #D4DCF5",
       background: "#FDFAF6",
     },
     historyTop: {
@@ -2871,18 +2871,18 @@ export default function App() {
       marginBottom: 9,
       flexWrap: "wrap" as const,
     },
-    historyDate: { fontSize: 12, color: "#6F6861" },
+    historyDate: { fontSize: 12, color: "#7B87A8" },
     historyLine: {
       fontSize: 13,
       lineHeight: 1.5,
-      color: "#161413",
+      color: "#0F1730",
       marginBottom: 5,
     },
-    historyLineLabel: { fontWeight: 700, color: "#6F6861" },
+    historyLineLabel: { fontWeight: 700, color: "#7B87A8" },
     emptyState: {
       textAlign: "center" as const,
       padding: "32px 16px",
-      color: "#6F6861",
+      color: "#7B87A8",
       fontSize: 14,
     },
     statusBadge: (s: EntryStatus): CSSProperties => ({
@@ -2903,10 +2903,10 @@ export default function App() {
     insightTitle: {
       fontSize: 13,
       fontWeight: 700,
-      color: "#23201D",
+      color: "#1B2340",
       marginBottom: 3,
     },
-    insightBody: { fontSize: 13, color: "#6F6861", lineHeight: 1.5 },
+    insightBody: { fontSize: 13, color: "#7B87A8", lineHeight: 1.5 },
     summaryGrid: {
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
@@ -2914,8 +2914,8 @@ export default function App() {
       marginBottom: 16,
     },
     summaryBox: {
-      background: "#F7F3EC",
-      border: "1px solid #E8E2D9",
+      background: "#EAF0FF",
+      border: "1px solid #D4DCF5",
       borderRadius: 16,
       padding: 12,
     },
@@ -2934,11 +2934,11 @@ export default function App() {
       fontSize: 24,
       fontWeight: 800,
       letterSpacing: "-0.04em",
-      color: "#7A5200",
+      color: "#8A5A00",
     },
     summaryLabel: {
       fontSize: 11,
-      color: "#6F6861",
+      color: "#7B87A8",
       textTransform: "uppercase" as const,
       letterSpacing: "0.08em",
       marginTop: 3,
@@ -2963,32 +2963,32 @@ export default function App() {
     modalCard: {
       width: "100%",
       maxWidth: 420,
-      background: "#FFFDF9",
+      background: "#EAF0FF",
       borderRadius: 28,
       overflow: "hidden",
-      border: "1px solid #DDD5CA",
+      border: "1px solid #C7D0EC",
       boxShadow: "0 25px 80px rgba(18,17,15,0.28)",
     },
     modalCardGold: {
       width: "100%",
       maxWidth: 420,
-      background: "linear-gradient(160deg,#FFF8E1 0%,#FFF3CC 100%)",
+      background: "linear-gradient(160deg,#EAF0FF 0%,#FFF3CC 100%)",
       borderRadius: 28,
       overflow: "hidden",
-      border: "2px solid #E8A000",
+      border: "2px solid #FFB23E",
       boxShadow: "0 25px 80px rgba(232,160,0,0.3)",
     },
     modalImage: {
       height: 190,
       backgroundImage:
-        "linear-gradient(rgba(245,241,234,0.12),rgba(245,241,234,0.55)),url('/garden.png')",
+        "linear-gradient(rgba(234,240,255,0.12),rgba(234,240,255,0.55)),url('/garden.png')",
       backgroundSize: "cover",
       backgroundPosition: "center",
     },
     modalImageGold: {
       height: 190,
       background:
-        "linear-gradient(135deg,#E8A000 0%,#F5C842 50%,#E8A000 100%)",
+        "linear-gradient(135deg,#FFB23E 0%,#F5C842 50%,#FFB23E 100%)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -3012,11 +3012,11 @@ export default function App() {
       fontFamily:
         'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
       marginBottom: 8,
-      color: "#7A5200",
+      color: "#8A5A00",
     },
     modalText: {
       fontSize: 14,
-      color: "#6F6861",
+      color: "#7B87A8",
       lineHeight: 1.5,
       marginBottom: 16,
     },
@@ -3028,18 +3028,18 @@ export default function App() {
       fontStyle: "italic",
     },
     modalDate: {
-      background: "#F7F3EC",
-      border: "1px solid #DDD5CA",
+      background: "#EAF0FF",
+      border: "1px solid #C7D0EC",
       borderRadius: 10,
       padding: "8px 12px",
       fontSize: 12,
-      color: "#6F6861",
+      color: "#7B87A8",
       marginBottom: 14,
     },
     footer: {
       textAlign: "center" as const,
       fontSize: 12,
-      color: "#A79E93",
+      color: "#9AA6C4",
       marginTop: 32,
       paddingBottom: 16,
     },
@@ -3102,7 +3102,7 @@ export default function App() {
             fontWeight: 800,
             letterSpacing: "0.22em",
             textTransform: "uppercase",
-            color: "rgba(245,241,234,0.22)",
+            color: "rgba(234,240,255,0.22)",
             marginBottom: 52,
             animation: "arrivalFadeUp 1s ease forwards",
             position: "relative",
@@ -3128,7 +3128,7 @@ export default function App() {
         <div
           style={{
             fontSize: 12,
-            color: "rgba(245,241,234,0.4)",
+            color: "rgba(234,240,255,0.4)",
             letterSpacing: "0.16em",
             textTransform: "uppercase",
             marginBottom: 18,
@@ -3146,7 +3146,7 @@ export default function App() {
           style={{
             fontSize: 26,
             fontWeight: 500,
-            color: "rgba(245,241,234,0.88)",
+            color: "rgba(234,240,255,0.88)",
             fontFamily:
               'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
             letterSpacing: "-0.03em",
@@ -3164,7 +3164,7 @@ export default function App() {
         <div
           style={{
             fontSize: 15,
-            color: "rgba(245,241,234,0.4)",
+            color: "rgba(234,240,255,0.4)",
             textAlign: "center",
             marginBottom: 8,
             position: "relative",
@@ -3177,7 +3177,7 @@ export default function App() {
         <div
           style={{
             fontSize: 13,
-            color: "rgba(245,241,234,0.28)",
+            color: "rgba(234,240,255,0.28)",
             textAlign: "center",
             marginBottom: 56,
             fontStyle: "italic",
@@ -3231,7 +3231,7 @@ export default function App() {
       1: "#C0392B",
       2: "#D4630A",
       3: "#B8940A",
-      4: "#2E7D52",
+      4: "#1E8C82",
       5: "#1A5276",
     };
     const avatarAccent =
@@ -3241,7 +3241,7 @@ export default function App() {
       <div
         style={{
           minHeight: "100vh",
-          background: "#0A0807",
+          background: "#0B1020",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -3291,10 +3291,10 @@ export default function App() {
         >
           {/* Avatar */}
           <div style={{ marginBottom: 28 }}>
-            <CalmAvatar
-              phase="reflect"
-              size={90}
-              accentHex={avatarAccent}
+            <BreathOrb
+              phase="idle"
+              size={140}
+              hue="#3DD9C4"
             />
           </div>
 
@@ -3304,7 +3304,7 @@ export default function App() {
               fontWeight: 800,
               letterSpacing: "0.2em",
               textTransform: "uppercase",
-              color: "rgba(245,241,234,0.25)",
+              color: "rgba(234,240,255,0.25)",
               marginBottom: 20,
             }}
           >
@@ -3314,7 +3314,7 @@ export default function App() {
             style={{
               fontSize: 26,
               fontWeight: 500,
-              color: "rgba(245,241,234,0.9)",
+              color: "rgba(234,240,255,0.9)",
               fontFamily:
                 'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
               letterSpacing: "-0.03em",
@@ -3328,7 +3328,7 @@ export default function App() {
           <div
             style={{
               fontSize: 13,
-              color: "rgba(245,241,234,0.28)",
+              color: "rgba(234,240,255,0.28)",
               textAlign: "center",
               marginBottom: 36,
               letterSpacing: "0.04em",
@@ -3352,10 +3352,10 @@ export default function App() {
                     borderRadius: 16,
                     border: selected
                       ? `1px solid ${info.color}66`
-                      : "1px solid rgba(245,241,234,0.07)",
+                      : "1px solid rgba(234,240,255,0.07)",
                     background: selected
                       ? `${info.color}20`
-                      : "rgba(245,241,234,0.02)",
+                      : "rgba(234,240,255,0.02)",
                     cursor: "pointer",
                     fontFamily: "inherit",
                     transition: "all 0.22s ease",
@@ -3367,7 +3367,7 @@ export default function App() {
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <div style={{
                       width: 10, height: 10, borderRadius: "50%",
-                      background: selected ? info.color : "rgba(245,241,234,0.15)",
+                      background: selected ? info.color : "rgba(234,240,255,0.15)",
                       boxShadow: selected ? `0 0 10px ${info.color}` : "none",
                       transition: "all 0.22s ease",
                       flexShrink: 0,
@@ -3375,7 +3375,7 @@ export default function App() {
                     <div>
                       <div style={{
                         fontSize: 14,
-                        color: selected ? "rgba(245,241,234,0.95)" : "rgba(245,241,234,0.45)",
+                        color: selected ? "rgba(234,240,255,0.95)" : "rgba(234,240,255,0.45)",
                         fontWeight: selected ? 600 : 400,
                         transition: "all 0.22s ease",
                         lineHeight: 1.2,
@@ -3393,7 +3393,7 @@ export default function App() {
                   <div style={{
                     fontSize: 11,
                     fontWeight: 800,
-                    color: selected ? info.color : "rgba(245,241,234,0.15)",
+                    color: selected ? info.color : "rgba(234,240,255,0.15)",
                     transition: "color 0.22s ease",
                     letterSpacing: "0.05em",
                   }}>{score}/5</div>
@@ -3411,10 +3411,10 @@ export default function App() {
               border: "none",
               background:
                 presenceScore > 0
-                  ? "rgba(245,241,234,0.92)"
-                  : "rgba(245,241,234,0.08)",
+                  ? "rgba(234,240,255,0.92)"
+                  : "rgba(234,240,255,0.08)",
               color:
-                presenceScore > 0 ? "#161413" : "rgba(245,241,234,0.25)",
+                presenceScore > 0 ? "#0F1730" : "rgba(234,240,255,0.25)",
               fontSize: 15,
               fontWeight: 800,
               cursor: presenceScore > 0 ? "pointer" : "default",
@@ -3422,7 +3422,7 @@ export default function App() {
               transition: "all 0.3s ease",
               boxShadow:
                 presenceScore > 0
-                  ? "0 8px 24px rgba(245,241,234,0.12)"
+                  ? "0 8px 24px rgba(234,240,255,0.12)"
                   : "none",
             }}
           >
@@ -3439,7 +3439,7 @@ export default function App() {
       <div
         style={{
           minHeight: "100vh",
-          background: "#0A0807",
+          background: "#0B1020",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -3482,7 +3482,7 @@ export default function App() {
               height: 520,
               borderRadius: "50%",
               background:
-                "radial-gradient(circle, rgba(212,82,26,0.12) 0%, transparent 70%)",
+                "radial-gradient(circle, rgba(255,178,62,0.12) 0%, transparent 70%)",
               animation: "reflectBg 12s ease-in-out infinite",
             }}
           />
@@ -3503,7 +3503,7 @@ export default function App() {
               fontWeight: 800,
               letterSpacing: "0.22em",
               textTransform: "uppercase",
-              color: "rgba(245,241,234,0.18)",
+              color: "rgba(234,240,255,0.18)",
               marginBottom: 44,
             }}
           >
@@ -3519,7 +3519,7 @@ export default function App() {
               animation: "fadeUpSlow 0.6s ease forwards",
             }}
           >
-            <CalmAvatar phase="reflect" size={100} accentHex="#D4521A" />
+            <BreathOrb phase="idle" size={130} hue="#6C7BFF" />
           </div>
 
           {/* What they typed */}
@@ -3529,7 +3529,7 @@ export default function App() {
               fontWeight: 700,
               letterSpacing: "0.14em",
               textTransform: "uppercase",
-              color: "rgba(245,241,234,0.2)",
+              color: "rgba(234,240,255,0.2)",
               marginBottom: 14,
             }}
           >
@@ -3538,7 +3538,7 @@ export default function App() {
           <div
             style={{
               fontSize: 17,
-              color: "rgba(245,241,234,0.5)",
+              color: "rgba(234,240,255,0.5)",
               fontFamily:
                 'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
               fontStyle: "italic",
@@ -3576,7 +3576,7 @@ export default function App() {
                       width: 7,
                       height: 7,
                       borderRadius: "50%",
-                      background: "rgba(180,120,50,0.6)",
+                      background: "rgba(61,217,196,0.6)",
                       animation: `dotPulse 1.4s ease-in-out ${i * 0.2}s infinite`,
                     }}
                   />
@@ -3588,7 +3588,7 @@ export default function App() {
                   fontSize: 22,
                   fontWeight: 500,
                   lineHeight: 1.38,
-                  color: "rgba(245,241,234,0.9)",
+                  color: "rgba(234,240,255,0.9)",
                   fontFamily:
                     'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
                   letterSpacing: "-0.02em",
@@ -3606,28 +3606,28 @@ export default function App() {
               style={{
                 padding: "15px 42px",
                 borderRadius: 999,
-                border: "1px solid rgba(180,120,50,0.28)",
-                background: "rgba(180,120,50,0.1)",
-                color: "rgba(245,241,234,0.8)",
+                border: "1px solid rgba(61,217,196,0.28)",
+                background: "rgba(61,217,196,0.1)",
+                color: "rgba(234,240,255,0.8)",
                 fontSize: 14,
                 cursor: "pointer",
                 fontFamily: "inherit",
                 letterSpacing: "0.05em",
                 transition: "all 0.3s ease",
                 animation: "fadeUpSlow 0.6s ease 0.3s both",
-                boxShadow: "0 0 20px rgba(180,120,50,0.08)",
+                boxShadow: "0 0 20px rgba(61,217,196,0.08)",
               }}
               onMouseEnter={(e) => {
                 (e.currentTarget as HTMLButtonElement).style.background =
-                  "rgba(180,120,50,0.18)";
+                  "rgba(61,217,196,0.18)";
                 (e.currentTarget as HTMLButtonElement).style.color =
-                  "rgba(245,241,234,0.95)";
+                  "rgba(234,240,255,0.95)";
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLButtonElement).style.background =
-                  "rgba(180,120,50,0.1)";
+                  "rgba(61,217,196,0.1)";
                 (e.currentTarget as HTMLButtonElement).style.color =
-                  "rgba(245,241,234,0.8)";
+                  "rgba(234,240,255,0.8)";
               }}
             >
               Keep going →
@@ -3727,7 +3727,7 @@ export default function App() {
                 boxShadow: `0 0 6px ${PRESENCE_LABELS[presenceScore]?.color}`,
               }}
             />
-            <span style={{ fontSize: 12, color: "#6F6861" }}>
+            <span style={{ fontSize: 12, color: "#7B87A8" }}>
               Today: {PRESENCE_LABELS[presenceScore]?.en} — {PRESENCE_LABELS[presenceScore]?.sub}
             </span>
           </div>
@@ -3931,7 +3931,7 @@ export default function App() {
                       fontFamily:
                         'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
                       letterSpacing: "-0.04em",
-                      color: "#161413",
+                      color: "#0F1730",
                       lineHeight: 1.1,
                       marginTop: 2,
                     }}
@@ -3943,7 +3943,7 @@ export default function App() {
                   <div
                     style={{
                       fontSize: 11,
-                      color: sealReady ? "#7A5200" : "#6F6861",
+                      color: sealReady ? "#8A5A00" : "#7B87A8",
                       textAlign: "right",
                       fontWeight: sealReady ? 700 : 400,
                     }}
@@ -3959,7 +3959,7 @@ export default function App() {
               <div
                 style={{
                   fontSize: 13,
-                  color: "#6F6861",
+                  color: "#7B87A8",
                   fontStyle: "italic",
                   marginBottom: 12,
                 }}
@@ -3969,7 +3969,7 @@ export default function App() {
               <div
                 style={{
                   height: 6,
-                  background: "#E8E2D9",
+                  background: "#D4DCF5",
                   borderRadius: 999,
                   overflow: "hidden",
                 }}
@@ -3979,7 +3979,7 @@ export default function App() {
                     height: "100%",
                     width: `${Math.round((journeyDay / 90) * 100)}%`,
                     background:
-                      "linear-gradient(90deg, #D4521A 0%, #E06B30 100%)",
+                      "linear-gradient(90deg, #FFB23E 0%, #FF7A45 100%)",
                     borderRadius: 999,
                     transition: "width 0.4s ease",
                   }}
@@ -4032,7 +4032,7 @@ export default function App() {
                     marginBottom: 4,
                   }}
                 >
-                  <CalmAvatar phase="still" size={56} accentHex="#D4A850" />
+                  <BreathOrb phase="idle" size={64} hue="#3DD9C4" dim />
                 </div>
                 <div>
                   <div style={S.heroTitle}>{getTimeBasedHero().title}</div>
@@ -4069,7 +4069,7 @@ export default function App() {
                 <div
                   style={{
                     fontSize: 13,
-                    color: "#6F6861",
+                    color: "#7B87A8",
                     margin: "6px 0 10px",
                     lineHeight: 1.5,
                   }}
@@ -4229,13 +4229,13 @@ export default function App() {
                 <div
                   style={{
                     fontSize: 12,
-                    color: "#A79E93",
+                    color: "#9AA6C4",
                     fontStyle: "italic",
                     marginBottom: 14,
                     padding: "8px 12px",
-                    background: "#F7F3EC",
+                    background: "#EAF0FF",
                     borderRadius: 10,
-                    borderLeft: "2px solid #DDD5CA",
+                    borderLeft: "2px solid #C7D0EC",
                   }}
                 >
                   You said: "{mind}"
@@ -4310,7 +4310,7 @@ export default function App() {
                 </div>
               )}
               {needsRecovery && (
-                <div style={{ ...S.boldHint, color: "#2E7D52" }}>
+                <div style={{ ...S.boldHint, color: "#1E8C82" }}>
                   You've been running low. Make it half the size you think it
                   should be.
                 </div>
@@ -4373,7 +4373,7 @@ export default function App() {
             <div
               style={{
                 ...S.title,
-                color: "rgba(245,241,234,0.88)",
+                color: "rgba(234,240,255,0.88)",
               }}
             >
               Do it. Right now.
@@ -4385,7 +4385,7 @@ export default function App() {
               <div
                 style={{
                   ...S.label,
-                  color: "#A79E93",
+                  color: "#9AA6C4",
                   marginBottom: 8,
                 }}
               >
@@ -4413,10 +4413,10 @@ export default function App() {
                     position: "relative",
                   }}
                 >
-                  <CalmAvatar
+                  <BreathOrb
                     phase={breathePhase}
-                    size={110}
-                    accentHex="#D4521A"
+                    size={150}
+                    hue="#FFB23E"
                   />
                   {/* Countdown number overlaid on avatar */}
                   <div
@@ -4432,11 +4432,11 @@ export default function App() {
                       style={{
                         fontSize: 32,
                         fontWeight: 800,
-                        color: "rgba(245,241,234,0.92)",
+                        color: "rgba(234,240,255,0.92)",
                         letterSpacing: "-0.05em",
                         fontFamily:
                           'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
-                        textShadow: "0 0 20px rgba(180,120,50,0.5)",
+                        textShadow: "0 0 20px rgba(61,217,196,0.5)",
                       }}
                     >
                       {countdown}
@@ -4446,7 +4446,7 @@ export default function App() {
                 <div
                   style={{
                     fontSize: 11,
-                    color: "rgba(245,241,234,0.35)",
+                    color: "rgba(234,240,255,0.35)",
                     textAlign: "center",
                     letterSpacing: "0.14em",
                     textTransform: "uppercase",
@@ -4486,7 +4486,7 @@ export default function App() {
             {aiFeedbackLoading ? (
               <div style={S.aiFeedbackBox}>
                 <div style={S.aiBadge}>Reset is reading the pattern</div>
-                <div style={{ ...S.feedbackText, color: "#A79E93", fontStyle: "italic" }}>
+                <div style={{ ...S.feedbackText, color: "#9AA6C4", fontStyle: "italic" }}>
                   Separating the story from the next decision...
                 </div>
               </div>
@@ -4496,9 +4496,9 @@ export default function App() {
                   <div style={S.aiBadge}>Your coach sees</div>
                   <div style={S.feedbackText}>{aiFeedback.coachInsight}</div>
                 </div>
-                <div style={{ ...S.aiFeedbackBox, background: "#161413", borderColor: "#2A2520" }}>
+                <div style={{ ...S.aiFeedbackBox, background: "#0F1730", borderColor: "#232C4D" }}>
                   <div style={{ ...S.aiBadge, color: "rgba(214,174,104,0.9)" }}>Your chief decides</div>
-                  <div style={{ ...S.feedbackText, color: "rgba(245,241,234,0.9)", fontSize: 18 }}>
+                  <div style={{ ...S.feedbackText, color: "rgba(234,240,255,0.9)", fontSize: 18 }}>
                     {aiFeedback.chiefDecision}
                   </div>
                 </div>
@@ -4517,8 +4517,8 @@ export default function App() {
                   gap: 10,
                   padding: "10px 14px",
                   marginBottom: 14,
-                  background: "rgba(35,32,29,0.04)",
-                  border: "1px solid rgba(35,32,29,0.08)",
+                  background: "rgba(27,35,64,0.04)",
+                  border: "1px solid rgba(27,35,64,0.08)",
                   borderRadius: 12,
                 }}
               >
@@ -4527,15 +4527,15 @@ export default function App() {
                     width: 6,
                     height: 6,
                     borderRadius: "50%",
-                    background: "#23201D",
+                    background: "#1B2340",
                     flexShrink: 0,
-                    boxShadow: "0 0 0 3px rgba(35,32,29,0.1)",
+                    boxShadow: "0 0 0 3px rgba(27,35,64,0.1)",
                   }}
                 />
                 <div
                   style={{
                     fontSize: 12,
-                    color: "#6F6861",
+                    color: "#7B87A8",
                     fontStyle: "italic",
                     lineHeight: 1.4,
                   }}
@@ -4555,7 +4555,7 @@ export default function App() {
                 <div
                   style={{
                     background: "#0D0B09",
-                    border: "1px solid #2A2520",
+                    border: "1px solid #232C4D",
                     borderRadius: 18,
                     padding: "14px 18px",
                     marginBottom: 14,
@@ -4571,7 +4571,7 @@ export default function App() {
                         fontWeight: 700,
                         letterSpacing: "0.12em",
                         textTransform: "uppercase" as const,
-                        color: "rgba(245,241,234,0.3)",
+                        color: "rgba(234,240,255,0.3)",
                         marginBottom: 4,
                       }}
                     >
@@ -4580,7 +4580,7 @@ export default function App() {
                     <div
                       style={{
                         fontSize: 13,
-                        color: "rgba(245,241,234,0.6)",
+                        color: "rgba(234,240,255,0.6)",
                       }}
                     >
                       Did you actually do it?
@@ -4590,7 +4590,7 @@ export default function App() {
                     style={{
                       fontSize: 22,
                       fontWeight: 500,
-                      color: "rgba(245,241,234,0.85)",
+                      color: "rgba(234,240,255,0.85)",
                       fontFamily:
                         'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
                       letterSpacing: "-0.03em",
@@ -4608,11 +4608,11 @@ export default function App() {
               <div
                 style={{
                   ...S.resultBox,
-                  background: streak >= 7 ? "#FFF8E1" : "#F7F3EC",
+                  background: streak >= 7 ? "#EAF0FF" : "#EAF0FF",
                   border:
                     streak >= 7
                       ? "1px solid #F0C040"
-                      : "1px solid #DDD5CA",
+                      : "1px solid #C7D0EC",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
@@ -4624,7 +4624,7 @@ export default function App() {
                     style={{
                       ...S.unfinishedMove,
                       marginBottom: 0,
-                      color: streak >= 7 ? "#7A5200" : "#161413",
+                      color: streak >= 7 ? "#8A5A00" : "#0F1730",
                     }}
                   >
                     {streak} day{streak !== 1 ? "s" : ""}
@@ -4663,7 +4663,7 @@ export default function App() {
                   <div style={S.label}>Rep {index + 1}</div>
                   <div style={{ ...S.unfinishedMove, margin: "5px 0 6px" }}>{item.title}</div>
                   <div style={{ ...S.trackerText, lineHeight: 1.5, marginBottom: 10 }}>{item.trigger}</div>
-                  <div style={{ fontSize: 14, color: "#23201D", fontWeight: 650, lineHeight: 1.5 }}>
+                  <div style={{ fontSize: 14, color: "#1B2340", fontWeight: 650, lineHeight: 1.5 }}>
                     {item.rep}
                   </div>
                 </div>
@@ -4868,7 +4868,7 @@ export default function App() {
                         style={{
                           ...S.historyLine,
                           fontStyle: "italic",
-                          color: "#6F6861",
+                          color: "#7B87A8",
                           marginTop: 6,
                         }}
                       >
@@ -4943,8 +4943,8 @@ export default function App() {
                   <button
                     style={{
                       ...S.statusPrimary,
-                      background: "#23201D",
-                      color: "#F5F1EA",
+                      background: "#1B2340",
+                      color: "#EAF0FF",
                     }}
                     onClick={() => {
                       setFollowUpAnswer("confirmed");
@@ -4956,8 +4956,8 @@ export default function App() {
                   <button
                     style={{
                       ...S.statusSecondary,
-                      border: "1px solid #DDD5CA",
-                      color: "#6F6861",
+                      border: "1px solid #C7D0EC",
+                      color: "#7B87A8",
                     }}
                     onClick={() => {
                       setFollowUpAnswer("slipped");
@@ -4979,7 +4979,7 @@ export default function App() {
             onClick={() => setShowPatternFlash(false)}
           >
             <div
-              style={{ ...S.modalCard, background: "#0E0C0A", border: "1px solid #2A2520" }}
+              style={{ ...S.modalCard, background: "#0E0C0A", border: "1px solid #232C4D" }}
               onClick={(e) => e.stopPropagation()}
             >
               <div style={S.modalBody}>
@@ -4989,7 +4989,7 @@ export default function App() {
                     fontWeight: 800,
                     letterSpacing: "0.18em",
                     textTransform: "uppercase",
-                    color: "rgba(200,150,70,0.8)",
+                    color: "rgba(255,178,62,0.8)",
                     marginBottom: 10,
                   }}
                 >
@@ -5001,7 +5001,7 @@ export default function App() {
                     fontWeight: 500,
                     fontFamily:
                       'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
-                    color: "rgba(245,241,234,0.9)",
+                    color: "rgba(234,240,255,0.9)",
                     lineHeight: 1.4,
                     letterSpacing: "-0.02em",
                     marginBottom: 18,
@@ -5012,8 +5012,8 @@ export default function App() {
                 <button
                   style={{
                     ...S.ctaMuted,
-                    border: "1px solid rgba(245,241,234,0.2)",
-                    color: "rgba(245,241,234,0.6)",
+                    border: "1px solid rgba(234,240,255,0.2)",
+                    color: "rgba(234,240,255,0.6)",
                     marginBottom: 0,
                   }}
                   onClick={() => setShowPatternFlash(false)}
