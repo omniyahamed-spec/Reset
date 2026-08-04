@@ -2703,7 +2703,8 @@ export default function App() {
       borderRadius: 28,
       overflow: "hidden",
       marginBottom: 14,
-      backgroundImage: "url('/garden.png')",
+      background:
+        "radial-gradient(ellipse at 50% 20%, rgba(61,217,196,0.22) 0%, transparent 55%), radial-gradient(ellipse at 80% 90%, rgba(108,123,255,0.28) 0%, transparent 55%), linear-gradient(160deg, #141B36 0%, #0B1020 100%)",
       backgroundSize: "cover",
       backgroundPosition: "center",
     },
@@ -2980,8 +2981,8 @@ export default function App() {
     },
     modalImage: {
       height: 190,
-      backgroundImage:
-        "linear-gradient(rgba(234,240,255,0.12),rgba(234,240,255,0.55)),url('/garden.png')",
+      background:
+        "radial-gradient(ellipse at 40% 30%, rgba(61,217,196,0.35) 0%, transparent 60%), linear-gradient(160deg, #1B2340 0%, #0B1020 100%)",
       backgroundSize: "cover",
       backgroundPosition: "center",
     },
@@ -3920,13 +3921,14 @@ export default function App() {
 
         {screen === "start" && journey && (
           <>
+            {/* ── ONE progress line ── */}
             <div style={S.trackerCard}>
               <div style={S.trackerTop}>
                 <div>
                   <div style={S.label}>Cycle {journey.cycle}</div>
                   <div
                     style={{
-                      fontSize: 30,
+                      fontSize: 26,
                       fontWeight: 500,
                       fontFamily:
                         'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
@@ -3946,25 +3948,12 @@ export default function App() {
                       color: sealReady ? "#8A5A00" : "#7B87A8",
                       textAlign: "right",
                       fontWeight: sealReady ? 700 : 400,
+                      alignSelf: "center",
                     }}
                   >
-                    {sealReady
-                      ? `Seal ${nextSeal} earned ★`
-                      : `Next seal: day ${nextSeal}`}
-                    <br />
-                    {doneInJourney}/{sealTarget(nextSeal)} moves
+                    {sealReady ? `Seal ${nextSeal} ★` : `Next seal · day ${nextSeal}`}
                   </div>
                 )}
-              </div>
-              <div
-                style={{
-                  fontSize: 13,
-                  color: "#7B87A8",
-                  fontStyle: "italic",
-                  marginBottom: 12,
-                }}
-              >
-                Vision: {journey.vision}
               </div>
               <div
                 style={{
@@ -3972,6 +3961,7 @@ export default function App() {
                   background: "#D4DCF5",
                   borderRadius: 999,
                   overflow: "hidden",
+                  marginTop: 12,
                 }}
               >
                 <div
@@ -4003,11 +3993,60 @@ export default function App() {
               )}
             </div>
 
+            {/* ── The nudge + the ONE action ── */}
+            <div style={S.heroCard}>
+              <div style={S.heroOverlay}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    marginBottom: 4,
+                  }}
+                >
+                  <BreathOrb phase="idle" size={72} hue="#3DD9C4" dim />
+                </div>
+                <div>
+                  <div style={S.heroTitle}>{getTimeBasedHero().title}</div>
+                  <div style={S.heroSub}>{getTimeBasedHero().sub}</div>
+                </div>
+                <div style={S.heroBottom}>
+                  <button
+                    style={S.startButton}
+                    onClick={() => setScreen("mind")}
+                  >
+                    {hasResetToday ? "Reset again" : "Start Reset"}
+                  </button>
+                  {lastNotYet && !hasResetToday ? (
+                    <button
+                      style={{
+                        ...S.heroFoot,
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        padding: 0,
+                        textDecoration: "underline",
+                      }}
+                      onClick={resumeLastNotYet}
+                    >
+                      Or resume: {lastNotYet.move.slice(0, 38)}
+                      {lastNotYet.move.length > 38 ? "…" : ""}
+                    </button>
+                  ) : (
+                    <div style={S.heroFoot}>
+                      This is saved to your reset record.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* ── Week reflection only when actually due ── */}
             {reflectDue && (
               <div style={S.unfinishedCard}>
                 <div style={S.label}>Week {journeyWeek} reflection</div>
                 <div style={{ ...S.trackerText, margin: "6px 0 12px" }}>
-                  Two minutes. Look back at the week, then aim the next one.
+                  Two minutes. Look back, then aim the next week.
                 </div>
                 <button
                   style={{ ...S.cta, marginBottom: 0 }}
@@ -4022,141 +4061,42 @@ export default function App() {
               </div>
             )}
 
-            <div style={S.heroCard}>
-              <div style={S.heroOverlay}>
-                {/* Small ambient avatar top-right of hero */}
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "flex-end",
-                    marginBottom: 4,
-                  }}
-                >
-                  <BreathOrb phase="idle" size={64} hue="#3DD9C4" dim />
-                </div>
-                <div>
-                  <div style={S.heroTitle}>{getTimeBasedHero().title}</div>
-                  <div style={S.heroSub}>{getTimeBasedHero().sub}</div>
-                </div>
-                <div style={S.heroBottom}>
-                  <button
-                    style={S.startButton}
-                    onClick={() => setScreen("mind")}
-                  >
-                    {hasResetToday ? "Reset again" : "Start Reset"}
-                  </button>
-                  <div style={S.heroFoot}>
-                    This is saved to your reset record.
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* ── DAILY LENS — one principle a day ── */}
-            <div style={S.lensCard}>
-              <div style={S.lensTop}>
-                <div style={S.label}>Today's lens</div>
-                <div style={S.lensSource}>{lens.source}</div>
-              </div>
-              <div style={S.lensTag}>{lens.tag}</div>
-              <div style={S.lensBody}>{lens.body}</div>
-            </div>
-
-            {/* ── WHY CAPTURE — shown once, until saved ── */}
-            {!why && (
-              <div style={S.trackerCard}>
-                <div style={S.label}>Your why</div>
-                <div
-                  style={{
-                    fontSize: 13,
-                    color: "#7B87A8",
-                    margin: "6px 0 10px",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  One line: what is all of this in service of? It shows up
-                  every time you commit.
-                </div>
-                <input
-                  style={S.input}
-                  placeholder="e.g. A life I run, not one that runs me"
-                  value={whyDraft}
-                  maxLength={80}
-                  onChange={(e) => setWhyDraft(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && saveWhy()}
-                />
-                <button
-                  style={{
-                    ...S.ctaMuted,
-                    marginBottom: 0,
-                    ...(whyDraft.trim() ? {} : S.ctaDisabled),
-                  }}
-                  disabled={!whyDraft.trim()}
-                  onClick={saveWhy}
-                >
-                  Save my why
-                </button>
-              </div>
-            )}
-
-            <div style={{ ...S.trackerCard, border: "1px solid #CDBB9D" }}>
-              <div style={S.label}>Current mentality training</div>
-              <div style={{ ...S.unfinishedMove, marginTop: 7 }}>
-                {MENTALITY_TRAINING[totalResets % MENTALITY_TRAINING.length].title}
-              </div>
-              <div style={{ ...S.trackerText, margin: "6px 0 12px", lineHeight: 1.55 }}>
-                {MENTALITY_TRAINING[totalResets % MENTALITY_TRAINING.length].trigger}
-              </div>
-              <button style={{ ...S.ctaMuted, marginBottom: 0 }} onClick={() => setScreen("training")}>
-                Complete today's rep
+            {/* ── Discreet links, not modules ── */}
+            <div
+              style={{
+                display: "flex",
+                gap: 18,
+                justifyContent: "center",
+                marginTop: 6,
+              }}
+            >
+              <button
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#7B87A8",
+                  fontSize: 13,
+                  cursor: "pointer",
+                  letterSpacing: "0.02em",
+                }}
+                onClick={() => setScreen("insights")}
+              >
+                Insights
+              </button>
+              <button
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#7B87A8",
+                  fontSize: 13,
+                  cursor: "pointer",
+                  letterSpacing: "0.02em",
+                }}
+                onClick={() => setScreen("history")}
+              >
+                History
               </button>
             </div>
-
-            {lastNotYet && !hasResetToday && (
-              <div style={S.unfinishedCard}>
-                <div style={S.label}>Unfinished business</div>
-                <div style={S.unfinishedMove}>{lastNotYet.move}</div>
-                <div style={S.trackerText}>
-                  You said "not yet." Respectfully, the task is still staring.
-                </div>
-                <button
-                  style={{ ...S.cta, marginTop: 12 }}
-                  onClick={resumeLastNotYet}
-                >
-                  Resume
-                </button>
-              </div>
-            )}
-            <div style={S.notifRow}>
-              <div>
-                <div style={S.notifLabel}>Daily reminder at noon</div>
-                <div style={S.notifSub}>
-                  {notifPermission === "denied"
-                    ? "Blocked in browser settings"
-                    : notifEnabled
-                    ? "You'll get a nudge if you haven't moved"
-                    : "Off — tap to enable"}
-                </div>
-              </div>
-              <div
-                style={S.toggleTrack(notifEnabled)}
-                onClick={
-                  notifPermission !== "denied"
-                    ? toggleNotifications
-                    : undefined
-                }
-                role="switch"
-                aria-checked={notifEnabled}
-              >
-                <div style={S.toggleThumb(notifEnabled)} />
-              </div>
-            </div>
-            <button
-              style={S.ctaMuted}
-              onClick={() => setScreen("history")}
-            >
-              View history
-            </button>
           </>
         )}
 
