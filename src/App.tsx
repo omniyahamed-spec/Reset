@@ -387,8 +387,12 @@ function CalmAvatar({
   );
 }
 
-function makeProfileId(name: string): string {
-  return name.trim().toLowerCase().replace(/\s+/g, "-");
+// Random, unguessable profile ID. The name is display-only, so two people
+// typing the same name never share (or see) each other's history.
+function makeProfileId(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 function startOfDay(d: Date): Date {
@@ -2118,12 +2122,20 @@ export default function App() {
       setProfileError("Name is required.");
       return;
     }
-    const id = makeProfileId(profileName);
-    const { data, error } = await supabase
-      .from("profiles")
-      .upsert({ id, name: profileName.trim() }, { onConflict: "id" })
-      .select()
-      .single();
+    // Renaming keeps the same profile; a new person always gets a new random ID.
+    const id = profile?.id ?? makeProfileId();
+    const { data, error } = profile
+      ? await supabase
+          .from("profiles")
+          .update({ name: profileName.trim() })
+          .eq("id", id)
+          .select()
+          .single()
+      : await supabase
+          .from("profiles")
+          .insert({ id, name: profileName.trim() })
+          .select()
+          .single();
     if (error) {
       setProfileError(error.message);
       return;
@@ -2138,13 +2150,10 @@ export default function App() {
     setScreen("arrival");
   }
 
+  // Edit the display name only. History stays attached to this device's
+  // private profile ID; typing a name can never open someone else's profile.
   function changeName() {
-    localStorage.removeItem("reset_profile_id");
-    cancelLocalReminder();
-    setProfile(null);
-    setEntries([]);
-    setProfileName("");
-    setNotifEnabled(false);
+    setProfileName(profile?.name ?? "");
     setScreen("profile");
   }
 
