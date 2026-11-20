@@ -19,7 +19,8 @@ type Screen =
   | "reflect"
   | "pulse"
   | "training"
-  | "teams";
+  | "teams"
+  | "done";
 
 type EntryStatus = "done" | "not_yet";
 
@@ -142,11 +143,11 @@ function getDailyLens() {
 }
 
 const PRESENCE_LABELS: Record<number, { en: string; sub: string; color: string }> = {
-  1: { en: "Completely lost", sub: "Can't land anywhere", color: "#E53E3E" },
-  2: { en: "Scattered", sub: "Head in 5 places", color: "#ED6C02" },
-  3: { en: "Halfway here", sub: "Part of me is missing", color: "#D4A017" },
-  4: { en: "Mostly present", sub: "Almost there", color: "#1E8C82" },
-  5: { en: "Fully here", sub: "Grounded and clear", color: "#0D7C6E" },
+  1: { en: "Completely lost", sub: "Can't land anywhere", color: "#9AA9B7" },
+  2: { en: "Scattered", sub: "Head in 5 places", color: "#8AA1B0" },
+  3: { en: "Halfway here", sub: "Part of me is missing", color: "#7E9AA4" },
+  4: { en: "Mostly present", sub: "Almost there", color: "#3B6B70" },
+  5: { en: "Fully here", sub: "Grounded and clear", color: "#2E5A5F" },
 };
 
 const PULSE_AVOIDANCES = [
@@ -466,7 +467,7 @@ function progressBarStyle(pct: number): CSSProperties {
   return {
     height: "100%",
     width: `${pct}%`,
-    background: "#1B2340",
+    background: "#3B6B70",
     borderRadius: 999,
     transition: "width 0.4s ease",
   };
@@ -844,19 +845,19 @@ function mapEntry(row: any): Entry {
 const ONBOARDING_SLIDES = [
   {
     tag: "Sound familiar?",
-    accent: "#E05D2A",
+    accent: "#3B6B70",
     title: "Your head is full.\nYou can't start.",
     body: "You know what you need to do. But something keeps you spinning — rehashing, overthinking, avoiding. It happens to everyone. Every day.",
   },
   {
     tag: "The fix",
-    accent: "#0D9488",
+    accent: "#3B6B70",
     title: "3 minutes.\nOne honest move.",
     body: "Not therapy. Not a todo list. Just three questions that cut through the noise — name what's in your head, what you're avoiding, and the one small action that actually moves things.",
   },
   {
     tag: "Just do it",
-    accent: "#7C3AED",
+    accent: "#3B6B70",
     title: "Stop thinking.\nStart moving.",
     body: "Reset turns the loop in your head into a single action. That's it. Do it daily and watch what shifts.",
   },
@@ -879,7 +880,7 @@ function OnboardingScreen({ onFinish }: { onFinish: () => void }) {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "#0B1020",
+      background: "#F4F7F7",
       display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center",
       padding: "0 28px",
@@ -927,14 +928,14 @@ function OnboardingScreen({ onFinish }: { onFinish: () => void }) {
         position: "fixed", top: 24, left: 0, right: 0,
         textAlign: "center", fontSize: 11, fontWeight: 800,
         letterSpacing: "0.22em", textTransform: "uppercase",
-        color: "rgba(234,240,255,0.22)",
+        color: "#5F7076",
       }}>Reset</div>
 
       {slide > 0 && (
         <button onClick={() => { localStorage.setItem("reset_onboarded", "true"); onFinish(); }}
           style={{
             position: "fixed", top: 20, right: 24,
-            fontSize: 12, color: "rgba(234,240,255,0.28)",
+            fontSize: 12, color: "#5F7076",
             background: "none", border: "none", cursor: "pointer",
             fontFamily: "inherit", letterSpacing: "0.05em",
           }}>Skip</button>
@@ -967,14 +968,14 @@ function OnboardingScreen({ onFinish }: { onFinish: () => void }) {
 
         <div style={{
           fontSize: 36, fontWeight: 700,
-          color: "rgba(234,240,255,0.95)",
-          fontFamily: 'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
+          color: "#1D2B30",
+          fontFamily: "inherit",
           letterSpacing: "-0.04em", lineHeight: 1.1,
           marginBottom: 22, whiteSpace: "pre-line",
         }}>{current.title}</div>
 
         <div style={{
-          fontSize: 15, color: "rgba(234,240,255,0.5)",
+          fontSize: 15, color: "#5F7076",
           lineHeight: 1.7, marginBottom: 52,
           maxWidth: 360, margin: "0 auto 52px",
         }}>{current.body}</div>
@@ -983,7 +984,7 @@ function OnboardingScreen({ onFinish }: { onFinish: () => void }) {
           padding: "16px 44px", borderRadius: 999,
           border: isLast ? "none" : `1px solid ${current.accent}44`,
           background: isLast ? current.accent : `${current.accent}18`,
-          color: "rgba(234,240,255,0.92)",
+          color: "#1D2B30",
           fontSize: 15, fontWeight: isLast ? 800 : 500,
           cursor: "pointer", fontFamily: "inherit",
           letterSpacing: isLast ? "0.01em" : "0.05em",
@@ -1001,7 +1002,7 @@ function OnboardingScreen({ onFinish }: { onFinish: () => void }) {
           <div key={i} style={{
             width: i === slide ? 22 : 6, height: 6,
             borderRadius: 999,
-            background: i === slide ? s.accent : "rgba(234,240,255,0.12)",
+            background: i === slide ? s.accent : "rgba(29,43,48,0.12)",
             transition: "all 0.35s ease",
             boxShadow: i === slide ? `0 0 8px ${s.accent}` : "none",
           }} />
@@ -1022,11 +1023,11 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
   return (
     <div
       style={{
-        background: "#0F1730",
+        background: "#FFFFFF",
         borderRadius: 24,
         padding: "20px 22px",
         marginBottom: 14,
-        border: "1px solid #232C4D",
+        border: "1px solid #D8E3E3",
         position: "relative",
         overflow: "hidden",
       }}
@@ -1040,7 +1041,7 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
           height: 160,
           borderRadius: "50%",
           background:
-            "radial-gradient(circle, rgba(61,217,196,0.08) 0%, transparent 70%)",
+            "radial-gradient(circle, rgba(59,107,112,0.08) 0%, transparent 70%)",
           pointerEvents: "none",
         }}
       />
@@ -1059,7 +1060,7 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
               fontWeight: 800,
               letterSpacing: "0.18em",
               textTransform: "uppercase",
-              color: "rgba(234,240,255,0.35)",
+              color: "#5F7076",
               marginBottom: 4,
             }}
           >
@@ -1069,9 +1070,9 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
             style={{
               fontSize: 18,
               fontWeight: 500,
-              color: "rgba(234,240,255,0.88)",
+              color: "#1D2B30",
               fontFamily:
-                'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
+                "inherit",
               letterSpacing: "-0.02em",
               lineHeight: 1.2,
             }}
@@ -1092,15 +1093,15 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
               width: 6,
               height: 6,
               borderRadius: "50%",
-              background: "#3DD9C4",
-              boxShadow: "0 0 6px rgba(61,217,196,0.6)",
+              background: "#6FA8A6",
+              boxShadow: "0 0 6px rgba(59,107,112,0.6)",
               animation: "pulseLive 2s ease-in-out infinite",
             }}
           />
           <span
             style={{
               fontSize: 11,
-              color: "rgba(234,240,255,0.4)",
+              color: "#5F7076",
               letterSpacing: "0.04em",
             }}
           >
@@ -1124,8 +1125,8 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
           <div
             key={label}
             style={{
-              background: "rgba(234,240,255,0.04)",
-              border: "1px solid rgba(234,240,255,0.07)",
+              background: "rgba(29,43,48,0.04)",
+              border: "1px solid rgba(29,43,48,0.07)",
               borderRadius: 14,
               padding: "10px 12px",
             }}
@@ -1134,11 +1135,11 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
               style={{
                 fontSize: 20,
                 fontWeight: 500,
-                color: "rgba(234,240,255,0.85)",
+                color: "#1D2B30",
                 letterSpacing: "-0.03em",
                 lineHeight: 1,
                 fontFamily:
-                  'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
+                  "inherit",
               }}
             >
               {num}
@@ -1146,7 +1147,7 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
             <div
               style={{
                 fontSize: 10,
-                color: "rgba(234,240,255,0.3)",
+                color: "#5F7076",
                 marginTop: 4,
                 letterSpacing: "0.06em",
                 textTransform: "uppercase",
@@ -1164,7 +1165,7 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
             fontWeight: 700,
             letterSpacing: "0.14em",
             textTransform: "uppercase",
-            color: "rgba(234,240,255,0.3)",
+            color: "#5F7076",
             marginBottom: 12,
           }}
         >
@@ -1181,14 +1182,14 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
                 }}
               >
                 <span
-                  style={{ fontSize: 12, color: "rgba(234,240,255,0.55)" }}
+                  style={{ fontSize: 12, color: "#4F6067" }}
                 >
                   {item.label}
                 </span>
                 <span
                   style={{
                     fontSize: 12,
-                    color: "rgba(234,240,255,0.3)",
+                    color: "#5F7076",
                     fontVariantNumeric: "tabular-nums",
                   }}
                 >
@@ -1198,7 +1199,7 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
               <div
                 style={{
                   height: 3,
-                  background: "rgba(234,240,255,0.07)",
+                  background: "rgba(29,43,48,0.07)",
                   borderRadius: 999,
                   overflow: "hidden",
                 }}
@@ -1209,10 +1210,10 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
                     borderRadius: 999,
                     background:
                       i === 0
-                        ? "rgba(61,217,196,0.7)"
+                        ? "rgba(59,107,112,0.7)"
                         : i === 1
-                        ? "rgba(234,240,255,0.25)"
-                        : "rgba(234,240,255,0.13)",
+                        ? "rgba(29,43,48,0.25)"
+                        : "rgba(29,43,48,0.13)",
                     width: barsVisible ? `${item.pct}%` : "0%",
                     transition: `width 0.9s ease ${i * 0.12}s`,
                   }}
@@ -1225,7 +1226,7 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
       <div
         style={{
           height: 1,
-          background: "rgba(234,240,255,0.06)",
+          background: "rgba(29,43,48,0.06)",
           marginBottom: 16,
         }}
       />
@@ -1242,14 +1243,14 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
             width: 28,
             height: 28,
             borderRadius: 8,
-            background: "rgba(61,217,196,0.12)",
-            border: "1px solid rgba(61,217,196,0.2)",
+            background: "rgba(59,107,112,0.12)",
+            border: "1px solid rgba(59,107,112,0.2)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             flexShrink: 0,
             fontSize: 13,
-            color: "rgba(255,178,62,0.8)",
+            color: "rgba(59,107,112,0.8)",
           }}
         >
           ↑
@@ -1259,7 +1260,7 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
             style={{
               fontSize: 13,
               fontWeight: 600,
-              color: "rgba(234,240,255,0.75)",
+              color: "#4F6067",
               marginBottom: 3,
             }}
           >
@@ -1268,7 +1269,7 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
           <div
             style={{
               fontSize: 12,
-              color: "rgba(234,240,255,0.35)",
+              color: "#5F7076",
               lineHeight: 1.55,
             }}
           >
@@ -1283,9 +1284,9 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
           width: "100%",
           padding: "12px 16px",
           borderRadius: 14,
-          border: "1px solid rgba(234,240,255,0.1)",
-          background: "rgba(234,240,255,0.04)",
-          color: "rgba(234,240,255,0.5)",
+          border: "1px solid rgba(29,43,48,0.1)",
+          background: "rgba(29,43,48,0.04)",
+          color: "#5F7076",
           fontSize: 13,
           cursor: "pointer",
           fontFamily: "inherit",
@@ -1297,15 +1298,15 @@ function PulseTeaser({ onExpand }: { onExpand: () => void }) {
         }}
         onMouseEnter={(e) => {
           (e.currentTarget as HTMLButtonElement).style.background =
-            "rgba(234,240,255,0.08)";
+            "rgba(29,43,48,0.08)";
           (e.currentTarget as HTMLButtonElement).style.color =
-            "rgba(234,240,255,0.75)";
+            "rgba(29,43,48,0.75)";
         }}
         onMouseLeave={(e) => {
           (e.currentTarget as HTMLButtonElement).style.background =
-            "rgba(234,240,255,0.04)";
+            "rgba(29,43,48,0.04)";
           (e.currentTarget as HTMLButtonElement).style.color =
-            "rgba(234,240,255,0.5)";
+            "rgba(29,43,48,0.5)";
         }}
       >
         See full community map
@@ -1326,10 +1327,10 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
   return (
     <div
       style={{
-        background: "#0F1730",
+        background: "#FFFFFF",
         borderRadius: 28,
         padding: "24px 22px",
-        border: "1px solid #232C4D",
+        border: "1px solid #D8E3E3",
         marginBottom: 14,
         position: "relative",
         overflow: "hidden",
@@ -1344,7 +1345,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
           height: 220,
           borderRadius: "50%",
           background:
-            "radial-gradient(circle, rgba(61,217,196,0.06) 0%, transparent 70%)",
+            "radial-gradient(circle, rgba(59,107,112,0.06) 0%, transparent 70%)",
           pointerEvents: "none",
         }}
       />
@@ -1363,7 +1364,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
               fontWeight: 800,
               letterSpacing: "0.18em",
               textTransform: "uppercase",
-              color: "rgba(234,240,255,0.3)",
+              color: "#5F7076",
               marginBottom: 6,
             }}
           >
@@ -1373,9 +1374,9 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
             style={{
               fontSize: 26,
               fontWeight: 500,
-              color: "rgba(234,240,255,0.9)",
+              color: "#1D2B30",
               fontFamily:
-                'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
+                "inherit",
               letterSpacing: "-0.03em",
               lineHeight: 1.15,
             }}
@@ -1385,7 +1386,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
           <div
             style={{
               fontSize: 13,
-              color: "rgba(234,240,255,0.3)",
+              color: "#5F7076",
               fontStyle: "italic",
               marginTop: 4,
             }}
@@ -1406,12 +1407,12 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
               width: 6,
               height: 6,
               borderRadius: "50%",
-              background: "#3DD9C4",
-              boxShadow: "0 0 6px rgba(61,217,196,0.6)",
+              background: "#6FA8A6",
+              boxShadow: "0 0 6px rgba(59,107,112,0.6)",
               animation: "pulseLive 2s ease-in-out infinite",
             }}
           />
-          <span style={{ fontSize: 11, color: "rgba(234,240,255,0.35)" }}>
+          <span style={{ fontSize: 11, color: "#5F7076" }}>
             Live
           </span>
         </div>
@@ -1441,8 +1442,8 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
           <div
             key={label}
             style={{
-              background: "rgba(234,240,255,0.03)",
-              border: "1px solid rgba(234,240,255,0.07)",
+              background: "rgba(29,43,48,0.03)",
+              border: "1px solid rgba(29,43,48,0.07)",
               borderRadius: 16,
               padding: "14px 16px",
             }}
@@ -1451,9 +1452,9 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
               style={{
                 fontSize: 24,
                 fontWeight: 500,
-                color: "rgba(234,240,255,0.88)",
+                color: "#1D2B30",
                 fontFamily:
-                  'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
+                  "inherit",
                 letterSpacing: "-0.04em",
                 lineHeight: 1,
               }}
@@ -1463,7 +1464,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
             <div
               style={{
                 fontSize: 12,
-                color: "rgba(234,240,255,0.6)",
+                color: "#4F6067",
                 marginTop: 5,
                 fontWeight: 600,
               }}
@@ -1473,7 +1474,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
             <div
               style={{
                 fontSize: 11,
-                color: "rgba(234,240,255,0.25)",
+                color: "#5F7076",
                 marginTop: 2,
               }}
             >
@@ -1489,7 +1490,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
             fontWeight: 700,
             letterSpacing: "0.14em",
             textTransform: "uppercase",
-            color: "rgba(234,240,255,0.3)",
+            color: "#5F7076",
             marginBottom: 14,
           }}
         >
@@ -1506,7 +1507,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
                 }}
               >
                 <span
-                  style={{ fontSize: 13, color: "rgba(234,240,255,0.6)" }}
+                  style={{ fontSize: 13, color: "#4F6067" }}
                 >
                   {item.label}
                 </span>
@@ -1515,8 +1516,8 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
                     fontSize: 13,
                     color:
                       i === 0
-                        ? "rgba(255,178,62,0.8)"
-                        : "rgba(234,240,255,0.3)",
+                        ? "rgba(59,107,112,0.8)"
+                        : "rgba(29,43,48,0.3)",
                     fontVariantNumeric: "tabular-nums",
                     fontWeight: i === 0 ? 700 : 400,
                   }}
@@ -1527,7 +1528,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
               <div
                 style={{
                   height: 4,
-                  background: "rgba(234,240,255,0.06)",
+                  background: "rgba(29,43,48,0.06)",
                   borderRadius: 999,
                   overflow: "hidden",
                 }}
@@ -1538,12 +1539,12 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
                     borderRadius: 999,
                     background:
                       i === 0
-                        ? "linear-gradient(90deg,rgba(61,217,196,0.8),rgba(220,160,60,0.6))"
+                        ? "linear-gradient(90deg,rgba(59,107,112,0.8),rgba(59,107,112,0.6))"
                         : i === 1
-                        ? "rgba(234,240,255,0.22)"
+                        ? "rgba(29,43,48,0.22)"
                         : i === 2
-                        ? "rgba(234,240,255,0.14)"
-                        : "rgba(234,240,255,0.08)",
+                        ? "rgba(29,43,48,0.14)"
+                        : "rgba(29,43,48,0.08)",
                     width: barsVisible ? `${item.pct}%` : "0%",
                     transition: `width 1s ease ${i * 0.15}s`,
                   }}
@@ -1556,7 +1557,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
       <div
         style={{
           height: 1,
-          background: "rgba(234,240,255,0.06)",
+          background: "rgba(29,43,48,0.06)",
           marginBottom: 20,
         }}
       />
@@ -1567,7 +1568,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
             fontWeight: 700,
             letterSpacing: "0.14em",
             textTransform: "uppercase",
-            color: "rgba(234,240,255,0.3)",
+            color: "#5F7076",
             marginBottom: 14,
           }}
         >
@@ -1584,14 +1585,14 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
                   width: 30,
                   height: 30,
                   borderRadius: 9,
-                  background: "rgba(61,217,196,0.1)",
-                  border: "1px solid rgba(61,217,196,0.18)",
+                  background: "rgba(59,107,112,0.1)",
+                  border: "1px solid rgba(59,107,112,0.18)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   flexShrink: 0,
                   fontSize: 14,
-                  color: "rgba(255,178,62,0.75)",
+                  color: "rgba(59,107,112,0.75)",
                 }}
               >
                 {ins.icon}
@@ -1601,7 +1602,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
                   style={{
                     fontSize: 13,
                     fontWeight: 600,
-                    color: "rgba(234,240,255,0.78)",
+                    color: "#4F6067",
                     marginBottom: 3,
                   }}
                 >
@@ -1610,7 +1611,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
                 <div
                   style={{
                     fontSize: 12,
-                    color: "rgba(234,240,255,0.38)",
+                    color: "#5F7076",
                     lineHeight: 1.6,
                   }}
                 >
@@ -1628,7 +1629,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
             fontWeight: 700,
             letterSpacing: "0.14em",
             textTransform: "uppercase",
-            color: "rgba(234,240,255,0.3)",
+            color: "#5F7076",
             marginBottom: 12,
           }}
         >
@@ -1646,7 +1647,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
               5: "rgba(26,82,118,0.8)",
               4: "rgba(46,125,82,0.7)",
               3: "rgba(184,148,10,0.7)",
-              2: "rgba(212,99,10,0.65)",
+              2: "rgba(59,107,112,0.65)",
               1: "rgba(192,57,43,0.65)",
             };
             return (
@@ -1658,7 +1659,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
                   style={{
                     width: 90,
                     fontSize: 11,
-                    color: "rgba(234,240,255,0.4)",
+                    color: "#5F7076",
                     textAlign: "right",
                   }}
                 >
@@ -1668,7 +1669,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
                   style={{
                     flex: 1,
                     height: 6,
-                    background: "rgba(234,240,255,0.06)",
+                    background: "rgba(29,43,48,0.06)",
                     borderRadius: 999,
                     overflow: "hidden",
                   }}
@@ -1687,7 +1688,7 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
                   style={{
                     width: 28,
                     fontSize: 11,
-                    color: "rgba(234,240,255,0.3)",
+                    color: "#5F7076",
                     fontVariantNumeric: "tabular-nums",
                   }}
                 >
@@ -1701,14 +1702,14 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
       <div
         style={{
           height: 1,
-          background: "rgba(234,240,255,0.06)",
+          background: "rgba(29,43,48,0.06)",
           marginBottom: 16,
         }}
       />
       <div
         style={{
           fontSize: 11,
-          color: "rgba(234,240,255,0.2)",
+          color: "#5F7076",
           lineHeight: 1.6,
           marginBottom: 18,
           fontStyle: "italic",
@@ -1724,9 +1725,9 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
           width: "100%",
           padding: "13px 16px",
           borderRadius: 14,
-          border: "1px solid rgba(234,240,255,0.12)",
+          border: "1px solid rgba(29,43,48,0.12)",
           background: "transparent",
-          color: "rgba(234,240,255,0.45)",
+          color: "#5F7076",
           fontSize: 14,
           cursor: "pointer",
           fontFamily: "inherit",
@@ -1735,6 +1736,40 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
         ← Back
       </button>
     </div>
+  );
+}
+
+// Soft, low-saturation horizon. Viewing nature scenes restores directed
+// attention (Kaplan's Attention Restoration Theory) and lowers stress (Ulrich).
+function NatureHorizon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 390 220"
+      preserveAspectRatio="xMidYMax slice"
+      style={{
+        position: "fixed",
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: "100%",
+        height: 220,
+        pointerEvents: "none",
+        zIndex: 0,
+      }}
+    >
+      <defs>
+        <linearGradient id="nhSky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#F4F7F7" stopOpacity="0" />
+          <stop offset="1" stopColor="#E6EFEF" />
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="390" height="220" fill="url(#nhSky)" />
+      <circle cx="292" cy="96" r="22" fill="#F1E6D2" opacity="0.9" />
+      <path d="M0 150 C60 118 120 122 180 140 C240 158 300 124 390 132 L390 220 L0 220 Z" fill="#C9DCDA" />
+      <path d="M0 176 C70 150 140 160 210 172 C280 184 330 160 390 166 L390 220 L0 220 Z" fill="#A9C6C3" />
+      <path d="M0 200 C80 186 160 192 240 200 C300 206 350 196 390 198 L390 220 L0 220 Z" fill="#8DB1AE" />
+    </svg>
   );
 }
 
@@ -2448,14 +2483,14 @@ export default function App() {
           alignItems: "center",
           justifyContent: "center",
           height: "100vh",
-          background: "#0B1020",
+          background: "#F4F7F7",
         }}
       >
         <style>{AVATAR_KEYFRAMES}</style>
         <div
           style={{
             fontSize: 13,
-            color: "#7B87A8",
+            color: "#5F7076",
             letterSpacing: "0.15em",
           }}
         >
@@ -2466,7 +2501,7 @@ export default function App() {
   }
 
   const S: Record<string, CSSProperties | any> = {
-    page: { minHeight: "100vh", background: "#EAF0FF", padding: "0 0 40px" },
+    page: { minHeight: "100vh", background: "#F4F7F7", padding: "0 0 32px" },
     wrap: { maxWidth: 480, margin: "0 auto", padding: "0 16px" },
     topRow: {
       display: "flex",
@@ -2480,78 +2515,77 @@ export default function App() {
       fontWeight: 800,
       letterSpacing: "0.12em",
       textTransform: "uppercase",
-      color: "#1B2340",
+      color: "#1D2B30",
     },
     profileBtn: {
       fontSize: 12,
-      color: "#7B87A8",
+      color: "#5F7076",
       background: "none",
       border: "none",
       cursor: "pointer",
       padding: "4px 8px",
     },
     card: {
-      background: "#EAF0FF",
-      border: "1px solid #C7D0EC",
-      borderRadius: 28,
-      padding: 24,
-      marginBottom: 14,
-      boxShadow: "0 18px 50px rgba(27,35,64,0.06)",
+      background: "#FFFFFF",
+      border: "1px solid #E3ECEC",
+      borderRadius: 20,
+      padding: 20,
+      marginBottom: 12,
+      boxShadow: "none",
     },
     progressWrap: {
       height: 3,
-      background: "#D4DCF5",
+      background: "#E3ECEC",
       borderRadius: 999,
       marginBottom: 20,
       overflow: "hidden",
     },
     stepPill: {
       display: "inline-block",
-      background: "#EAF0FF",
-      border: "1px solid #C7D0EC",
+      background: "#FFFFFF",
+      border: "1px solid #D8E3E3",
       borderRadius: 999,
       padding: "5px 12px",
       fontSize: 11,
       fontWeight: 700,
       letterSpacing: "0.1em",
       textTransform: "uppercase" as const,
-      color: "#7B87A8",
+      color: "#5F7076",
       marginBottom: 14,
     },
-    stepPillDark: { background: "#1B2340", color: "#EAF0FF", border: "none" },
+    stepPillDark: { background: "#1D2B30", color: "#FFFFFF", border: "none" },
     title: {
-      fontSize: 28,
-      lineHeight: 1.15,
-      fontWeight: 500,
-      fontFamily:
-        'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
+      fontSize: 22,
+      lineHeight: 1.25,
+      fontWeight: 700,
+      fontFamily: "inherit",
       marginBottom: 6,
-      letterSpacing: "-0.03em",
-      color: "#0F1730",
+      letterSpacing: "-0.01em",
+      color: "#1D2B30",
     },
     sub: {
-      fontSize: 14,
-      color: "#7B87A8",
+      fontSize: 15,
+      color: "#4F6067",
       lineHeight: 1.5,
       marginBottom: 14,
     },
-    subDark: { color: "#9AA6C4" },
+    subDark: { color: "#5F7076" },
     label: {
       fontSize: 11,
       fontWeight: 700,
       letterSpacing: "0.1em",
       textTransform: "uppercase" as const,
-      color: "#7B87A8",
+      color: "#5F7076",
     },
     focusHint: {
       fontSize: 12,
-      color: "#7B87A8",
+      color: "#5F7076",
       marginBottom: 16,
       fontStyle: "italic",
     },
     boldHint: {
       fontSize: 12,
-      color: "#B4611E",
+      color: "#4F6067",
       marginTop: -8,
       marginBottom: 16,
       fontStyle: "italic",
@@ -2563,28 +2597,28 @@ export default function App() {
       marginBottom: 14,
     },
     chip: {
-      padding: "7px 14px",
+      padding: "5px 11px",
       borderRadius: 999,
-      border: "1px solid #C7D0EC",
-      background: "#EAF0FF",
-      fontSize: 13,
+      border: "1px solid #D8E3E3",
+      background: "#FFFFFF",
+      fontSize: 12.5,
       cursor: "pointer",
-      color: "#4A4540",
+      color: "#4F6067",
       fontFamily: "inherit",
     },
     chipActive: {
-      background: "#1B2340",
-      color: "#EAF0FF",
-      border: "1px solid #1B2340",
+      background: "#E3EFEF",
+      color: "#2E5A5F",
+      border: "1px solid #3B6B70",
     },
     input: {
       width: "100%",
-      padding: "13px 14px",
-      borderRadius: 16,
-      border: "1px solid #C7D0EC",
-      background: "#EAF0FF",
-      fontSize: 15,
-      color: "#0F1730",
+      padding: "11px 13px",
+      borderRadius: 12,
+      border: "1px solid #D8E3E3",
+      background: "#FFFFFF",
+      fontSize: 16,
+      color: "#1D2B30",
       fontFamily: "inherit",
       outline: "none",
       boxSizing: "border-box" as const,
@@ -2594,33 +2628,35 @@ export default function App() {
       display: "flex",
       justifyContent: "space-between",
       fontSize: 12,
-      color: "#736C64",
+      color: "#4F6067",
       marginBottom: 16,
     },
-    helper: { fontSize: 12, color: "#736C64" },
+    helper: { fontSize: 12, color: "#4F6067" },
     cta: {
       width: "100%",
-      padding: "15px 18px",
-      borderRadius: 18,
+      minHeight: 48,
+      padding: "12px 16px",
+      borderRadius: 14,
       border: "none",
-      background: "linear-gradient(135deg, #FFB23E 0%, #FF7A45 100%)",
-      color: "#FFF8F5",
+      background: "#3B6B70",
+      color: "#FFFFFF",
       fontSize: 15,
-      fontWeight: 800,
+      fontWeight: 700,
       cursor: "pointer",
       fontFamily: "inherit",
-      marginBottom: 10,
-      boxShadow: "0 4px 20px rgba(255,178,62,0.35)",
+      marginBottom: 8,
+      boxShadow: "none",
       transition: "all 0.2s ease",
     },
     ctaDisabled: { opacity: 0.38, cursor: "not-allowed" },
     ctaMuted: {
       width: "100%",
-      padding: "13px 18px",
-      borderRadius: 18,
-      border: "1px solid #C7D0EC",
+      minHeight: 44,
+      padding: "10px 16px",
+      borderRadius: 14,
+      border: "1px solid #D8E3E3",
       background: "transparent",
-      color: "#7B87A8",
+      color: "#5F7076",
       fontSize: 14,
       cursor: "pointer",
       fontFamily: "inherit",
@@ -2631,25 +2667,25 @@ export default function App() {
       padding: "15px 18px",
       borderRadius: 18,
       border: "none",
-      background: "linear-gradient(135deg, #D4A017 0%, #E8B830 100%)",
-      color: "#EAF0FF",
+      background: "#3B6B70",
+      color: "#FFFFFF",
       fontSize: 15,
       fontWeight: 800,
       cursor: "pointer",
       fontFamily: "inherit",
-      boxShadow: "0 4px 20px rgba(212,160,23,0.4)",
+      boxShadow: "none",
     },
     trackerCard: {
-      background: "#EAF0FF",
-      border: "1px solid #C7D0EC",
+      background: "#FFFFFF",
+      border: "1px solid #D8E3E3",
       borderRadius: 22,
       padding: 16,
       marginBottom: 14,
-      boxShadow: "0 14px 40px rgba(27,35,64,0.05)",
+      boxShadow: "0 14px 40px rgba(29,43,48,0.05)",
     },
     trackerCardMilestone: {
       background:
-        "linear-gradient(135deg,#EAF0FF 0%,#FFF3CC 50%,#EAF0FF 100%)",
+        "linear-gradient(135deg,#FFFFFF 0%,#FFF3CC 50%,#FFFFFF 100%)",
       border: "1.5px solid #F0C040",
       borderRadius: 22,
       padding: 16,
@@ -2666,8 +2702,8 @@ export default function App() {
       display: "inline-flex",
       alignItems: "center",
       gap: 5,
-      background: "#1B2340",
-      color: "#EAF0FF",
+      background: "#1D2B30",
+      color: "#FFFFFF",
       borderRadius: 999,
       padding: "4px 10px",
       fontSize: 11,
@@ -2677,8 +2713,8 @@ export default function App() {
       display: "inline-flex",
       alignItems: "center",
       gap: 5,
-      background: "#FFB23E",
-      color: "#EAF0FF",
+      background: "#3B6B70",
+      color: "#FFFFFF",
       borderRadius: 999,
       padding: "4px 10px",
       fontSize: 11,
@@ -2687,7 +2723,7 @@ export default function App() {
     streakAtRiskPill: {
       display: "inline-block",
       background: "#8B1E1E",
-      color: "#EAF0FF",
+      color: "#FFFFFF",
       borderRadius: 999,
       padding: "4px 10px",
       fontSize: 11,
@@ -2701,17 +2737,17 @@ export default function App() {
     },
     trackerDay: {
       fontSize: 10,
-      color: "#7B87A8",
+      color: "#5F7076",
       display: "flex",
       flexDirection: "column" as const,
       alignItems: "center",
       gap: 5,
     },
-    trackerText: { fontSize: 12, color: "#7B87A8" },
-    dot: { width: 10, height: 10, borderRadius: "50%", background: "#D4DCF5" },
-    dotActive: { background: "#1B2340" },
+    trackerText: { fontSize: 12, color: "#5F7076" },
+    dot: { width: 10, height: 10, borderRadius: "50%", background: "#E3ECEC" },
+    dotActive: { background: "#1D2B30" },
     dotToday: {
-      boxShadow: "0 0 0 2px #EAF0FF, 0 0 0 3.5px #1B2340",
+      boxShadow: "0 0 0 2px #FFFFFF, 0 0 0 3.5px #1D2B30",
     },
     milestoneText: {
       fontSize: 13,
@@ -2742,16 +2778,16 @@ export default function App() {
       borderRadius: 999,
       border: "none",
       background: "#8B1E1E",
-      color: "#EAF0FF",
+      color: "#FFFFFF",
       fontSize: 12,
       fontWeight: 700,
       cursor: "pointer",
       whiteSpace: "nowrap" as const,
     },
     recoveryBanner: {
-      background: "#EAF0FF",
+      background: "#FFFFFF",
       border: "1px solid #C9D8CE",
-      borderLeft: "3px solid #1E8C82",
+      borderLeft: "3px solid #3B6B70",
       borderRadius: 16,
       padding: "13px 16px",
       marginBottom: 12,
@@ -2761,21 +2797,21 @@ export default function App() {
       fontWeight: 700,
       letterSpacing: "0.08em",
       textTransform: "uppercase" as const,
-      color: "#1E8C82",
+      color: "#3B6B70",
       marginBottom: 4,
     },
     recoveryText: {
       fontSize: 13,
-      color: "#4A4540",
+      color: "#4F6067",
       lineHeight: 1.55,
     },
     lensCard: {
-      background: "#EAF0FF",
-      border: "1px solid #C7D0EC",
+      background: "#FFFFFF",
+      border: "1px solid #D8E3E3",
       borderRadius: 22,
       padding: "16px 18px",
       marginBottom: 14,
-      boxShadow: "0 14px 40px rgba(27,35,64,0.05)",
+      boxShadow: "0 14px 40px rgba(29,43,48,0.05)",
     },
     lensTop: {
       display: "flex",
@@ -2785,21 +2821,21 @@ export default function App() {
     },
     lensSource: {
       fontSize: 11,
-      color: "#9AA6C4",
+      color: "#5F7076",
       fontStyle: "italic",
     },
     lensTag: {
       fontSize: 17,
       fontWeight: 500,
-      color: "#1B2340",
+      color: "#1D2B30",
       fontFamily:
-        'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
+        "inherit",
       letterSpacing: "-0.02em",
       marginBottom: 4,
     },
     lensBody: {
       fontSize: 13,
-      color: "#7B87A8",
+      color: "#5F7076",
       lineHeight: 1.55,
     },
     notifRow: {
@@ -2807,19 +2843,19 @@ export default function App() {
       alignItems: "center",
       justifyContent: "space-between",
       gap: 10,
-      background: "#EAF0FF",
-      border: "1px solid #C7D0EC",
+      background: "#FFFFFF",
+      border: "1px solid #D8E3E3",
       borderRadius: 16,
       padding: "12px 16px",
       marginBottom: 10,
     },
-    notifLabel: { fontSize: 13, color: "#1B2340", fontWeight: 600 },
-    notifSub: { fontSize: 11, color: "#7B87A8", marginTop: 2 },
+    notifLabel: { fontSize: 13, color: "#1D2B30", fontWeight: 600 },
+    notifSub: { fontSize: 11, color: "#5F7076", marginTop: 2 },
     toggleTrack: (on: boolean): CSSProperties => ({
       width: 44,
       height: 26,
       borderRadius: 999,
-      background: on ? "#1B2340" : "#C7D0EC",
+      background: on ? "#1D2B30" : "#D8E3E3",
       position: "relative",
       cursor: "pointer",
       transition: "background 0.2s",
@@ -2832,28 +2868,28 @@ export default function App() {
       width: 20,
       height: 20,
       borderRadius: "50%",
-      background: "#EAF0FF",
+      background: "#FFFFFF",
       transition: "left 0.2s",
       boxShadow: "0 1px 4px rgba(0,0,0,0.18)",
     }),
     checkinCard: {
-      background: "#EAF0FF",
-      border: "1px solid #C7D0EC",
+      background: "#FFFFFF",
+      border: "1px solid #D8E3E3",
       borderRadius: 28,
       padding: 24,
-      boxShadow: "0 18px 50px rgba(27,35,64,0.06)",
+      boxShadow: "0 18px 50px rgba(29,43,48,0.06)",
     },
     checkinBadge: {
       display: "inline-block",
-      background: "#EAF0FF",
-      border: "1px solid #C7D0EC",
+      background: "#FFFFFF",
+      border: "1px solid #D8E3E3",
       borderRadius: 999,
       padding: "5px 12px",
       fontSize: 11,
       fontWeight: 700,
       letterSpacing: "0.1em",
       textTransform: "uppercase" as const,
-      color: "#7B87A8",
+      color: "#5F7076",
       marginBottom: 14,
     },
     checkinMove: {
@@ -2861,7 +2897,7 @@ export default function App() {
       lineHeight: 1.2,
       fontWeight: 500,
       fontFamily:
-        'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
+        "inherit",
       margin: "10px 0 6px",
       letterSpacing: "-0.03em",
     },
@@ -2872,7 +2908,7 @@ export default function App() {
       overflow: "hidden",
       marginBottom: 14,
       background:
-        "radial-gradient(ellipse at 50% 20%, rgba(61,217,196,0.22) 0%, transparent 55%), radial-gradient(ellipse at 80% 90%, rgba(108,123,255,0.28) 0%, transparent 55%), linear-gradient(160deg, #141B36 0%, #0B1020 100%)",
+        "radial-gradient(ellipse at 50% 20%, rgba(59,107,112,0.22) 0%, transparent 55%), radial-gradient(ellipse at 80% 90%, rgba(124,147,184,0.28) 0%, transparent 55%), linear-gradient(160deg, #F4F7F7 0%, #F4F7F7 100%)",
       backgroundSize: "cover",
       backgroundPosition: "center",
     },
@@ -2880,7 +2916,7 @@ export default function App() {
       position: "absolute",
       inset: 0,
       background:
-        "linear-gradient(180deg,rgba(234,240,255,0.08) 0%,rgba(27,35,64,0.72) 100%)",
+        "linear-gradient(180deg,rgba(29,43,48,0.08) 0%,rgba(29,43,48,0.72) 100%)",
       padding: "32px 28px",
       display: "flex",
       flexDirection: "column" as const,
@@ -2891,15 +2927,15 @@ export default function App() {
       fontWeight: 500,
       lineHeight: 1.1,
       letterSpacing: "-0.04em",
-      color: "#EAF0FF",
+      color: "#FFFFFF",
       fontFamily:
-        'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
+        "inherit",
       whiteSpace: "pre-line" as const,
       marginBottom: 10,
     },
     heroSub: {
       fontSize: 15,
-      color: "rgba(234,240,255,0.72)",
+      color: "#4F6067",
       lineHeight: 1.5,
       maxWidth: 260,
     },
@@ -2909,25 +2945,25 @@ export default function App() {
       padding: "18px 20px",
       borderRadius: 20,
       border: "none",
-      background: "linear-gradient(135deg, #FFB23E 0%, #FF7A45 100%)",
-      color: "#FFF8F5",
+      background: "linear-gradient(135deg, #3B6B70 0%, #3B6B70 100%)",
+      color: "#FFFFFF",
       fontSize: 16,
       fontWeight: 800,
       cursor: "pointer",
       fontFamily: "inherit",
       marginBottom: 10,
-      boxShadow: "0 6px 28px rgba(255,178,62,0.5)",
+      boxShadow: "0 6px 28px rgba(59,107,112,0.5)",
       letterSpacing: "0.01em",
     },
     heroFoot: {
       fontSize: 12,
-      color: "rgba(234,240,255,0.5)",
+      color: "#5F7076",
       textAlign: "center" as const,
       marginTop: 8,
     },
     unfinishedCard: {
-      background: "#EAF0FF",
-      border: "1px solid #C7D0EC",
+      background: "#FFFFFF",
+      border: "1px solid #D8E3E3",
       borderRadius: 22,
       padding: 18,
       marginBottom: 12,
@@ -2936,33 +2972,33 @@ export default function App() {
       fontSize: 20,
       fontWeight: 500,
       fontFamily:
-        'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
+        "inherit",
       marginBottom: 4,
       letterSpacing: "-0.02em",
     },
     commitCard: {
-      background: "#0E0C0A",
-      border: "1px solid #232C4D",
+      background: "#FFFFFF",
+      border: "1px solid #D8E3E3",
     },
     moveBox: {
-      background: "rgba(234,240,255,0.05)",
+      background: "rgba(29,43,48,0.05)",
       borderRadius: 16,
       padding: "16px 18px",
       marginBottom: 24,
-      border: "1px solid rgba(234,240,255,0.07)",
+      border: "1px solid rgba(29,43,48,0.07)",
     },
     moveBig: {
       fontSize: 26,
       fontWeight: 500,
       lineHeight: 1.2,
-      color: "#EAF0FF",
+      color: "#FFFFFF",
       fontFamily:
-        'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
+        "inherit",
       letterSpacing: "-0.03em",
     },
     moveWhy: {
       fontSize: 12,
-      color: "rgba(234,240,255,0.38)",
+      color: "#5F7076",
       marginTop: 10,
       fontStyle: "italic",
       lineHeight: 1.45,
@@ -2972,8 +3008,8 @@ export default function App() {
       padding: "14px 10px",
       borderRadius: 16,
       border: "none",
-      background: "#EAF0FF",
-      color: "#0F1730",
+      background: "#FFFFFF",
+      color: "#1D2B30",
       fontSize: 14,
       fontWeight: 800,
       cursor: "pointer",
@@ -2982,9 +3018,9 @@ export default function App() {
     statusSecondary: {
       padding: "14px 10px",
       borderRadius: 16,
-      border: "1px solid rgba(234,240,255,0.2)",
+      border: "1px solid rgba(29,43,48,0.2)",
       background: "transparent",
-      color: "rgba(234,240,255,0.6)",
+      color: "#4F6067",
       fontSize: 14,
       cursor: "pointer",
       fontFamily: "inherit",
@@ -3006,15 +3042,15 @@ export default function App() {
     },
     feedbackText: { fontSize: 14, color: "#2B2723", lineHeight: 1.6 },
     resultBox: {
-      background: "#EAF0FF",
-      border: "1px solid #C7D0EC",
+      background: "#FFFFFF",
+      border: "1px solid #D8E3E3",
       borderRadius: 16,
       padding: "12px 14px",
       marginBottom: 14,
     },
     shareBox: {
-      background: "#EAF0FF",
-      border: "1px solid #C7D0EC",
+      background: "#FFFFFF",
+      border: "1px solid #D8E3E3",
       borderRadius: 16,
       padding: "14px 16px",
       marginBottom: 14,
@@ -3022,7 +3058,7 @@ export default function App() {
     shareTitle: { fontSize: 13, fontWeight: 700, marginBottom: 5 },
     shareText: {
       fontSize: 13,
-      color: "#7B87A8",
+      color: "#5F7076",
       lineHeight: 1.5,
       marginBottom: 11,
     },
@@ -3030,7 +3066,7 @@ export default function App() {
     historyCard: {
       padding: 14,
       borderRadius: 16,
-      border: "1px solid #D4DCF5",
+      border: "1px solid #E3ECEC",
       background: "#FDFAF6",
     },
     historyTop: {
@@ -3040,18 +3076,18 @@ export default function App() {
       marginBottom: 9,
       flexWrap: "wrap" as const,
     },
-    historyDate: { fontSize: 12, color: "#7B87A8" },
+    historyDate: { fontSize: 12, color: "#5F7076" },
     historyLine: {
       fontSize: 13,
       lineHeight: 1.5,
-      color: "#0F1730",
+      color: "#1D2B30",
       marginBottom: 5,
     },
-    historyLineLabel: { fontWeight: 700, color: "#7B87A8" },
+    historyLineLabel: { fontWeight: 700, color: "#5F7076" },
     emptyState: {
       textAlign: "center" as const,
       padding: "32px 16px",
-      color: "#7B87A8",
+      color: "#5F7076",
       fontSize: 14,
     },
     statusBadge: (s: EntryStatus): CSSProperties => ({
@@ -3060,7 +3096,7 @@ export default function App() {
       padding: "3px 9px",
       borderRadius: 999,
       background: s === "done" ? "#E8F5E9" : "#FFF3E0",
-      color: s === "done" ? "#2E7D32" : "#E65100",
+      color: s === "done" ? "#2E7D32" : "#8A5A00",
     }),
     insightRow: {
       display: "flex",
@@ -3072,10 +3108,10 @@ export default function App() {
     insightTitle: {
       fontSize: 13,
       fontWeight: 700,
-      color: "#1B2340",
+      color: "#1D2B30",
       marginBottom: 3,
     },
-    insightBody: { fontSize: 13, color: "#7B87A8", lineHeight: 1.5 },
+    insightBody: { fontSize: 13, color: "#5F7076", lineHeight: 1.5 },
     summaryGrid: {
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
@@ -3083,14 +3119,14 @@ export default function App() {
       marginBottom: 16,
     },
     summaryBox: {
-      background: "#EAF0FF",
-      border: "1px solid #D4DCF5",
+      background: "#FFFFFF",
+      border: "1px solid #E3ECEC",
       borderRadius: 16,
       padding: 12,
     },
     summaryBoxGold: {
-      background: "rgba(232,160,0,0.1)",
-      border: "1px solid rgba(232,160,0,0.3)",
+      background: "rgba(59,107,112,0.1)",
+      border: "1px solid rgba(59,107,112,0.3)",
       borderRadius: 16,
       padding: 12,
     },
@@ -3107,7 +3143,7 @@ export default function App() {
     },
     summaryLabel: {
       fontSize: 11,
-      color: "#7B87A8",
+      color: "#5F7076",
       textTransform: "uppercase" as const,
       letterSpacing: "0.08em",
       marginTop: 3,
@@ -3132,32 +3168,32 @@ export default function App() {
     modalCard: {
       width: "100%",
       maxWidth: 420,
-      background: "#EAF0FF",
+      background: "#FFFFFF",
       borderRadius: 28,
       overflow: "hidden",
-      border: "1px solid #C7D0EC",
+      border: "1px solid #D8E3E3",
       boxShadow: "0 25px 80px rgba(18,17,15,0.28)",
     },
     modalCardGold: {
       width: "100%",
       maxWidth: 420,
-      background: "linear-gradient(160deg,#EAF0FF 0%,#FFF3CC 100%)",
+      background: "linear-gradient(160deg,#FFFFFF 0%,#FFF3CC 100%)",
       borderRadius: 28,
       overflow: "hidden",
-      border: "2px solid #FFB23E",
-      boxShadow: "0 25px 80px rgba(232,160,0,0.3)",
+      border: "2px solid #3B6B70",
+      boxShadow: "0 25px 80px rgba(59,107,112,0.3)",
     },
     modalImage: {
       height: 190,
       background:
-        "radial-gradient(ellipse at 40% 30%, rgba(61,217,196,0.35) 0%, transparent 60%), linear-gradient(160deg, #1B2340 0%, #0B1020 100%)",
+        "radial-gradient(ellipse at 40% 30%, rgba(59,107,112,0.35) 0%, transparent 60%), linear-gradient(160deg, #1D2B30 0%, #F4F7F7 100%)",
       backgroundSize: "cover",
       backgroundPosition: "center",
     },
     modalImageGold: {
       height: 190,
       background:
-        "linear-gradient(135deg,#FFB23E 0%,#F5C842 50%,#FFB23E 100%)",
+        "linear-gradient(135deg,#3B6B70 0%,#F5C842 50%,#3B6B70 100%)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -3170,7 +3206,7 @@ export default function App() {
       letterSpacing: "-0.05em",
       fontWeight: 500,
       fontFamily:
-        'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
+        "inherit",
       marginBottom: 8,
     },
     modalTitleGold: {
@@ -3179,13 +3215,13 @@ export default function App() {
       letterSpacing: "-0.05em",
       fontWeight: 500,
       fontFamily:
-        'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
+        "inherit",
       marginBottom: 8,
       color: "#8A5A00",
     },
     modalText: {
       fontSize: 14,
-      color: "#7B87A8",
+      color: "#5F7076",
       lineHeight: 1.5,
       marginBottom: 16,
     },
@@ -3197,18 +3233,18 @@ export default function App() {
       fontStyle: "italic",
     },
     modalDate: {
-      background: "#EAF0FF",
-      border: "1px solid #C7D0EC",
+      background: "#FFFFFF",
+      border: "1px solid #D8E3E3",
       borderRadius: 10,
       padding: "8px 12px",
       fontSize: 12,
-      color: "#7B87A8",
+      color: "#5F7076",
       marginBottom: 14,
     },
     footer: {
       textAlign: "center" as const,
       fontSize: 12,
-      color: "#9AA6C4",
+      color: "#5F7076",
       marginTop: 32,
       paddingBottom: 16,
     },
@@ -3232,370 +3268,201 @@ export default function App() {
 
   // ── ARRIVAL SCREEN — avatar is the centrepiece ─────────────────────────
   if (screen === "arrival") {
+    // One screen, one action. Nature horizon (Attention Restoration Theory),
+    // bright low-saturation palette (low arousal), breathing paced by the orb.
     return (
       <div
         style={{
           minHeight: "100vh",
-          background: "radial-gradient(ellipse at 50% 30%, #141B36 0%, #0B1020 60%)",
+          background: "#F4F7F7",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          padding: "0 24px",
+          padding: "0 24px 140px",
           position: "relative",
           overflow: "hidden",
+          boxSizing: "border-box",
         }}
       >
         <style>{`
           ${ORB_KEYFRAMES}
           @keyframes arrivalFadeUp {
-            from { opacity: 0; transform: translateY(18px); }
+            from { opacity: 0; transform: translateY(12px); }
             to   { opacity: 1; transform: translateY(0); }
           }
         `}</style>
-
-        {/* Deep background wash */}
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background:
-              "radial-gradient(ellipse at 50% 45%, rgba(61,217,196,0.12) 0%, rgba(11,16,32,0) 65%)",
-            pointerEvents: "none",
-          }}
-        />
-
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 800,
-            letterSpacing: "0.22em",
-            textTransform: "uppercase",
-            color: "rgba(234,240,255,0.22)",
-            marginBottom: 52,
-            animation: "arrivalFadeUp 1s ease forwards",
-            position: "relative",
-            zIndex: 1,
-          }}
-        >
-          Reset
+        <NatureHorizon />
+        <div style={{ position: "relative", zIndex: 1, textAlign: "center" }}>
+          <div style={{ marginBottom: 20, animation: "arrivalFadeUp 0.8s ease both" }}>
+            <BreathOrb phase={breathePhase} size={170} hue="#6FA8A6" />
+          </div>
+          <div
+            style={{
+              fontSize: 13,
+              color: "#5F7076",
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              marginBottom: 10,
+            }}
+          >
+            {breathePhase === "in" ? "Breathe in" : "Breathe out"}
+          </div>
+          <div
+            style={{
+              fontSize: 24,
+              fontWeight: 700,
+              color: "#1D2B30",
+              lineHeight: 1.3,
+              marginBottom: 4,
+            }}
+          >
+            You're here.
+          </div>
+          <div style={{ fontSize: 15, color: "#4F6067", marginBottom: 28 }}>
+            قِف. تنفّس. أنت هنا.
+          </div>
+          <button
+            onClick={() => setScreen("presence")}
+            disabled={!arrivalUnlocked}
+            style={{
+              minWidth: 160,
+              minHeight: 46,
+              padding: "10px 28px",
+              borderRadius: 999,
+              border: "none",
+              background: arrivalUnlocked ? "#3B6B70" : "#E3ECEC",
+              color: arrivalUnlocked ? "#FFFFFF" : "#5F7076",
+              fontSize: 15,
+              fontWeight: 700,
+              cursor: arrivalUnlocked ? "pointer" : "default",
+              fontFamily: "inherit",
+              transition: "background 0.6s ease, color 0.6s ease",
+            }}
+          >
+            {arrivalUnlocked ? "I'm here" : "Breathe…"}
+          </button>
         </div>
-
-        {/* The Avatar — breathing */}
-        <div
-          style={{
-            marginBottom: 36,
-            animation: "arrivalFadeUp 0.8s ease 0.2s both",
-            position: "relative",
-            zIndex: 1,
-          }}
-        >
-          <BreathOrb phase={breathePhase} size={300} hue="#3DD9C4" />
-        </div>
-
-        {/* Breathe label */}
-        <div
-          style={{
-            fontSize: 12,
-            color: "rgba(234,240,255,0.4)",
-            letterSpacing: "0.16em",
-            textTransform: "uppercase",
-            marginBottom: 18,
-            animation: "arrivalFadeUp 1s ease 0.4s both",
-            transition: "opacity 0.8s ease",
-            position: "relative",
-            zIndex: 1,
-          }}
-        >
-          {breathePhase === "in" ? "Breathe in" : "Breathe out"}
-        </div>
-
-        {/* Tagline */}
-        <div
-          style={{
-            fontSize: 26,
-            fontWeight: 500,
-            color: "rgba(234,240,255,0.88)",
-            fontFamily:
-              'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
-            letterSpacing: "-0.03em",
-            textAlign: "center",
-            lineHeight: 1.3,
-            marginBottom: 10,
-            maxWidth: 280,
-            animation: "arrivalFadeUp 1.2s ease 0.6s both",
-            position: "relative",
-            zIndex: 1,
-          }}
-        >
-          Stop. Breathe.{"\n"}You're already here.
-        </div>
-        <div
-          style={{
-            fontSize: 15,
-            color: "rgba(234,240,255,0.4)",
-            textAlign: "center",
-            marginBottom: 8,
-            position: "relative",
-            zIndex: 1,
-            animation: "arrivalFadeUp 1.2s ease 0.7s both",
-          }}
-        >
-          قِف. تنفّس. أنت هنا.
-        </div>
-        <div
-          style={{
-            fontSize: 13,
-            color: "rgba(234,240,255,0.28)",
-            textAlign: "center",
-            marginBottom: 56,
-            fontStyle: "italic",
-            position: "relative",
-            zIndex: 1,
-            letterSpacing: "0.04em",
-          }}
-        >
-          Three minutes. One move. Done.
-        </div>
-
-        <button
-          onClick={() => setScreen("presence")}
-          disabled={!arrivalUnlocked}
-          style={{
-            padding: "14px 36px",
-            borderRadius: 999,
-            border: `1px solid ${
-              arrivalUnlocked
-                ? "rgba(61,217,196,0.45)"
-                : "rgba(234,240,255,0.08)"
-            }`,
-            background: arrivalUnlocked
-              ? "rgba(61,217,196,0.14)"
-              : "transparent",
-            color: arrivalUnlocked
-              ? "rgba(234,240,255,0.9)"
-              : "rgba(234,240,255,0.18)",
-            fontSize: 14,
-            cursor: arrivalUnlocked ? "pointer" : "default",
-            fontFamily: "inherit",
-            letterSpacing: "0.06em",
-            transition: "all 1s ease",
-            position: "relative",
-            zIndex: 1,
-            boxShadow: arrivalUnlocked
-              ? "0 0 24px rgba(61,217,196,0.18)"
-              : "none",
-          }}
-        >
-          {arrivalUnlocked ? "I'm here" : "Breathe..."}
-        </button>
       </div>
     );
   }
 
   // ── PRESENCE SCREEN — avatar tints to match score ─────────────────────
   if (screen === "presence") {
-    // Avatar accent color based on selected score
-    const presenceAccents: Record<number, string> = {
-      1: "#C0392B",
-      2: "#D4630A",
-      3: "#B8940A",
-      4: "#1E8C82",
-      5: "#1A5276",
-    };
-    const avatarAccent =
-      presenceScore > 0 ? presenceAccents[presenceScore] : "#B47832";
-
+    // 5 small targets in one row, tap = answer + continue (one decision, one tap).
     return (
       <div
         style={{
           minHeight: "100vh",
-          background: "#0B1020",
+          background: "#F4F7F7",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          padding: "0 24px",
+          padding: "0 24px 140px",
           position: "relative",
           overflow: "hidden",
+          boxSizing: "border-box",
         }}
       >
-        <style>{`
-          ${AVATAR_KEYFRAMES}
-          @keyframes pFadeUp {
-            from { opacity: 0; transform: translateY(16px); }
-            to   { opacity: 1; transform: translateY(0); }
-          }
-          @keyframes pBgPulse {
-            0%, 100% { opacity: 1; }
-            50%       { opacity: 0.6; }
-          }
-        `}</style>
-
-        {/* Dynamic background wash matching presence color */}
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background:
-              presenceScore > 0
-                ? `radial-gradient(ellipse at 50% 30%, ${avatarAccent}18 0%, transparent 60%)`
-                : "transparent",
-            transition: "background 0.8s ease",
-            pointerEvents: "none",
-          }}
-        />
-
-        <div
-          style={{
-            width: "100%",
-            maxWidth: 400,
-            animation: "pFadeUp 0.6s ease forwards",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            position: "relative",
-            zIndex: 1,
-          }}
-        >
-          {/* Avatar */}
-          <div style={{ marginBottom: 28 }}>
-            <BreathOrb
-              phase="idle"
-              size={140}
-              hue="#3DD9C4"
-            />
+        <NatureHorizon />
+        <div style={{ width: "100%", maxWidth: 360, position: "relative", zIndex: 1, textAlign: "center" }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: "#1D2B30", marginBottom: 6 }}>
+            How present are you?
           </div>
-
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 800,
-              letterSpacing: "0.2em",
-              textTransform: "uppercase",
-              color: "rgba(234,240,255,0.25)",
-              marginBottom: 20,
-            }}
-          >
-            Reset
+          <div style={{ fontSize: 15, color: "#4F6067", marginBottom: 24 }}>
+            Tap one.
           </div>
-          <div
-            style={{
-              fontSize: 26,
-              fontWeight: 500,
-              color: "rgba(234,240,255,0.9)",
-              fontFamily:
-                'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
-              letterSpacing: "-0.03em",
-              textAlign: "center",
-              lineHeight: 1.3,
-              marginBottom: 8,
-            }}
-          >
-            How present are you{"\n"}right now?
-          </div>
-          <div
-            style={{
-              fontSize: 13,
-              color: "rgba(234,240,255,0.28)",
-              textAlign: "center",
-              marginBottom: 36,
-              letterSpacing: "0.04em",
-            }}
-          >
-            Be honest. No one's watching.
-          </div>
-          <div style={{ display: "grid", gap: 10, marginBottom: 36, width: "100%" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
             {[1, 2, 3, 4, 5].map((score) => {
-              const info = PRESENCE_LABELS[score];
               const selected = presenceScore === score;
               return (
                 <button
                   key={score}
-                  onClick={() => setPresenceScore(score)}
+                  aria-label={PRESENCE_LABELS[score].en}
+                  onClick={() => {
+                    setPresenceScore(score);
+                    window.setTimeout(() => setScreen("start"), 250);
+                  }}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "14px 18px",
-                    borderRadius: 16,
-                    border: selected
-                      ? `1px solid ${info.color}66`
-                      : "1px solid rgba(234,240,255,0.07)",
-                    background: selected
-                      ? `${info.color}20`
-                      : "rgba(234,240,255,0.02)",
+                    width: 52,
+                    height: 52,
+                    borderRadius: "50%",
+                    border: selected ? "2px solid #3B6B70" : "1px solid #D8E3E3",
+                    background: selected ? "#E3EFEF" : "#FFFFFF",
+                    color: "#1D2B30",
+                    fontSize: 17,
+                    fontWeight: 700,
                     cursor: "pointer",
                     fontFamily: "inherit",
-                    transition: "all 0.22s ease",
-                    boxShadow: selected
-                      ? `0 0 24px ${info.color}20, inset 0 0 0 1px ${info.color}22`
-                      : "none",
+                    transition: "all 0.2s ease",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{
-                      width: 10, height: 10, borderRadius: "50%",
-                      background: selected ? info.color : "rgba(234,240,255,0.15)",
-                      boxShadow: selected ? `0 0 10px ${info.color}` : "none",
-                      transition: "all 0.22s ease",
-                      flexShrink: 0,
-                    }} />
-                    <div>
-                      <div style={{
-                        fontSize: 14,
-                        color: selected ? "rgba(234,240,255,0.95)" : "rgba(234,240,255,0.45)",
-                        fontWeight: selected ? 600 : 400,
-                        transition: "all 0.22s ease",
-                        lineHeight: 1.2,
-                      }}>{info.en}</div>
-                      {selected && (
-                        <div style={{
-                          fontSize: 11,
-                          color: `${info.color}CC`,
-                          marginTop: 2,
-                          transition: "all 0.3s ease",
-                        }}>{info.sub}</div>
-                      )}
-                    </div>
-                  </div>
-                  <div style={{
-                    fontSize: 11,
-                    fontWeight: 800,
-                    color: selected ? info.color : "rgba(234,240,255,0.15)",
-                    transition: "color 0.22s ease",
-                    letterSpacing: "0.05em",
-                  }}>{score}/5</div>
+                  {score}
                 </button>
               );
             })}
           </div>
-          <button
-            onClick={() => presenceScore > 0 && setScreen("start")}
-            disabled={presenceScore === 0}
+          <div
             style={{
-              width: "100%",
-              padding: "15px 18px",
-              borderRadius: 18,
-              border: "none",
-              background:
-                presenceScore > 0
-                  ? "rgba(234,240,255,0.92)"
-                  : "rgba(234,240,255,0.08)",
-              color:
-                presenceScore > 0 ? "#0F1730" : "rgba(234,240,255,0.25)",
-              fontSize: 15,
-              fontWeight: 800,
-              cursor: presenceScore > 0 ? "pointer" : "default",
-              fontFamily: "inherit",
-              transition: "all 0.3s ease",
-              boxShadow:
-                presenceScore > 0
-                  ? "0 8px 24px rgba(234,240,255,0.12)"
-                  : "none",
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: 13,
+              color: "#5F7076",
+              marginTop: 10,
             }}
           >
-            Continue
+            <span>{PRESENCE_LABELS[1].en}</span>
+            <span>{PRESENCE_LABELS[5].en}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Closing screen: a clear end point so the session stops here (less screen time).
+  if (screen === "done") {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#F4F7F7",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "0 24px 140px",
+          position: "relative",
+          overflow: "hidden",
+          boxSizing: "border-box",
+          textAlign: "center",
+        }}
+      >
+        <NatureHorizon />
+        <div style={{ position: "relative", zIndex: 1 }}>
+          <div style={{ fontSize: 24, fontWeight: 700, color: "#1D2B30", marginBottom: 6 }}>
+            Done for today.
+          </div>
+          <div style={{ fontSize: 16, color: "#4F6067", marginBottom: 4 }}>
+            Put the phone down. Go do it.
+          </div>
+          <div style={{ fontSize: 15, color: "#4F6067", marginBottom: 28 }}>
+            خلصت. اترك الهاتف.
+          </div>
+          <button
+            onClick={() => setScreen("start")}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#3B6B70",
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              padding: 12,
+            }}
+          >
+            Start another reset
           </button>
         </div>
       </div>
@@ -3608,7 +3475,7 @@ export default function App() {
       <div
         style={{
           minHeight: "100vh",
-          background: "#0B1020",
+          background: "#F4F7F7",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -3651,7 +3518,7 @@ export default function App() {
               height: 520,
               borderRadius: "50%",
               background:
-                "radial-gradient(circle, rgba(255,178,62,0.12) 0%, transparent 70%)",
+                "radial-gradient(circle, rgba(59,107,112,0.12) 0%, transparent 70%)",
               animation: "reflectBg 12s ease-in-out infinite",
             }}
           />
@@ -3672,7 +3539,7 @@ export default function App() {
               fontWeight: 800,
               letterSpacing: "0.22em",
               textTransform: "uppercase",
-              color: "rgba(234,240,255,0.18)",
+              color: "#5F7076",
               marginBottom: 44,
             }}
           >
@@ -3688,7 +3555,7 @@ export default function App() {
               animation: "fadeUpSlow 0.6s ease forwards",
             }}
           >
-            <BreathOrb phase="idle" size={130} hue="#6C7BFF" />
+            <BreathOrb phase="idle" size={130} hue="#7C93B8" />
           </div>
 
           {/* What they typed */}
@@ -3698,7 +3565,7 @@ export default function App() {
               fontWeight: 700,
               letterSpacing: "0.14em",
               textTransform: "uppercase",
-              color: "rgba(234,240,255,0.2)",
+              color: "#5F7076",
               marginBottom: 14,
             }}
           >
@@ -3707,9 +3574,9 @@ export default function App() {
           <div
             style={{
               fontSize: 17,
-              color: "rgba(234,240,255,0.5)",
+              color: "#4F6067",
               fontFamily:
-                'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
+                "inherit",
               fontStyle: "italic",
               lineHeight: 1.45,
               marginBottom: 40,
@@ -3745,7 +3612,7 @@ export default function App() {
                       width: 7,
                       height: 7,
                       borderRadius: "50%",
-                      background: "rgba(61,217,196,0.6)",
+                      background: "rgba(59,107,112,0.6)",
                       animation: `dotPulse 1.4s ease-in-out ${i * 0.2}s infinite`,
                     }}
                   />
@@ -3757,9 +3624,9 @@ export default function App() {
                   fontSize: 22,
                   fontWeight: 500,
                   lineHeight: 1.38,
-                  color: "rgba(234,240,255,0.9)",
+                  color: "#1D2B30",
                   fontFamily:
-                    'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
+                    "inherit",
                   letterSpacing: "-0.02em",
                   animation: "fadeUpSlow 0.8s ease forwards",
                 }}
@@ -3775,28 +3642,28 @@ export default function App() {
               style={{
                 padding: "15px 42px",
                 borderRadius: 999,
-                border: "1px solid rgba(61,217,196,0.28)",
-                background: "rgba(61,217,196,0.1)",
-                color: "rgba(234,240,255,0.8)",
+                border: "1px solid rgba(59,107,112,0.28)",
+                background: "rgba(59,107,112,0.1)",
+                color: "#1D2B30",
                 fontSize: 14,
                 cursor: "pointer",
                 fontFamily: "inherit",
                 letterSpacing: "0.05em",
                 transition: "all 0.3s ease",
                 animation: "fadeUpSlow 0.6s ease 0.3s both",
-                boxShadow: "0 0 20px rgba(61,217,196,0.08)",
+                boxShadow: "0 0 20px rgba(59,107,112,0.08)",
               }}
               onMouseEnter={(e) => {
                 (e.currentTarget as HTMLButtonElement).style.background =
-                  "rgba(61,217,196,0.18)";
+                  "rgba(59,107,112,0.18)";
                 (e.currentTarget as HTMLButtonElement).style.color =
-                  "rgba(234,240,255,0.95)";
+                  "rgba(29,43,48,0.95)";
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLButtonElement).style.background =
-                  "rgba(61,217,196,0.1)";
+                  "rgba(59,107,112,0.1)";
                 (e.currentTarget as HTMLButtonElement).style.color =
-                  "rgba(234,240,255,0.8)";
+                  "rgba(29,43,48,0.8)";
               }}
             >
               Keep going →
@@ -3824,7 +3691,7 @@ export default function App() {
             )}
           </div>
           <PulseScreen onBack={() => setScreen("start")} />
-          <div style={S.footer}>Stop thinking. Start moving.</div>
+          
         </div>
       </div>
     );
@@ -3896,13 +3763,14 @@ export default function App() {
                 boxShadow: `0 0 6px ${PRESENCE_LABELS[presenceScore]?.color}`,
               }}
             />
-            <span style={{ fontSize: 12, color: "#7B87A8" }}>
+            <span style={{ fontSize: 12, color: "#5F7076" }}>
               Today: {PRESENCE_LABELS[presenceScore]?.en} — {PRESENCE_LABELS[presenceScore]?.sub}
             </span>
           </div>
         )}
 
-        {screen !== "profile" && (
+        {/* Progress only where it informs a decision; hidden mid-flow to cut load. */}
+        {(screen === "start" || screen === "history" || screen === "insights") && (
           <div
             style={
               isMilestone ? S.trackerCardMilestone : S.trackerCard
@@ -4036,7 +3904,7 @@ export default function App() {
             {profileError && (
               <div
                 style={{
-                  color: "#C0392B",
+                  color: "#A33A2E",
                   fontSize: 13,
                   marginBottom: 10,
                 }}
@@ -4072,18 +3940,18 @@ export default function App() {
               <div
                 key={p.name}
                 style={{
-                  border: "1px solid #D6DEF5",
+                  border: "1px solid #D8E3E3",
                   borderRadius: 14,
                   padding: "12px 14px",
                   margin: "10px 0",
-                  background: "#F7F9FF",
+                  background: "#F4F7F7",
                 }}
               >
                 <div style={{ fontWeight: 700, fontSize: 15 }}>{p.name}</div>
-                <div style={{ fontWeight: 600, color: "#3B4BB8", margin: "4px 0" }}>
+                <div style={{ fontWeight: 600, color: "#3B6B70", margin: "4px 0" }}>
                   {p.price}
                 </div>
-                <div style={{ fontSize: 13, color: "#55607A" }}>{p.detail}</div>
+                <div style={{ fontSize: 13, color: "#4F6067" }}>{p.detail}</div>
               </div>
             ))}
             {leadStatus === "sent" ? (
@@ -4136,7 +4004,7 @@ export default function App() {
                   ))}
                 </select>
                 {leadStatus === "error" && (
-                  <div style={{ color: "#C0392B", fontSize: 13, marginTop: 8 }}>
+                  <div style={{ color: "#A33A2E", fontSize: 13, marginTop: 8 }}>
                     Name and email are required. If they're filled in, try again.
                   </div>
                 )}
@@ -4229,9 +4097,9 @@ export default function App() {
                       fontSize: 26,
                       fontWeight: 500,
                       fontFamily:
-                        'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
+                        "inherit",
                       letterSpacing: "-0.04em",
-                      color: "#0F1730",
+                      color: "#1D2B30",
                       lineHeight: 1.1,
                       marginTop: 2,
                     }}
@@ -4243,7 +4111,7 @@ export default function App() {
                   <div
                     style={{
                       fontSize: 11,
-                      color: sealReady ? "#8A5A00" : "#7B87A8",
+                      color: sealReady ? "#8A5A00" : "#5F7076",
                       textAlign: "right",
                       fontWeight: sealReady ? 700 : 400,
                       alignSelf: "center",
@@ -4256,7 +4124,7 @@ export default function App() {
               <div
                 style={{
                   height: 6,
-                  background: "#D4DCF5",
+                  background: "#E3ECEC",
                   borderRadius: 999,
                   overflow: "hidden",
                   marginTop: 12,
@@ -4267,7 +4135,7 @@ export default function App() {
                     height: "100%",
                     width: `${Math.round((journeyDay / 90) * 100)}%`,
                     background:
-                      "linear-gradient(90deg, #FFB23E 0%, #FF7A45 100%)",
+                      "linear-gradient(90deg, #3B6B70 0%, #3B6B70 100%)",
                     borderRadius: 999,
                     transition: "width 0.4s ease",
                   }}
@@ -4301,7 +4169,7 @@ export default function App() {
                     marginBottom: 4,
                   }}
                 >
-                  <BreathOrb phase="idle" size={72} hue="#3DD9C4" dim />
+                  <BreathOrb phase="idle" size={72} hue="#6FA8A6" dim />
                 </div>
                 <div>
                   <div style={S.heroTitle}>{getTimeBasedHero().title}</div>
@@ -4372,7 +4240,7 @@ export default function App() {
                 style={{
                   background: "none",
                   border: "none",
-                  color: "#7B87A8",
+                  color: "#5F7076",
                   fontSize: 13,
                   cursor: "pointer",
                   letterSpacing: "0.02em",
@@ -4385,7 +4253,7 @@ export default function App() {
                 style={{
                   background: "none",
                   border: "none",
-                  color: "#7B87A8",
+                  color: "#5F7076",
                   fontSize: 13,
                   cursor: "pointer",
                   letterSpacing: "0.02em",
@@ -4467,13 +4335,13 @@ export default function App() {
                 <div
                   style={{
                     fontSize: 12,
-                    color: "#9AA6C4",
+                    color: "#5F7076",
                     fontStyle: "italic",
                     marginBottom: 14,
                     padding: "8px 12px",
-                    background: "#EAF0FF",
+                    background: "#FFFFFF",
                     borderRadius: 10,
-                    borderLeft: "2px solid #C7D0EC",
+                    borderLeft: "2px solid #D8E3E3",
                   }}
                 >
                   You said: "{mind}"
@@ -4548,7 +4416,7 @@ export default function App() {
                 </div>
               )}
               {needsRecovery && (
-                <div style={{ ...S.boldHint, color: "#1E8C82" }}>
+                <div style={{ ...S.boldHint, color: "#3B6B70" }}>
                   You've been running low. Make it half the size you think it
                   should be.
                 </div>
@@ -4611,7 +4479,7 @@ export default function App() {
             <div
               style={{
                 ...S.title,
-                color: "rgba(234,240,255,0.88)",
+                color: "#1D2B30",
               }}
             >
               Do it. Right now.
@@ -4623,7 +4491,7 @@ export default function App() {
               <div
                 style={{
                   ...S.label,
-                  color: "#9AA6C4",
+                  color: "#5F7076",
                   marginBottom: 8,
                 }}
               >
@@ -4654,7 +4522,7 @@ export default function App() {
                   <BreathOrb
                     phase={breathePhase}
                     size={150}
-                    hue="#FFB23E"
+                    hue="#3B6B70"
                   />
                   {/* Countdown number overlaid on avatar */}
                   <div
@@ -4670,11 +4538,10 @@ export default function App() {
                       style={{
                         fontSize: 32,
                         fontWeight: 800,
-                        color: "rgba(234,240,255,0.92)",
+                        color: "#FFFFFF",
                         letterSpacing: "-0.05em",
-                        fontFamily:
-                          'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
-                        textShadow: "0 0 20px rgba(61,217,196,0.5)",
+                        fontFamily: "inherit",
+                        textShadow: "none",
                       }}
                     >
                       {countdown}
@@ -4684,7 +4551,7 @@ export default function App() {
                 <div
                   style={{
                     fontSize: 11,
-                    color: "rgba(234,240,255,0.35)",
+                    color: "#5F7076",
                     textAlign: "center",
                     letterSpacing: "0.14em",
                     textTransform: "uppercase",
@@ -4724,7 +4591,7 @@ export default function App() {
             {aiFeedbackLoading ? (
               <div style={S.aiFeedbackBox}>
                 <div style={S.aiBadge}>Reset is reading the pattern</div>
-                <div style={{ ...S.feedbackText, color: "#9AA6C4", fontStyle: "italic" }}>
+                <div style={{ ...S.feedbackText, color: "#5F7076", fontStyle: "italic" }}>
                   Separating the story from the next decision...
                 </div>
               </div>
@@ -4734,9 +4601,9 @@ export default function App() {
                   <div style={S.aiBadge}>Your coach sees</div>
                   <div style={S.feedbackText}>{aiFeedback.coachInsight}</div>
                 </div>
-                <div style={{ ...S.aiFeedbackBox, background: "#0F1730", borderColor: "#232C4D" }}>
+                <div style={{ ...S.aiFeedbackBox, background: "#FFFFFF", borderColor: "#D8E3E3" }}>
                   <div style={{ ...S.aiBadge, color: "rgba(214,174,104,0.9)" }}>Your chief decides</div>
-                  <div style={{ ...S.feedbackText, color: "rgba(234,240,255,0.9)", fontSize: 18 }}>
+                  <div style={{ ...S.feedbackText, color: "#1D2B30", fontSize: 18 }}>
                     {aiFeedback.chiefDecision}
                   </div>
                 </div>
@@ -4755,8 +4622,8 @@ export default function App() {
                   gap: 10,
                   padding: "10px 14px",
                   marginBottom: 14,
-                  background: "rgba(27,35,64,0.04)",
-                  border: "1px solid rgba(27,35,64,0.08)",
+                  background: "rgba(29,43,48,0.04)",
+                  border: "1px solid rgba(29,43,48,0.08)",
                   borderRadius: 12,
                 }}
               >
@@ -4765,15 +4632,15 @@ export default function App() {
                     width: 6,
                     height: 6,
                     borderRadius: "50%",
-                    background: "#1B2340",
+                    background: "#1D2B30",
                     flexShrink: 0,
-                    boxShadow: "0 0 0 3px rgba(27,35,64,0.1)",
+                    boxShadow: "0 0 0 3px rgba(29,43,48,0.1)",
                   }}
                 />
                 <div
                   style={{
                     fontSize: 12,
-                    color: "#7B87A8",
+                    color: "#5F7076",
                     fontStyle: "italic",
                     lineHeight: 1.4,
                   }}
@@ -4793,7 +4660,7 @@ export default function App() {
                 <div
                   style={{
                     background: "#0D0B09",
-                    border: "1px solid #232C4D",
+                    border: "1px solid #D8E3E3",
                     borderRadius: 18,
                     padding: "14px 18px",
                     marginBottom: 14,
@@ -4809,7 +4676,7 @@ export default function App() {
                         fontWeight: 700,
                         letterSpacing: "0.12em",
                         textTransform: "uppercase" as const,
-                        color: "rgba(234,240,255,0.3)",
+                        color: "#5F7076",
                         marginBottom: 4,
                       }}
                     >
@@ -4818,7 +4685,7 @@ export default function App() {
                     <div
                       style={{
                         fontSize: 13,
-                        color: "rgba(234,240,255,0.6)",
+                        color: "#4F6067",
                       }}
                     >
                       Did you actually do it?
@@ -4828,9 +4695,9 @@ export default function App() {
                     style={{
                       fontSize: 22,
                       fontWeight: 500,
-                      color: "rgba(234,240,255,0.85)",
+                      color: "#1D2B30",
                       fontFamily:
-                        'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
+                        "inherit",
                       letterSpacing: "-0.03em",
                       minWidth: 52,
                       textAlign: "right" as const,
@@ -4846,11 +4713,11 @@ export default function App() {
               <div
                 style={{
                   ...S.resultBox,
-                  background: streak >= 7 ? "#EAF0FF" : "#EAF0FF",
+                  background: streak >= 7 ? "#FFFFFF" : "#FFFFFF",
                   border:
                     streak >= 7
                       ? "1px solid #F0C040"
-                      : "1px solid #C7D0EC",
+                      : "1px solid #D8E3E3",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
@@ -4862,7 +4729,7 @@ export default function App() {
                     style={{
                       ...S.unfinishedMove,
                       marginBottom: 0,
-                      color: streak >= 7 ? "#8A5A00" : "#0F1730",
+                      color: streak >= 7 ? "#8A5A00" : "#1D2B30",
                     }}
                   >
                     {streak} day{streak !== 1 ? "s" : ""}
@@ -4882,8 +4749,14 @@ export default function App() {
                 {shareCopied ? "Copied" : "Share my move"}
               </button>
             </div>
-            <button style={S.ctaMuted} onClick={resetFlow}>
-              Back to start
+            <button
+              style={{ ...S.cta, marginTop: 4 }}
+              onClick={() => {
+                resetFlow();
+                setScreen("done");
+              }}
+            >
+              Done for today
             </button>
           </div>
         )}
@@ -4901,7 +4774,7 @@ export default function App() {
                   <div style={S.label}>Rep {index + 1}</div>
                   <div style={{ ...S.unfinishedMove, margin: "5px 0 6px" }}>{item.title}</div>
                   <div style={{ ...S.trackerText, lineHeight: 1.5, marginBottom: 10 }}>{item.trigger}</div>
-                  <div style={{ fontSize: 14, color: "#1B2340", fontWeight: 650, lineHeight: 1.5 }}>
+                  <div style={{ fontSize: 14, color: "#1D2B30", fontWeight: 650, lineHeight: 1.5 }}>
                     {item.rep}
                   </div>
                 </div>
@@ -5106,7 +4979,7 @@ export default function App() {
                         style={{
                           ...S.historyLine,
                           fontStyle: "italic",
-                          color: "#7B87A8",
+                          color: "#5F7076",
                           marginTop: 6,
                         }}
                       >
@@ -5149,7 +5022,7 @@ export default function App() {
                     borderRadius: 12,
                     padding: "14px 16px",
                     fontFamily:
-                      'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
+                      "inherit",
                     fontStyle: "italic",
                     fontSize: 16,
                     color: "#5C4400",
@@ -5181,8 +5054,8 @@ export default function App() {
                   <button
                     style={{
                       ...S.statusPrimary,
-                      background: "#1B2340",
-                      color: "#EAF0FF",
+                      background: "#1D2B30",
+                      color: "#FFFFFF",
                     }}
                     onClick={() => saveFollowUp("confirmed")}
                   >
@@ -5191,8 +5064,8 @@ export default function App() {
                   <button
                     style={{
                       ...S.statusSecondary,
-                      border: "1px solid #C7D0EC",
-                      color: "#7B87A8",
+                      border: "1px solid #D8E3E3",
+                      color: "#5F7076",
                     }}
                     onClick={() => saveFollowUp("slipped")}
                   >
@@ -5211,7 +5084,7 @@ export default function App() {
             onClick={() => setShowPatternFlash(false)}
           >
             <div
-              style={{ ...S.modalCard, background: "#0E0C0A", border: "1px solid #232C4D" }}
+              style={{ ...S.modalCard, background: "#FFFFFF", border: "1px solid #D8E3E3" }}
               onClick={(e) => e.stopPropagation()}
             >
               <div style={S.modalBody}>
@@ -5221,7 +5094,7 @@ export default function App() {
                     fontWeight: 800,
                     letterSpacing: "0.18em",
                     textTransform: "uppercase",
-                    color: "rgba(255,178,62,0.8)",
+                    color: "rgba(59,107,112,0.8)",
                     marginBottom: 10,
                   }}
                 >
@@ -5232,8 +5105,8 @@ export default function App() {
                     fontSize: 19,
                     fontWeight: 500,
                     fontFamily:
-                      'Iowan Old Style,"Palatino Linotype","Book Antiqua",Georgia,serif',
-                    color: "rgba(234,240,255,0.9)",
+                      "inherit",
+                    color: "#1D2B30",
                     lineHeight: 1.4,
                     letterSpacing: "-0.02em",
                     marginBottom: 18,
@@ -5244,8 +5117,8 @@ export default function App() {
                 <button
                   style={{
                     ...S.ctaMuted,
-                    border: "1px solid rgba(234,240,255,0.2)",
-                    color: "rgba(234,240,255,0.6)",
+                    border: "1px solid rgba(29,43,48,0.2)",
+                    color: "#4F6067",
                     marginBottom: 0,
                   }}
                   onClick={() => setShowPatternFlash(false)}
@@ -5307,7 +5180,7 @@ export default function App() {
           </div>
         )}
 
-        <div style={S.footer}>Stop thinking. Start moving.</div>
+        
       </div>
     </div>
   );
