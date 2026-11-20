@@ -18,7 +18,8 @@ type Screen =
   | "insights"
   | "reflect"
   | "pulse"
-  | "training";
+  | "training"
+  | "teams";
 
 type EntryStatus = "done" | "not_yet";
 
@@ -396,6 +397,35 @@ function makeProfileId(): string {
 }
 
 const DEVICE_PROFILES_KEY = "reset_device_profiles";
+
+// Optional Stripe Payment Links (set in Vercel env). Buttons hide if unset.
+const PRO_PAYMENT_LINK = process.env.REACT_APP_PRO_PAYMENT_LINK || "";
+const PILOT_PAYMENT_LINK = process.env.REACT_APP_PILOT_PAYMENT_LINK || "";
+
+const PLANS = [
+  {
+    name: "Leadership Pilot",
+    price: "9,900 AED / month",
+    detail:
+      "Up to 30 leaders · 3-month minimum · monthly outcome report · launch session",
+  },
+  {
+    name: "Reset Teams",
+    price: "1,500 AED / month + 4 AED per verified move",
+    detail:
+      "Up to 100 people · you only pay for moves people confirm they kept · capped at 60 AED per person per month",
+  },
+  {
+    name: "Coach",
+    price: "349 AED / month",
+    detail: "Up to 25 clients on your code · monthly client outcome report",
+  },
+  {
+    name: "Individual",
+    price: "29 AED / month",
+    detail: "Free while your company or coach sponsors you",
+  },
+];
 
 function readDeviceProfiles(): Record<string, string> {
   try {
@@ -1710,6 +1740,16 @@ function PulseScreen({ onBack }: { onBack: () => void }) {
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("profile");
+  const [orgCodeDraft, setOrgCodeDraft] = useState("");
+  const [lead, setLead] = useState({
+    name: "",
+    company: "",
+    email: "",
+    phone: "",
+    teamSize: "",
+    interest: "Leadership Pilot",
+  });
+  const [leadStatus, setLeadStatus] = useState<"" | "sending" | "sent" | "error">("");
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileName, setProfileName] = useState("");
@@ -1812,6 +1852,11 @@ export default function App() {
 
   useEffect(() => {
     async function init() {
+      if (new URLSearchParams(window.location.search).has("teams")) {
+        setScreen("teams");
+        setLoading(false);
+        return;
+      }
       const savedProfileId = localStorage.getItem("reset_profile_id");
       const reminderEnabled =
         localStorage.getItem("reset_reminder_enabled") === "true";
@@ -2151,6 +2196,19 @@ export default function App() {
       setProfileError(error.message);
       return;
     }
+    if (orgCodeDraft.trim()) {
+      const { data: orgName, error: orgError } = await supabase.rpc("join_org", {
+        p_profile_id: id,
+        p_code: orgCodeDraft.trim(),
+      });
+      if (orgError || !orgName) {
+        setProfileError(
+          "That company or coach code wasn't recognised. Check it, or leave it empty."
+        );
+        return;
+      }
+      setOrgCodeDraft("");
+    }
     map[nameKey] = id;
     writeDeviceProfiles(map);
     localStorage.setItem("reset_profile_id", id);
@@ -2163,6 +2221,23 @@ export default function App() {
     }
     setProfile(data as Profile);
     setScreen("arrival");
+  }
+
+  async function submitLead() {
+    if (!lead.name.trim() || !lead.email.trim()) {
+      setLeadStatus("error");
+      return;
+    }
+    setLeadStatus("sending");
+    const { error } = await supabase.from("leads").insert({
+      name: lead.name.trim(),
+      company: lead.company.trim() || null,
+      email: lead.email.trim(),
+      phone: lead.phone.trim() || null,
+      team_size: lead.teamSize.trim() || null,
+      interest: lead.interest,
+    });
+    setLeadStatus(error ? "error" : "sent");
   }
 
   // Switch person on this device. The current profile is remembered under its
@@ -3947,6 +4022,17 @@ export default function App() {
               onChange={(e) => setWhyDraft(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && saveProfile()}
             />
+            <div style={{ ...S.sub, marginTop: 10, marginBottom: 6 }}>
+              Company or coach code (optional)
+            </div>
+            <input
+              style={S.input}
+              placeholder="e.g. ACME"
+              value={orgCodeDraft}
+              maxLength={24}
+              onChange={(e) => setOrgCodeDraft(e.target.value.toUpperCase())}
+              onKeyDown={(e) => e.key === "Enter" && saveProfile()}
+            />
             {profileError && (
               <div
                 style={{
@@ -3963,6 +4049,125 @@ export default function App() {
               onClick={saveProfile}
             >
               Start
+            </button>
+            <button
+              style={{ ...S.ctaMuted, marginTop: 10 }}
+              onClick={() => setScreen("teams")}
+            >
+              Reset for teams & coaches
+            </button>
+          </div>
+        )}
+
+        {screen === "teams" && (
+          <div style={S.card}>
+            <div style={S.stepPill}>For teams</div>
+            <div style={S.title}>Pay only for moves people keep.</div>
+            <div style={S.sub}>
+              Your people reset when they're stuck and pick one move. Five
+              minutes later they confirm it's still done. You pay per
+              confirmed move — not per seat nobody opens.
+            </div>
+            {PLANS.map((p) => (
+              <div
+                key={p.name}
+                style={{
+                  border: "1px solid #D6DEF5",
+                  borderRadius: 14,
+                  padding: "12px 14px",
+                  margin: "10px 0",
+                  background: "#F7F9FF",
+                }}
+              >
+                <div style={{ fontWeight: 700, fontSize: 15 }}>{p.name}</div>
+                <div style={{ fontWeight: 600, color: "#3B4BB8", margin: "4px 0" }}>
+                  {p.price}
+                </div>
+                <div style={{ fontSize: 13, color: "#55607A" }}>{p.detail}</div>
+              </div>
+            ))}
+            {leadStatus === "sent" ? (
+              <div style={{ ...S.sub, marginTop: 14 }}>
+                Thanks — we'll contact you within one working day.
+              </div>
+            ) : (
+              <>
+                <div style={{ ...S.label, margin: "16px 0 6px" }}>Book a pilot</div>
+                <input
+                  style={S.input}
+                  placeholder="Your name"
+                  value={lead.name}
+                  onChange={(e) => setLead({ ...lead, name: e.target.value })}
+                />
+                <input
+                  style={{ ...S.input, marginTop: 8 }}
+                  placeholder="Company"
+                  value={lead.company}
+                  onChange={(e) => setLead({ ...lead, company: e.target.value })}
+                />
+                <input
+                  style={{ ...S.input, marginTop: 8 }}
+                  placeholder="Work email"
+                  type="email"
+                  value={lead.email}
+                  onChange={(e) => setLead({ ...lead, email: e.target.value })}
+                />
+                <input
+                  style={{ ...S.input, marginTop: 8 }}
+                  placeholder="Phone (optional)"
+                  value={lead.phone}
+                  onChange={(e) => setLead({ ...lead, phone: e.target.value })}
+                />
+                <input
+                  style={{ ...S.input, marginTop: 8 }}
+                  placeholder="How many people?"
+                  value={lead.teamSize}
+                  onChange={(e) => setLead({ ...lead, teamSize: e.target.value })}
+                />
+                <select
+                  style={{ ...S.input, marginTop: 8 }}
+                  value={lead.interest}
+                  onChange={(e) => setLead({ ...lead, interest: e.target.value })}
+                >
+                  {PLANS.map((p) => (
+                    <option key={p.name} value={p.name}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+                {leadStatus === "error" && (
+                  <div style={{ color: "#C0392B", fontSize: 13, marginTop: 8 }}>
+                    Name and email are required. If they're filled in, try again.
+                  </div>
+                )}
+                <button
+                  style={{ ...S.cta, marginTop: 14 }}
+                  onClick={submitLead}
+                  disabled={leadStatus === "sending"}
+                >
+                  {leadStatus === "sending" ? "Sending…" : "Book a pilot"}
+                </button>
+              </>
+            )}
+            {PILOT_PAYMENT_LINK && (
+              <a href={PILOT_PAYMENT_LINK} target="_blank" rel="noreferrer">
+                <button style={{ ...S.ctaGold, marginTop: 10 }}>
+                  Start Leadership Pilot now
+                </button>
+              </a>
+            )}
+            {PRO_PAYMENT_LINK && (
+              <a href={PRO_PAYMENT_LINK} target="_blank" rel="noreferrer">
+                <button style={{ ...S.ctaMuted, marginTop: 10 }}>
+                  Individual — 29 AED / month
+                </button>
+              </a>
+            )}
+            <button
+              style={{ ...S.ctaMuted, marginTop: 10 }}
+              onClick={() => setScreen(profile ? "start" : "profile")}
+            >
+              Back
             </button>
           </div>
         )}
