@@ -2225,6 +2225,20 @@ export default function App() {
     );
   }
 
+  // Persist the 5-minute follow-up answer so "moved after reset" is measurable
+  // from real data, not self-report. Needs entries.follow_up + entries.follow_up_at
+  // (see supabase/migrations/20261120_entries_follow_up.sql).
+  async function saveFollowUp(answer: "confirmed" | "slipped") {
+    setFollowUpAnswer(answer);
+    setShowFollowUp(false);
+    if (!latestId) return;
+    const { error } = await supabase
+      .from("entries")
+      .update({ follow_up: answer, follow_up_at: new Date().toISOString() })
+      .eq("id", latestId);
+    if (error) console.error("Follow-up answer did not save:", error.message);
+  }
+
   async function toggleNotifications() {
     if (notifEnabled) {
       cancelLocalReminder();
@@ -4886,10 +4900,7 @@ export default function App() {
                       background: "#1B2340",
                       color: "#EAF0FF",
                     }}
-                    onClick={() => {
-                      setFollowUpAnswer("confirmed");
-                      setShowFollowUp(false);
-                    }}
+                    onClick={() => saveFollowUp("confirmed")}
                   >
                     Still done
                   </button>
@@ -4899,10 +4910,7 @@ export default function App() {
                       border: "1px solid #C7D0EC",
                       color: "#7B87A8",
                     }}
-                    onClick={() => {
-                      setFollowUpAnswer("slipped");
-                      setShowFollowUp(false);
-                    }}
+                    onClick={() => saveFollowUp("slipped")}
                   >
                     It slipped
                   </button>
