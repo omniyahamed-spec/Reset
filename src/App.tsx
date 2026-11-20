@@ -395,6 +395,20 @@ function makeProfileId(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+const DEVICE_PROFILES_KEY = "reset_device_profiles";
+
+function readDeviceProfiles(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(DEVICE_PROFILES_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function writeDeviceProfiles(map: Record<string, string>) {
+  localStorage.setItem(DEVICE_PROFILES_KEY, JSON.stringify(map));
+}
+
 function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
@@ -2122,25 +2136,26 @@ export default function App() {
       setProfileError("Name is required.");
       return;
     }
-    // Renaming keeps the same profile; a new person always gets a new random ID.
-    const id = profile?.id ?? makeProfileId();
-    const { data, error } = profile
-      ? await supabase
-          .from("profiles")
-          .update({ name: profileName.trim() })
-          .eq("id", id)
-          .select()
-          .single()
-      : await supabase
-          .from("profiles")
-          .insert({ id, name: profileName.trim() })
-          .select()
-          .single();
+    // Each name on this device has its own private profile (random ID).
+    // Same name again on this device -> same history; new name -> fresh history.
+    // A name typed here can never open a profile created on another device.
+    const nameKey = profileName.trim().toLowerCase();
+    const map = readDeviceProfiles();
+    const id = map[nameKey] ?? makeProfileId();
+    const { data, error } = await supabase
+      .from("profiles")
+      .upsert({ id, name: profileName.trim() }, { onConflict: "id" })
+      .select()
+      .single();
     if (error) {
       setProfileError(error.message);
       return;
     }
+    map[nameKey] = id;
+    writeDeviceProfiles(map);
     localStorage.setItem("reset_profile_id", id);
+    setEntries([]);
+    await loadEntries(id);
     if (whyDraft.trim()) {
       localStorage.setItem("reset_why", whyDraft.trim());
       setWhy(whyDraft.trim());
@@ -2150,10 +2165,20 @@ export default function App() {
     setScreen("arrival");
   }
 
-  // Edit the display name only. History stays attached to this device's
-  // private profile ID; typing a name can never open someone else's profile.
+  // Switch person on this device. The current profile is remembered under its
+  // name so typing that name again later brings its history back.
   function changeName() {
-    setProfileName(profile?.name ?? "");
+    if (profile) {
+      const map = readDeviceProfiles();
+      map[profile.name.trim().toLowerCase()] = profile.id;
+      writeDeviceProfiles(map);
+    }
+    localStorage.removeItem("reset_profile_id");
+    cancelLocalReminder();
+    setProfile(null);
+    setEntries([]);
+    setProfileName("");
+    setNotifEnabled(false);
     setScreen("profile");
   }
 
