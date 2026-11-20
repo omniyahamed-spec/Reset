@@ -22,6 +22,12 @@ type Screen =
 
 type EntryStatus = "done" | "not_yet";
 
+// 5-minute "Still done / It slipped" follow-up, persisted on device so it
+// survives closing the app. Ignored if answered more than 12h late.
+const FOLLOWUP_KEY = "reset_followup_pending";
+const FOLLOWUP_DELAY_SECONDS = 300;
+const FOLLOWUP_MAX_LATE_MS = 12 * 60 * 60 * 1000;
+
 interface Profile {
   id: string;
   name: string;
@@ -1714,6 +1720,7 @@ export default function App() {
   const [followUpAnswer, setFollowUpAnswer] = useState<
     "confirmed" | "slipped" | null
   >(null);
+  const [followUpEntryId, setFollowUpEntryId] = useState<string | null>(null);
   const [mindReflection, setMindReflection] = useState<string>("");
   const [mindReflectionLoading, setMindReflectionLoading] = useState(false);
   const [patternFlash, setPatternFlash] = useState<string>("");
@@ -1881,6 +1888,24 @@ export default function App() {
     }, 1000);
     return () => window.clearTimeout(timer);
   }, [screen, countdown]);
+
+  // Restore a pending 5-minute follow-up after the app was closed/reloaded.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(FOLLOWUP_KEY);
+      if (!raw) return;
+      const pending = JSON.parse(raw) as { entryId: string; dueAt: number };
+      if (!pending?.entryId || Date.now() > pending.dueAt + FOLLOWUP_MAX_LATE_MS) {
+        localStorage.removeItem(FOLLOWUP_KEY);
+        return;
+      }
+      setFollowUpEntryId(pending.entryId);
+      setFollowUpAnswer(null);
+      setFollowUpSeconds(Math.max(0, Math.ceil((pending.dueAt - Date.now()) / 1000)));
+    } catch {
+      /* storage unavailable: follow-up only works while the app stays open */
+    }
+  }, []);
 
   useEffect(() => {
     if (followUpSeconds === null || followUpSeconds <= 0) {
@@ -2137,9 +2162,7 @@ export default function App() {
     setMindReflectionLoading(false);
     setPatternFlash("");
     setShowPatternFlash(false);
-    setFollowUpSeconds(null);
-    setShowFollowUp(false);
-    setFollowUpAnswer(null);
+    // Pending follow-up is kept on purpose: it belongs to the previous entry.
     setScreen(profile ? "start" : "profile");
   }
 
@@ -2188,7 +2211,23 @@ export default function App() {
     setLatestId(newEntry.id);
     setScreen("result");
     const newStreak = status === "done" ? streak + 1 : streak;
-    if (status === "done") setFollowUpSeconds(300);
+    if (status === "done") {
+      setFollowUpEntryId(newEntry.id);
+      setFollowUpAnswer(null);
+      setShowFollowUp(false);
+      setFollowUpSeconds(FOLLOWUP_DELAY_SECONDS);
+      try {
+        localStorage.setItem(
+          FOLLOWUP_KEY,
+          JSON.stringify({
+            entryId: newEntry.id,
+            dueAt: Date.now() + FOLLOWUP_DELAY_SECONDS * 1000,
+          })
+        );
+      } catch {
+        /* ignore */
+      }
+    }
     if (status === "done" && MILESTONE_DAYS.includes(newStreak)) {
       setShowMilestone(true);
     } else {
@@ -2231,11 +2270,17 @@ export default function App() {
   async function saveFollowUp(answer: "confirmed" | "slipped") {
     setFollowUpAnswer(answer);
     setShowFollowUp(false);
-    if (!latestId) return;
+    try {
+      localStorage.removeItem(FOLLOWUP_KEY);
+    } catch {
+      /* ignore */
+    }
+    const entryId = followUpEntryId;
+    if (!entryId) return;
     const { error } = await supabase
       .from("entries")
       .update({ follow_up: answer, follow_up_at: new Date().toISOString() })
-      .eq("id", latestId);
+      .eq("id", entryId);
     if (error) console.error("Follow-up answer did not save:", error.message);
   }
 
