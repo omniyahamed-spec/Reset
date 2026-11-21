@@ -743,11 +743,92 @@ function checkAndFireReminder(profileName: string, hasResetToday: boolean) {
   if (hour < DAILY_REMINDER_HOUR) return;
   if (hasResetToday) return;
   localStorage.setItem("reset_reminder_last_fired", today);
+  markArrivalSource("notification");
   new Notification("Reset — time to arrive", {
     body: `Hey ${profileName}. Before the noise takes over. One minute to come back to yourself.`,
     icon: "/favicon.ico",
     tag: "reset-daily",
   });
+}
+
+// ── RESET SOURCE (prompted vs unprompted) ─────────────────────────────────
+// Validation bar 2 counts *unprompted* resets. Every entry is tagged with where
+// it came from: "reminder" (calendar link), "notification" (in-app nudge) or
+// "organic" (the user opened Reset on their own).
+type EntrySource = "organic" | "reminder" | "notification";
+const SOURCE_WINDOW_MS = 30 * 60 * 1000;
+function markArrivalSource(src: EntrySource) {
+  try {
+    localStorage.setItem(
+      "reset_arrival_src",
+      JSON.stringify({ src, at: Date.now() })
+    );
+  } catch {}
+}
+function captureArrivalSource() {
+  const params = new URLSearchParams(window.location.search);
+  const src = params.get("src");
+  if (src !== "reminder" && src !== "notification") return;
+  markArrivalSource(src);
+  params.delete("src");
+  const q = params.toString();
+  window.history.replaceState(
+    null,
+    "",
+    window.location.pathname + (q ? "?" + q : "") + window.location.hash
+  );
+}
+function consumeEntrySource(): EntrySource {
+  try {
+    const raw = localStorage.getItem("reset_arrival_src");
+    if (!raw) return "organic";
+    localStorage.removeItem("reset_arrival_src");
+    const { src, at } = JSON.parse(raw);
+    if (Date.now() - at > SOURCE_WINDOW_MS) return "organic";
+    return src === "reminder" || src === "notification" ? src : "organic";
+  } catch {
+    return "organic";
+  }
+}
+
+// ── CALENDAR REMINDER (works with the app closed, no push server) ─────────
+function reminderTimeFromNow(): { h: number; m: number } {
+  const d = new Date();
+  let m = Math.round(d.getMinutes() / 15) * 15;
+  let h = d.getHours();
+  if (m === 60) {
+    m = 0;
+    h = (h + 1) % 24;
+  }
+  return { h, m };
+}
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
+function googleCalendarUrl(h: number, m: number): string {
+  const start = new Date();
+  start.setDate(start.getDate() + 1);
+  start.setHours(h, m, 0, 0);
+  const end = new Date(start.getTime() + 5 * 60 * 1000);
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}T${pad2(
+      d.getHours()
+    )}${pad2(d.getMinutes())}00`;
+  const link = `${window.location.origin}/?src=reminder`;
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: "Reset — 1 minute",
+    dates: `${fmt(start)}/${fmt(end)}`,
+    recur: "RRULE:FREQ=DAILY",
+    details: `Pause. Name the freeze. Move.\n${link}`,
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+function icsCalendarUrl(h: number, m: number): string {
+  const t = new Date();
+  t.setDate(t.getDate() + 1);
+  const d = `${t.getFullYear()}${pad2(t.getMonth() + 1)}${pad2(t.getDate())}`;
+  return `/api/calendar?h=${h}&m=${m}&d=${d}`;
 }
 
 // ── 90-DAY JOURNEY ─────────────────────────────────────────────────────────
@@ -1797,6 +1878,9 @@ export default function App() {
   const [countdown, setCountdown] = useState(COMMIT_SECONDS);
   const [latestId, setLatestId] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [calendarAdded, setCalendarAdded] = useState(
+    () => localStorage.getItem("reset_calendar_added") === "true"
+  );
   const [breathePhase, setBreathePhase] = useState<"in" | "out">("in");
   const [breatheCount, setBreatheCount] = useState(0);
   const [arrivalUnlocked, setArrivalUnlocked] = useState(false);
@@ -1887,6 +1971,7 @@ export default function App() {
 
   useEffect(() => {
     async function init() {
+      captureArrivalSource();
       if (new URLSearchParams(window.location.search).has("teams")) {
         setScreen("teams");
         setLoading(false);
@@ -2331,19 +2416,29 @@ export default function App() {
     if (!profile) return;
     setAiFeedbackLoading(true);
     const pastPatterns = buildPastPatternsSummary(entries);
-    const { data, error } = await supabase
+    const row = {
+      profile_id: profile.id,
+      mind: mind.trim(),
+      avoiding: avoiding.trim(),
+      move: move.trim(),
+      status,
+      feedback: "...",
+      presence_score: presenceScore || null,
+    };
+    const source = consumeEntrySource();
+    let { data, error } = await supabase
       .from("entries")
-      .insert({
-        profile_id: profile.id,
-        mind: mind.trim(),
-        avoiding: avoiding.trim(),
-        move: move.trim(),
-        status,
-        feedback: "...",
-        presence_score: presenceScore || null,
-      })
+      .insert({ ...row, source })
       .select()
       .single();
+    if (error && /source/i.test(error.message)) {
+      // Migration 20261121_entries_source.sql not run yet: save without it.
+      ({ data, error } = await supabase
+        .from("entries")
+        .insert(row)
+        .select()
+        .single());
+    }
     if (error) {
       alert("The entry did not save. Check Supabase table or policies.");
       setAiFeedbackLoading(false);
@@ -4749,6 +4844,40 @@ export default function App() {
                 {shareCopied ? "Copied" : "Share my move"}
               </button>
             </div>
+            {!calendarAdded && (() => {
+              const { h, m } = reminderTimeFromNow();
+              const markAdded = () => {
+                localStorage.setItem("reset_calendar_added", "true");
+                setTimeout(() => setCalendarAdded(true), 1500);
+              };
+              return (
+                <div style={S.shareBox}>
+                  <div style={S.shareTitle}>Same time tomorrow?</div>
+                  <div style={S.shareText}>
+                    A daily {pad2(h)}:{pad2(m)} reminder in your calendar. One tap
+                    opens Reset.
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <a
+                      href={icsCalendarUrl(h, m)}
+                      onClick={markAdded}
+                      style={{ ...S.ctaMuted, textAlign: "center" as const, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 0 }}
+                    >
+                      iPhone / Outlook
+                    </a>
+                    <a
+                      href={googleCalendarUrl(h, m)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={markAdded}
+                      style={{ ...S.ctaMuted, textAlign: "center" as const, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 0 }}
+                    >
+                      Google
+                    </a>
+                  </div>
+                </div>
+              );
+            })()}
             <button
               style={{ ...S.cta, marginTop: 4 }}
               onClick={() => {
