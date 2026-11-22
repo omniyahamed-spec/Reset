@@ -1,6 +1,7 @@
 import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "./supabaseClient";
 import { useAutoUpdate } from "./useAutoUpdate";
+import { Landing } from "./Landing";
 import { AVOID_OPTIONS, MIND_OPTIONS, MOVE_OPTIONS, TapStep, learnedOptions } from "./TapStep";
 import { CHECKOUT_HOUR, DayLog, EVENING_DEFAULT, dayKey, loadDays, saveDay } from "./daily";
 import {
@@ -34,7 +35,8 @@ type Screen =
   | "sprint"
   | "closeday"
   | "dayclosed"
-  | "done";
+  | "done"
+  | "landing";
 
 type EntryStatus = "done" | "not_yet";
 
@@ -2053,7 +2055,16 @@ export default function App() {
     async function init() {
       captureArrivalSource();
       pendingDailyAction.current = captureDailyAction();
-      if (new URLSearchParams(window.location.search).has("teams")) {
+      const qs = new URLSearchParams(window.location.search);
+      // Reset is WhatsApp-first: the public site is the landing page.
+      // The web app stays reachable with ?app (and calendar/deep links).
+      if (!["app", "src", "do", "screen"].some((k) => qs.has(k))) {
+        setScreen("landing");
+        setLoading(false);
+        return;
+      }
+      // B2B (teams page, sponsor codes) is hidden; kept for later at ?app&teams.
+      if (qs.has("teams")) {
         setScreen("teams");
         setLoading(false);
         return;
@@ -2657,6 +2668,8 @@ export default function App() {
       window.setTimeout(() => setShareCopied(false), 1800);
     } catch {}
   }
+
+  if (screen === "landing") return <Landing />;
 
   if (loading) {
     return (
@@ -4158,17 +4171,6 @@ export default function App() {
               onChange={(e) => setWhyDraft(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && saveProfile()}
             />
-            <div style={{ ...S.sub, marginTop: 10, marginBottom: 6 }}>
-              Company or coach code (optional)
-            </div>
-            <input
-              style={S.input}
-              placeholder="e.g. ACME"
-              value={orgCodeDraft}
-              maxLength={24}
-              onChange={(e) => setOrgCodeDraft(e.target.value.toUpperCase())}
-              onKeyDown={(e) => e.key === "Enter" && saveProfile()}
-            />
             {profileError && (
               <div
                 style={{
@@ -4185,12 +4187,6 @@ export default function App() {
               onClick={saveProfile}
             >
               Start
-            </button>
-            <button
-              style={{ ...S.ctaMuted, marginTop: 10 }}
-              onClick={() => setScreen("teams")}
-            >
-              Reset for teams & coaches
             </button>
           </div>
         )}

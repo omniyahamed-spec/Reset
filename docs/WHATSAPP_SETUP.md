@@ -1,0 +1,61 @@
+# Reset on WhatsApp — setup
+
+The code is live. These steps connect your accounts. Do them in order.
+
+## 1. Supabase (2 minutes)
+SQL Editor → run `supabase/migrations/20261122_whatsapp.sql`.
+
+Then run this (replace CRON_SECRET_HERE with the same value you put in Vercel, step 4):
+
+```sql
+create extension if not exists pg_cron;
+create extension if not exists pg_net;
+select cron.schedule(
+  'reset-whatsapp-tick',
+  '* * * * *',
+  $$ select net.http_get(url := 'https://reset-cjii.vercel.app/api/tick?key=CRON_SECRET_HERE') $$
+);
+```
+
+## 2. Meta (WhatsApp)
+developers.facebook.com → your app → WhatsApp → API Setup:
+- Copy **Phone number ID** → `WHATSAPP_PHONE_NUMBER_ID`
+- Copy the **access token** → `WHATSAPP_TOKEN` (the temporary one lasts 24h; for real use create a System User token in Business Settings)
+- Add your own number under "To" so the test number can message you.
+
+App settings → Basic → **App secret** → `WHATSAPP_APP_SECRET`
+
+WhatsApp → Configuration → Webhook:
+- Callback URL: `https://reset-cjii.vercel.app/api/whatsapp`
+- Verify token: any phrase you choose → same phrase in `WHATSAPP_VERIFY_TOKEN`
+- Subscribe to the **messages** field.
+
+(Do this after step 4, so the verify call finds the token.)
+
+## 3. Stripe
+- Product "Reset" with two prices: 29 AED / month, 249 AED / year.
+- Payment Links → one per price → `PAY_LINK_MONTHLY`, `PAY_LINK_YEARLY`. After payment: "Show confirmation page" → "You're in. Go back to WhatsApp."
+- Settings → Billing → Customer portal → activate → copy the login link → `STRIPE_PORTAL_URL`
+- Developers → Webhooks → add endpoint `https://reset-cjii.vercel.app/api/stripe-webhook`, events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted` → signing secret → `STRIPE_WEBHOOK_SECRET`
+
+## 4. Vercel
+Project reset-cjii → Settings → Environment Variables (Production), then Redeploy:
+
+| Name | Where from |
+|---|---|
+| WHATSAPP_TOKEN | Meta, step 2 |
+| WHATSAPP_PHONE_NUMBER_ID | Meta, step 2 |
+| WHATSAPP_VERIFY_TOKEN | your phrase |
+| WHATSAPP_APP_SECRET | Meta, step 2 |
+| SUPABASE_SERVICE_ROLE_KEY | Supabase → Settings → API → service_role (secret) |
+| PAY_LINK_MONTHLY / PAY_LINK_YEARLY | Stripe, step 3 |
+| STRIPE_PORTAL_URL | Stripe, step 3 |
+| STRIPE_WEBHOOK_SECRET | Stripe, step 3 |
+| CRON_SECRET | a long random string (same as in the step 1 SQL) |
+| REACT_APP_WHATSAPP_NUMBER | the WhatsApp number, digits only, e.g. 9715XXXXXXXX |
+
+Optional, after Meta approves message templates (needed to message people who haven't written in 24h):
+`WHATSAPP_NUDGE_TEMPLATE`, `WHATSAPP_TRIAL_TEMPLATE` (template names).
+
+## 5. Test
+Send "hi" to the number from your phone. You should get the welcome and the first question.
