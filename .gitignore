@@ -3,3 +3,6 @@ build/
 # Repo has never committed a lockfile; Vercel resolves from package.json.
 package-lock.json
 .env*.local
+
+# Written at build time by scripts/stamp-version.js
+public/version.json
