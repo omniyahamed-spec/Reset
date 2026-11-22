@@ -1,5 +1,6 @@
 import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "./supabaseClient";
+import { useAutoUpdate } from "./useAutoUpdate";
 import { CHECKOUT_HOUR, DayLog, EVENING_DEFAULT, dayKey, loadDays, saveDay } from "./daily";
 import {
   CheckinScreen,
@@ -1923,6 +1924,12 @@ function NatureHorizon() {
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("profile");
+  // Reload into the newest deploy when the user is on a calm screen.
+  const SAFE_TO_RELOAD: Screen[] = [
+    "start", "arrival", "presence", "profile", "onboarding", "history",
+    "insights", "dayclosed", "done",
+  ];
+  const updateReady = useAutoUpdate(() => SAFE_TO_RELOAD.includes(screen));
   const [orgCodeDraft, setOrgCodeDraft] = useState("");
   const [lead, setLead] = useState({
     name: "",
@@ -3906,6 +3913,18 @@ export default function App() {
         button:active { transform: scale(0.98); }
       `}</style>
       <div style={S.wrap}>
+        {updateReady && (
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              width: "100%", margin: "12px 0 0", padding: "10px 14px", borderRadius: 14,
+              border: "1px solid #D8E3E3", background: "#E3EFEF", color: "#1D2B30",
+              fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: "pointer",
+            }}
+          >
+            A new version of Reset is ready. Tap to update.
+          </button>
+        )}
         <div style={S.topRow}>
           <div style={S.badge}>Reset</div>
           <div style={{ display: "flex", gap: 8 }}>
