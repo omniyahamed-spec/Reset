@@ -1,6 +1,7 @@
 import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "./supabaseClient";
 import { useAutoUpdate } from "./useAutoUpdate";
+import { AVOID_OPTIONS, MIND_OPTIONS, MOVE_OPTIONS, TapStep, learnedOptions } from "./TapStep";
 import { CHECKOUT_HOUR, DayLog, EVENING_DEFAULT, dayKey, loadDays, saveDay } from "./daily";
 import {
   CheckinScreen,
@@ -100,9 +101,6 @@ const MENTALITY_TRAINING = [
   },
 ];
 
-const MIND_SUGGESTIONS = ["Work", "A person", "Money", "Health"];
-const AVOIDING_SUGGESTIONS = ["Starting", "A message", "A decision"];
-const MOVE_SUGGESTIONS = ["Send it", "Open it", "Start 2 min"];
 
 const COMMIT_SECONDS = 5;
 const DAILY_REMINDER_HOUR = 12;
@@ -1964,6 +1962,7 @@ export default function App() {
   const [notifPermission, setNotifPermission] = useState<string>("default");
   const [streakAtRisk, setStreakAtRisk] = useState(false);
   const [checkinEntry, setCheckinEntry] = useState<Entry | null>(null);
+  const [showJourneySetup, setShowJourneySetup] = useState(false);
   // ── DAILY LOOP (check-in / 2-min sprint / check-out) ──
   const [days, setDays] = useState<Record<string, DayLog>>({});
   const [dayReminderAdded, setDayReminderAdded] = useState(
@@ -2021,7 +2020,8 @@ export default function App() {
     setBreathePhase("in");
 
     const startedAt = Date.now();
-    const UNLOCK_MS = 12000; // ~3 breaths
+    // First visit: ~3 breaths. After that: one breath, so the reboot stays fast.
+    const UNLOCK_MS = entries.length > 0 ? 4000 : 12000;
 
     // Phase toggle + visible count, purely for the animation/label
     const timer = window.setInterval(() => {
@@ -3937,11 +3937,6 @@ export default function App() {
               </button>
             )}
             {profile && (
-              <button style={S.profileBtn} onClick={() => setScreen("training")}>
-                Training
-              </button>
-            )}
-            {profile && (
               <button style={S.profileBtn} onClick={changeName}>
                 {profile.name} ↩
               </button>
@@ -4043,7 +4038,7 @@ export default function App() {
         )}
 
         {/* Progress only where it informs a decision; hidden mid-flow to cut load. */}
-        {(screen === "start" || screen === "history" || screen === "insights") && (
+        {(screen === "history" || screen === "insights") && (
           <div
             style={
               isMilestone ? S.trackerCardMilestone : S.trackerCard
@@ -4313,7 +4308,37 @@ export default function App() {
           </div>
         )}
 
+        {/* Reset must always be one tap from home, journey or not. */}
         {screen === "start" && !journey && (
+          <div style={S.card}>
+            <div style={S.label}>Stuck right now?</div>
+            <div style={{ ...S.sub, margin: "6px 0 12px" }}>
+              Three taps from frozen to a first move.
+            </div>
+            <button style={{ ...S.cta, marginBottom: 0 }} onClick={() => setScreen("mind")}>
+              {hasResetToday ? "Reset again" : "Start Reset"}
+            </button>
+          </div>
+        )}
+
+        {screen === "start" && !journey && !showJourneySetup && (
+          <div style={{ display: "flex", gap: 18, justifyContent: "center", margin: "4px 0 12px" }}>
+            <button
+              style={{ background: "none", border: "none", color: "#5F7076", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
+              onClick={() => setShowJourneySetup(true)}
+            >
+              90-day goal (optional)
+            </button>
+            <button
+              style={{ background: "none", border: "none", color: "#5F7076", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
+              onClick={() => setScreen("training")}
+            >
+              Training
+            </button>
+          </div>
+        )}
+
+        {screen === "start" && !journey && showJourneySetup && (
           <div style={S.card}>
             <div style={S.stepPill}>Day 0</div>
             <div style={S.title}>90 days. One move a day.</div>
@@ -4535,213 +4560,84 @@ export default function App() {
               >
                 History
               </button>
+              <button
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#5F7076",
+                  fontSize: 13,
+                  cursor: "pointer",
+                  letterSpacing: "0.02em",
+                }}
+                onClick={() => setScreen("training")}
+              >
+                Training
+              </button>
             </div>
           </>
         )}
 
-        {screen === "mind" &&
-          renderStepCard(
-            1,
-            <>
-              <div style={S.stepPill}>Step 1 / 3</div>
-              <div style={S.title}>What's actually in your head?</div>
-              <div style={S.sub}>Not everything. Just the loudest thing.</div>
-              <div style={S.focusHint}>
-                If you over-explain, you're avoiding.
-              </div>
-              <div style={S.chips}>
-                {MIND_SUGGESTIONS.map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    style={{
-                      ...S.chip,
-                      ...(mind === opt ? S.chipActive : {}),
-                    }}
-                    onClick={() => setMind(opt)}
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
-              <input
-                ref={mindRef}
-                style={S.input}
-                placeholder="The loudest thing right now…"
-                value={mind}
-                maxLength={120}
-                onChange={(e) => setMind(e.target.value)}
-                onKeyDown={(e) =>
-                  e.key === "Enter" && mind.trim() && submitMind()
-                }
-              />
-              <div style={S.helperRow}>
-                <span style={S.helper}>Be specific. Vague = stuck.</span>
-                <span style={S.helper}>{mind.length}/120</span>
-              </div>
-              <button
-                style={{
-                  ...S.cta,
-                  ...(mind.trim() ? {} : S.ctaDisabled),
-                }}
-                disabled={!mind.trim()}
-                onClick={submitMind}
-              >
-                That's it. Continue.
-              </button>
-              <button style={S.ctaMuted} onClick={resetFlow}>
-                Cancel
-              </button>
-            </>
-          )}
+        {screen === "mind" && (
+          <TapStep
+            step={1}
+            title="What's loudest in your head?"
+            sub="Tap the closest. Good enough is enough."
+            options={MIND_OPTIONS}
+            learned={learnedOptions(entries.map((e) => e.mind), MIND_OPTIONS)}
+            value={mind}
+            placeholder="The loudest thing right now"
+            onPick={(v) => {
+              setMind(v);
+              setScreen("avoid");
+            }}
+            onBack={resetFlow}
+            backLabel="Cancel"
+          />
+        )}
 
-        {screen === "avoid" &&
-          renderStepCard(
-            2,
-            <>
-              <div style={S.stepPill}>Step 2 / 3</div>
-              <div style={S.title}>What are you avoiding?</div>
-              <div style={{ ...S.sub, marginBottom: 6 }}>
-                Not the story. The thing itself.
-              </div>
-              {mind && (
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "#5F7076",
-                    fontStyle: "italic",
-                    marginBottom: 14,
-                    padding: "8px 12px",
-                    background: "#FFFFFF",
-                    borderRadius: 10,
-                    borderLeft: "2px solid #D8E3E3",
-                  }}
-                >
-                  You said: "{mind}"
-                </div>
-              )}
-              <div style={S.focusHint}>
-                If you soften it, you'll keep avoiding it.
-              </div>
-              <div style={S.chips}>
-                {AVOIDING_SUGGESTIONS.map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    style={{
-                      ...S.chip,
-                      ...(avoiding === opt ? S.chipActive : {}),
-                    }}
-                    onClick={() => setAvoiding(opt)}
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
-              <input
-                ref={avoidRef}
-                style={S.input}
-                placeholder="What you keep not doing…"
-                value={avoiding}
-                maxLength={120}
-                onChange={(e) => setAvoiding(e.target.value)}
-                onKeyDown={(e) =>
-                  e.key === "Enter" && avoiding.trim() && setScreen("move")
-                }
-              />
-              <div style={S.helperRow}>
-                <span style={S.helper}>Name it exactly.</span>
-                <span style={S.helper}>{avoiding.length}/120</span>
-              </div>
-              <button
-                style={{
-                  ...S.cta,
-                  ...(avoiding.trim() ? {} : S.ctaDisabled),
-                }}
-                disabled={!avoiding.trim()}
-                onClick={() => setScreen("move")}
-              >
-                Got it. Next.
-              </button>
-              <button
-                style={S.ctaMuted}
-                onClick={() => setScreen("mind")}
-              >
-                ← Back
-              </button>
-            </>
-          )}
+        {screen === "avoid" && (
+          <TapStep
+            step={2}
+            title="What are you avoiding?"
+            sub="The thing itself, not the story."
+            context={mind ? `On your mind: ${mind}` : undefined}
+            options={AVOID_OPTIONS}
+            learned={learnedOptions(entries.map((e) => e.avoiding), AVOID_OPTIONS)}
+            value={avoiding}
+            placeholder="What you keep not doing"
+            onPick={(v) => {
+              setAvoiding(v);
+              setScreen("move");
+            }}
+            onBack={() => setScreen("mind")}
+          />
+        )}
 
-        {screen === "move" &&
-          renderStepCard(
-            3,
-            <>
-              <div style={S.stepPill}>Step 3 / 3</div>
-              <div style={S.title}>What's the smallest move?</div>
-              <div style={S.sub}>Not the plan. Just the first step.</div>
-              <div style={S.focusHint}>
-                If it feels big, you won't do it.
-              </div>
-              {presenceScore >= 4 && (
-                <div style={S.boldHint}>
-                  You arrived steady today. Pick the version that scares you a
-                  little.
-                </div>
-              )}
-              {needsRecovery && (
-                <div style={{ ...S.boldHint, color: "#3B6B70" }}>
-                  You've been running low. Make it half the size you think it
-                  should be.
-                </div>
-              )}
-              <div style={S.chips}>
-                {MOVE_SUGGESTIONS.map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    style={{
-                      ...S.chip,
-                      ...(move === opt ? S.chipActive : {}),
-                    }}
-                    onClick={() => setMove(opt)}
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
-              <input
-                ref={moveRef}
-                style={S.input}
-                placeholder="One tiny action…"
-                value={move}
-                maxLength={120}
-                onChange={(e) => setMove(e.target.value)}
-                onKeyDown={(e) =>
-                  e.key === "Enter" && move.trim() && beginCommit()
-                }
-              />
-              <div style={S.helperRow}>
-                <span style={S.helper}>Embarrassingly small is right.</span>
-                <span style={S.helper}>{move.length}/120</span>
-              </div>
-              <button
-                style={{
-                  ...S.cta,
-                  ...(move.trim() ? {} : S.ctaDisabled),
-                }}
-                disabled={!move.trim()}
-                onClick={beginCommit}
-              >
-                Commit.
-              </button>
-              <button
-                style={S.ctaMuted}
-                onClick={() => setScreen("avoid")}
-              >
-                ← Back
-              </button>
-            </>
-          )}
+        {screen === "move" && (
+          <TapStep
+            step={3}
+            title="What's the smallest move?"
+            sub={
+              needsRecovery
+                ? "You've been running low. Make it half-size."
+                : presenceScore >= 4
+                ? "You arrived steady. Pick the one that scares you a little."
+                : "Embarrassingly small is right."
+            }
+            context={avoiding ? `Avoiding: ${avoiding}` : undefined}
+            options={MOVE_OPTIONS}
+            learned={learnedOptions(entries.map((e) => e.move), MOVE_OPTIONS)}
+            value={move}
+            placeholder="One tiny action"
+            onPick={(v) => {
+              setMove(v);
+              setCountdown(COMMIT_SECONDS);
+              setBreathePhase("in");
+              setScreen("commit");
+            }}
+            onBack={() => setScreen("avoid")}
+          />
+        )}
 
         {/* ── COMMIT SCREEN — avatar breathes with countdown ── */}
         {screen === "commit" && (
