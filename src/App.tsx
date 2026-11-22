@@ -2413,6 +2413,7 @@ export default function App() {
     localStorage.setItem("reset_profile_id", id);
     setEntries([]);
     await loadEntries(id);
+    setDays(await loadDays(id));
     if (whyDraft.trim()) {
       localStorage.setItem("reset_why", whyDraft.trim());
       setWhy(whyDraft.trim());
@@ -2451,6 +2452,7 @@ export default function App() {
     cancelLocalReminder();
     setProfile(null);
     setEntries([]);
+    setDays({});
     setProfileName("");
     setNotifEnabled(false);
     setScreen("profile");
