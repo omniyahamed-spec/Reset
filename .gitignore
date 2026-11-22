@@ -1,0 +1,5 @@
+node_modules/
+build/
+# Repo has never committed a lockfile; Vercel resolves from package.json.
+package-lock.json
+.env*.local

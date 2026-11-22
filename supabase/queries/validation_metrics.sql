@@ -1,11 +1,12 @@
 -- 10-user validation metrics, per user (profile).
 -- Bar 1: moved-after-reset >= 60%  -> moved_rate
--- Bar 2: >= 5/10 users with 3+ resets -> total_resets >= 3
---        (NOTE: "unprompted" cannot be measured yet; the reminder only fires
---         while the app is open.)
+-- Bar 2: >= 5/10 users with 3+ unprompted resets -> unprompted_resets >= 3
+--        (source = 'organic'; rows before 2026-11-21 have source null = unknown)
 select
   e.profile_id,
   count(*)                                                   as total_resets,
+  count(*) filter (where e.source = 'organic')               as unprompted_resets,
+  count(*) filter (where e.source in ('reminder','notification')) as prompted_resets,
   count(*) filter (where e.status = 'done')                  as said_done,
   count(*) filter (where e.follow_up = 'confirmed')          as still_done_5min,
   count(*) filter (where e.follow_up = 'slipped')            as slipped_5min,
