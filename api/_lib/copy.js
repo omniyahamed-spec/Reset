@@ -19,6 +19,7 @@ const OPTIONS = {
 const T = {
   en: {
     welcome: "I'm Reset. When your head is full and you can't start, message me. Three taps, one small move, done.\n\nYour first 7 days are free.",
+    welcomeBack: "Welcome back to Reset. Your free trial was already used on this number.",
     askMind: "What's in your head right now?",
     askAvoid: "What are you avoiding?",
     askMove: "What's the smallest move? Do it in the next 2 minutes.",
@@ -39,13 +40,20 @@ const T = {
     ended: "Your Reset subscription has ended. Message me if you want it back.",
     manage: (url) => `Manage or cancel your subscription here: ${url}`,
     manageMissing: "To cancel, reply with your email and we'll do it for you.",
-    help: "Send any message to start a reset.\n• \"cancel\" — manage your subscription\n• \"عربي\" — switch to Arabic",
+    help: "Send any message to start a reset.\n• \"cancel\" — manage your subscription\n• \"no reminders\" — stop the morning message\n• \"delete my data\" — erase everything\n• \"عربي\" — switch to Arabic",
     nudge: "Morning. Anything you're avoiding today? Tap to reset.",
     startButton: "Reset now",
     switched: "Switched to English.",
+    deleteAsk: "Delete everything Reset has about you: your resets, your history and this number's account? This can't be undone.",
+    deleteYes: "Yes, delete",
+    deleteNo: "Keep it",
+    deleted: "Done. Everything is deleted. If you message again, you start fresh.",
+    deletedPaid: (url) => `Done. Your data is deleted. Your subscription is separate: cancel it here so you're not charged again: ${url}`,
+    deleteKept: "Kept. Nothing was deleted.",
   },
   ar: {
     welcome: "أنا Reset. لما يكون راسك مليان وما تقدر تبدأ، ارسل لي. ثلاث ضغطات، خطوة صغيرة، وخلصنا.\n\nأول 7 أيام مجاناً.",
+    welcomeBack: "أهلاً فيك مرة ثانية في Reset. التجربة المجانية استُخدمت قبل على هذا الرقم.",
     askMind: "شو اللي في راسك الحين؟",
     askAvoid: "شو اللي تتهرب منه؟",
     askMove: "شو أصغر خطوة؟ سوّها خلال دقيقتين.",
@@ -66,10 +74,16 @@ const T = {
     ended: "انتهى اشتراكك في Reset. ارسل لي إذا تبي ترجعه.",
     manage: (url) => `تقدر تدير أو تلغي اشتراكك من هنا: ${url}`,
     manageMissing: "للإلغاء، ارسل إيميلك ونلغيه لك.",
-    help: "ارسل أي رسالة عشان تبدأ.\n• \"الغاء\" — إدارة الاشتراك\n• \"English\" — للإنجليزي",
+    help: "ارسل أي رسالة عشان تبدأ.\n• \"الغاء\" — إدارة الاشتراك\n• \"بدون تذكير\" — وقف رسالة الصباح\n• \"احذف بياناتي\" — حذف كل شي\n• \"English\" — للإنجليزي",
     nudge: "صباح الخير. في شي تتهرب منه اليوم؟ اضغط وابدأ.",
     startButton: "ابدأ الحين",
     switched: "تم التحويل للعربي.",
+    deleteAsk: "تبي تحذف كل شي عندنا عنك: خطواتك وسجلك وحساب هذا الرقم؟ ما نقدر نرجعه بعدين.",
+    deleteYes: "نعم، احذف",
+    deleteNo: "لا، خله",
+    deleted: "تم. انحذف كل شي. إذا ارسلت مرة ثانية، تبدأ من جديد.",
+    deletedPaid: (url) => `تم. انحذفت بياناتك. الاشتراك منفصل: ألغه من هنا عشان ما ينخصم منك مرة ثانية: ${url}`,
+    deleteKept: "تمام. ما انحذف شي.",
   },
 };
 
@@ -78,5 +92,6 @@ const detectLang = (text) => (ARABIC.test(text || "") ? "ar" : "en");
 
 const CANCEL_WORDS = ["cancel", "stop", "unsubscribe", "الغاء", "إلغاء", "الغ", "وقف"];
 const HELP_WORDS = ["help", "?", "مساعدة"];
+const DELETE_WORDS = ["delete my data", "delete", "احذف بياناتي", "احذف"];
 
-module.exports = { OPTIONS, T, detectLang, CANCEL_WORDS, HELP_WORDS };
+module.exports = { OPTIONS, T, detectLang, CANCEL_WORDS, HELP_WORDS, DELETE_WORDS };

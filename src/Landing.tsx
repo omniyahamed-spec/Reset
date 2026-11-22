@@ -1,4 +1,5 @@
 // Public landing page: Reset lives in WhatsApp. One action: "Start on WhatsApp".
+import { Privacy, Terms } from "./Legal";
 const C = {
   bg: "#F4F7F7",
   ink: "#1D2B30",
@@ -45,6 +46,10 @@ function Horizon() {
 }
 
 export function Landing() {
+  const qs = new URLSearchParams(window.location.search);
+  if (qs.has("privacy")) return <Privacy />;
+  if (qs.has("terms")) return <Terms />;
+
   const cta = (label: string) =>
     WA_LINK ? (
       <a
@@ -76,6 +81,9 @@ export function Landing() {
           Reset
         </div>
 
+        <div style={{ fontSize: 14, color: C.brand, fontWeight: 700, marginBottom: 8 }}>
+          So many apps for distraction. This one is for action.
+        </div>
         <h1 style={{ fontSize: 30, lineHeight: 1.2, margin: "0 0 10px", fontWeight: 700 }}>
           Stuck? Reset in 30 seconds. On WhatsApp.
         </h1>
@@ -125,7 +133,13 @@ export function Landing() {
         </div>
 
         {cta("Start on WhatsApp")}
-        <div style={{ height: 24 }} />
+        <div style={{ fontSize: 13, color: C.muted, textAlign: "center", margin: "18px 0 24px" }}>
+          <a href="/?privacy" style={{ color: C.muted }}>Privacy</a>
+          {" · "}
+          <a href="/?terms" style={{ color: C.muted }}>Terms</a>
+          {" · "}
+          We never sell your data.
+        </div>
       </div>
       <Horizon />
     </div>

@@ -1,5 +1,5 @@
 // WhatsApp Cloud API sender (Meta Graph API).
-const VERSION = process.env.WHATSAPP_API_VERSION || "v21.0";
+const VERSION = process.env.WHATSAPP_API_VERSION || "v25.0"; // v21.0 is removed on 21 Jan 2027
 
 async function send(to, payload) {
   const id = process.env.WHATSAPP_PHONE_NUMBER_ID;

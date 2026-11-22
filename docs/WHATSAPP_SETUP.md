@@ -1,6 +1,9 @@
 # Reset on WhatsApp — setup
 
-The code is live. These steps connect your accounts. Do them in order.
+The code is in PR #11. Merge it, then these steps connect your accounts. Do them in order.
+Until step 4 is done, the site shows "Opening soon" instead of the WhatsApp button.
+
+Tests (no accounts needed): `node tests/whatsapp.test.js`
 
 ## 1. Supabase (2 minutes)
 SQL Editor → run `supabase/migrations/20261122_whatsapp.sql`.
@@ -24,6 +27,7 @@ developers.facebook.com → your app → WhatsApp → API Setup:
 - Add your own number under "To" so the test number can message you.
 
 App settings → Basic → **App secret** → `WHATSAPP_APP_SECRET`
+App settings → Basic → **Privacy Policy URL**: `https://reset-cjii.vercel.app/?privacy`, **Terms of Service URL**: `https://reset-cjii.vercel.app/?terms` (Meta requires these before the app can go Live).
 
 WhatsApp → Configuration → Webhook:
 - Callback URL: `https://reset-cjii.vercel.app/api/whatsapp`
@@ -53,6 +57,7 @@ Project reset-cjii → Settings → Environment Variables (Production), then Red
 | STRIPE_WEBHOOK_SECRET | Stripe, step 3 |
 | CRON_SECRET | a long random string (same as in the step 1 SQL) |
 | REACT_APP_WHATSAPP_NUMBER | the WhatsApp number, digits only, e.g. 9715XXXXXXXX |
+| REACT_APP_CONTACT_EMAIL | optional: email shown on the Privacy and Terms pages |
 
 Optional, after Meta approves message templates (needed to message people who haven't written in 24h):
 `WHATSAPP_NUDGE_TEMPLATE`, `WHATSAPP_TRIAL_TEMPLATE` (template names).

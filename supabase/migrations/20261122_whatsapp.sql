@@ -27,6 +27,14 @@ create index if not exists wa_users_sub on public.wa_users (stripe_subscription_
 -- Only the server (service role key) touches this table. RLS on, no policies = no anon access.
 alter table public.wa_users enable row level security;
 
+-- "delete my data" erases the wa_users row. A one-way hash of the number is kept
+-- only so deleting and re-joining doesn't give a second free trial.
+create table if not exists public.wa_trial_used (
+  phone_hash text primary key,
+  created_at timestamptz not null default now()
+);
+alter table public.wa_trial_used enable row level security;
+
 -- Paying users per month, for the revenue view.
 create or replace view public.wa_subscribers as
 select sub_status, lang, count(*) as users

@@ -67,6 +67,24 @@ const db = {
   async dueFollowups(nowIso) {
     return rest(`wa_users?followup_due_at=lte.${enc(nowIso)}&select=*`);
   },
+  // "delete my data": entries, check-ins, profile, then the WhatsApp row.
+  async deleteUserData(phone, profileId) {
+    await rest(`entries?profile_id=eq.${enc(profileId)}`, { method: "DELETE" });
+    await rest(`daily_checkins?profile_id=eq.${enc(profileId)}`, { method: "DELETE" }).catch(() => {}); // table may not exist
+    await rest(`profiles?id=eq.${enc(profileId)}`, { method: "DELETE" }).catch(() => {});
+    await rest(`wa_users?phone=eq.${enc(phone)}`, { method: "DELETE" });
+  },
+  async trialUsed(hash) {
+    const rows = await rest(`wa_trial_used?phone_hash=eq.${enc(hash)}&select=phone_hash`).catch(() => []);
+    return rows.length > 0;
+  },
+  async markTrialUsed(hash) {
+    await rest("wa_trial_used?on_conflict=phone_hash", {
+      method: "POST",
+      body: { phone_hash: hash },
+      prefer: "resolution=ignore-duplicates",
+    }).catch(() => {});
+  },
   async allUsers() {
     return rest("wa_users?select=*");
   },

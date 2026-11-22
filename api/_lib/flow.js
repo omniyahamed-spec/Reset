@@ -1,12 +1,14 @@
 // The Reset conversation on WhatsApp. Pure logic: all I/O goes through deps
 // ({ db, wa }) so it can be tested without Meta, Stripe or Supabase.
 const crypto = require("crypto");
-const { OPTIONS, T, detectLang, CANCEL_WORDS, HELP_WORDS } = require("./copy");
+const { OPTIONS, T, detectLang, CANCEL_WORDS, HELP_WORDS, DELETE_WORDS } = require("./copy");
 
 const TRIAL_DAYS = 7;
 const FOLLOWUP_MIN = 5;
 const DAY = 24 * 60 * 60 * 1000;
 const DUBAI_OFFSET_H = 4; // UTC+4, no DST
+
+const phoneHash = (phone) => crypto.createHash("sha256").update("trial:" + String(phone)).digest("hex");
 
 const profileIdFor = (phone) =>
   "wa_" + crypto.createHash("sha256").update(String(phone)).digest("hex").slice(0, 20);
@@ -87,6 +89,7 @@ async function handleInbound(deps, { phone, name, msg, now = new Date() }) {
 
   if (!user) {
     const profile_id = profileIdFor(phone);
+    const hadTrial = deps.db.trialUsed ? await deps.db.trialUsed(phoneHash(phone)) : false;
     await deps.db.ensureProfile(profile_id, name);
     user = await deps.db.createUser({
       phone,
@@ -96,10 +99,14 @@ async function handleInbound(deps, { phone, name, msg, now = new Date() }) {
       state: "idle",
       draft: {},
       sub_status: "trial",
-      trial_ends_at: new Date(now.getTime() + TRIAL_DAYS * DAY).toISOString(),
+      trial_ends_at: new Date(now.getTime() + (hadTrial ? 0 : TRIAL_DAYS) * DAY).toISOString(),
       last_inbound_at: now.toISOString(),
       nudge_hour: 9,
     });
+    if (hadTrial) {
+      await deps.wa.text(phone, T[user.lang].welcomeBack);
+      return sendPaywall(deps, user, now);
+    }
     await deps.wa.text(phone, T[user.lang].welcome);
     if (msg.kind === "voice") await deps.wa.text(phone, T[user.lang].voice);
     return startReset(deps, user);
@@ -122,6 +129,20 @@ async function handleInbound(deps, { phone, name, msg, now = new Date() }) {
     return deps.wa.text(phone, url ? t().manage(url) : t().manageMissing);
   }
   if (HELP_WORDS.includes(lower)) return deps.wa.text(phone, t().help);
+  if (DELETE_WORDS.includes(lower)) {
+    return deps.wa.buttons(phone, t().deleteAsk, [
+      { id: "del:yes", title: t().deleteYes },
+      { id: "del:no", title: t().deleteNo },
+    ]);
+  }
+  if (msg.kind === "reply" && msg.id === "del:no") return deps.wa.text(phone, t().deleteKept);
+  if (msg.kind === "reply" && msg.id === "del:yes") {
+    const copy = t();
+    const paid = user.sub_status === "active" && process.env.STRIPE_PORTAL_URL;
+    if (deps.db.markTrialUsed) await deps.db.markTrialUsed(phoneHash(phone));
+    await deps.db.deleteUserData(phone, user.profile_id);
+    return deps.wa.text(phone, paid ? copy.deletedPaid(process.env.STRIPE_PORTAL_URL) : copy.deleted);
+  }
   if (["no reminders", "بدون تذكير"].includes(lower)) {
     await deps.db.updateUser(phone, { nudge_hour: null });
     return deps.wa.text(phone, "OK. No morning reminders. / تم. بدون تذكير صباحي.");
@@ -252,4 +273,4 @@ async function applyStripeEvent(deps, event) {
   return "ignored";
 }
 
-module.exports = { handleInbound, tick, applyStripeEvent, profileIdFor, entitled, learned, TRIAL_DAYS };
+module.exports = { handleInbound, tick, applyStripeEvent, profileIdFor, phoneHash, entitled, learned, TRIAL_DAYS };

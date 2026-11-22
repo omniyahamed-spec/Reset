@@ -2058,7 +2058,7 @@ export default function App() {
       const qs = new URLSearchParams(window.location.search);
       // Reset is WhatsApp-first: the public site is the landing page.
       // The web app stays reachable with ?app (and calendar/deep links).
-      if (!["app", "src", "do", "screen"].some((k) => qs.has(k))) {
+      if (!["app", "src", "do", "screen"].some((k) => qs.has(k))) { // ?privacy / ?terms render inside Landing
         setScreen("landing");
         setLoading(false);
         return;

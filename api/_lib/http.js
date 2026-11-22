@@ -1,12 +1,17 @@
 const crypto = require("crypto");
 
 /** Raw request body (needed to check Meta's and Stripe's signatures). */
+// Read the stream first, before touching req.body: on Vercel, req.body is a lazy getter
+// that parses JSON, and a re-serialized object no longer matches the signature.
 async function rawBody(req) {
+  if (req && typeof req[Symbol.asyncIterator] === "function" && !req.readableEnded) {
+    const chunks = [];
+    for await (const c of req) chunks.push(typeof c === "string" ? Buffer.from(c) : c);
+    if (chunks.length) return Buffer.concat(chunks).toString("utf8");
+  }
   if (typeof req.body === "string") return req.body;
   if (Buffer.isBuffer(req.body)) return req.body.toString("utf8");
-  const chunks = [];
-  for await (const c of req) chunks.push(typeof c === "string" ? Buffer.from(c) : c);
-  return Buffer.concat(chunks).toString("utf8");
+  return "";
 }
 
 const safeEqual = (a, b) => {
