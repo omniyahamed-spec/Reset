@@ -1,5 +1,13 @@
 import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "./supabaseClient";
+import { CHECKOUT_HOUR, DayLog, EVENING_DEFAULT, dayKey, loadDays, saveDay } from "./daily";
+import {
+  CheckinScreen,
+  CloseDayScreen,
+  DayClosedScreen,
+  SprintScreen,
+  TodayCard,
+} from "./DailyLoop";
 
 type Screen =
   | "onboarding"
@@ -20,6 +28,10 @@ type Screen =
   | "pulse"
   | "training"
   | "teams"
+  | "today"
+  | "sprint"
+  | "closeday"
+  | "dayclosed"
   | "done";
 
 type EntryStatus = "done" | "not_yet";
@@ -824,6 +836,61 @@ function googleCalendarUrl(h: number, m: number): string {
   });
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
+// Daily-loop deep links from the calendar: ?do=checkin | ?do=checkout
+function captureDailyAction(): "checkin" | "checkout" | null {
+  const params = new URLSearchParams(window.location.search);
+  const act = params.get("do");
+  if (!params.has("do")) return null;
+  params.delete("do");
+  const q = params.toString();
+  window.history.replaceState(
+    null,
+    "",
+    window.location.pathname + (q ? "?" + q : "") + window.location.hash
+  );
+  return act === "checkin" || act === "checkout" ? act : null;
+}
+function googleDayUrl(kind: "checkin" | "checkout", h: number, m: number): string {
+  const start = new Date();
+  start.setDate(start.getDate() + 1);
+  start.setHours(h, m, 0, 0);
+  const end = new Date(start.getTime() + 5 * 60 * 1000);
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}T${pad2(
+      d.getHours()
+    )}${pad2(d.getMinutes())}00`;
+  const link = `${window.location.origin}/?src=reminder&do=${kind}`;
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: kind === "checkin" ? "Reset — check in (20 sec)" : "Reset — close the day (10 sec)",
+    dates: `${fmt(start)}/${fmt(end)}`,
+    recur: "RRULE:FREQ=DAILY",
+    details: `${
+      kind === "checkin"
+        ? "One thing that matters today. Then 2 minutes on it."
+        : "Did your one thing move? Set tomorrow's."
+    }\n${link}`,
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+function icsDayUrl(h: number, m: number): string {
+  const t = new Date();
+  t.setDate(t.getDate() + 1);
+  const d = `${t.getFullYear()}${pad2(t.getMonth() + 1)}${pad2(t.getDate())}`;
+  return `/api/calendar?k=day&h=${h}&m=${m}&eh=${EVENING_DEFAULT.h}&em=${EVENING_DEFAULT.m}&d=${d}`;
+}
+function roundedTime(iso: string | null): { h: number; m: number } {
+  if (!iso) return { h: 8, m: 30 };
+  const d = new Date(iso);
+  let m = Math.round(d.getMinutes() / 15) * 15;
+  let h = d.getHours();
+  if (m === 60) {
+    m = 0;
+    h = (h + 1) % 24;
+  }
+  return { h, m };
+}
+
 function icsCalendarUrl(h: number, m: number): string {
   const t = new Date();
   t.setDate(t.getDate() + 1);
@@ -1890,6 +1957,12 @@ export default function App() {
   const [notifPermission, setNotifPermission] = useState<string>("default");
   const [streakAtRisk, setStreakAtRisk] = useState(false);
   const [checkinEntry, setCheckinEntry] = useState<Entry | null>(null);
+  // ── DAILY LOOP (check-in / 2-min sprint / check-out) ──
+  const [days, setDays] = useState<Record<string, DayLog>>({});
+  const [dayReminderAdded, setDayReminderAdded] = useState(
+    () => localStorage.getItem("reset_day_reminder_added") === "true"
+  );
+  const pendingDailyAction = useRef<"checkin" | "checkout" | null>(null);
   const [aiFeedback, setAiFeedback] = useState<ResetGuidance>(EMPTY_GUIDANCE);
   const [aiFeedbackLoading, setAiFeedbackLoading] = useState(false);
   const [followUpSeconds, setFollowUpSeconds] = useState<number | null>(null);
@@ -1972,6 +2045,7 @@ export default function App() {
   useEffect(() => {
     async function init() {
       captureArrivalSource();
+      pendingDailyAction.current = captureDailyAction();
       if (new URLSearchParams(window.location.search).has("teams")) {
         setScreen("teams");
         setLoading(false);
@@ -2001,6 +2075,7 @@ export default function App() {
       setProfile(data as Profile);
       setProfileName(data.name ?? "");
       await loadEntries(savedProfileId);
+      setDays(await loadDays(savedProfileId));
       setLoading(false);
     }
     init();
@@ -2028,7 +2103,11 @@ export default function App() {
         startOfDay(new Date(e.createdAt)).getTime() ===
           startOfDay(yesterday).getTime()
     );
-    if (yesterdayNotYet && !hasResetToday) {
+    const action = pendingDailyAction.current;
+    if (action) {
+      pendingDailyAction.current = null;
+      setScreen(action === "checkin" ? "today" : "closeday");
+    } else if (yesterdayNotYet && !hasResetToday) {
       setCheckinEntry(yesterdayNotYet);
       setScreen("checkin");
     } else if (!hasResetToday) {
@@ -3477,7 +3556,16 @@ export default function App() {
                   aria-label={PRESENCE_LABELS[score].en}
                   onClick={() => {
                     setPresenceScore(score);
-                    window.setTimeout(() => setScreen("start"), 250);
+                    window.setTimeout(
+                      () =>
+                        setScreen(
+                          !days[dayKey()]?.checkinAt &&
+                            new Date().getHours() < CHECKOUT_HOUR
+                            ? "today"
+                            : "start"
+                        ),
+                      250
+                    );
                   }}
                   style={{
                     width: 52,
@@ -3839,6 +3927,75 @@ export default function App() {
             )}
           </div>
         </div>
+
+        {screen === "start" && profile && (
+          <TodayCard
+            days={days}
+            onCheckin={() => setScreen("today")}
+            onCheckout={() => setScreen("closeday")}
+            onSprint={() => setScreen("sprint")}
+            onResetOnIt={(thing) => {
+              setAvoiding(thing);
+              setScreen("mind");
+            }}
+          />
+        )}
+
+        {screen === "today" && profile && (
+          <CheckinScreen
+            days={days}
+            energy={presenceScore || null}
+            onSkip={() => setScreen("start")}
+            onSave={async (d, startSprint) => {
+              setScreen(startSprint ? "sprint" : "start");
+              setDays(await saveDay(profile.id, days, d));
+            }}
+          />
+        )}
+
+        {screen === "sprint" && profile && days[dayKey()] && (
+          <SprintScreen
+            day={days[dayKey()]}
+            onCancel={() => setScreen("start")}
+            onFinish={async () => {
+              setScreen("start");
+              setDays(
+                await saveDay(profile.id, days, { ...days[dayKey()], sprintDone: true })
+              );
+            }}
+          />
+        )}
+
+        {screen === "closeday" && profile && (
+          <CloseDayScreen
+            days={days}
+            onCancel={() => setScreen("start")}
+            onSave={async (d) => {
+              const next = await saveDay(profile.id, days, d);
+              setDays(next);
+              setScreen("dayclosed");
+            }}
+          />
+        )}
+
+        {screen === "dayclosed" && profile && (() => {
+          const morning = roundedTime(days[dayKey()]?.checkinAt ?? null);
+          return (
+            <DayClosedScreen
+              days={days}
+              showReminderOffer={!dayReminderAdded}
+              morning={morning}
+              icsUrl={icsDayUrl(morning.h, morning.m)}
+              googleMorningUrl={googleDayUrl("checkin", morning.h, morning.m)}
+              googleEveningUrl={googleDayUrl("checkout", EVENING_DEFAULT.h, EVENING_DEFAULT.m)}
+              onReminderAdded={() => {
+                localStorage.setItem("reset_day_reminder_added", "true");
+                window.setTimeout(() => setDayReminderAdded(true), 4000);
+              }}
+              onHome={() => setScreen("start")}
+            />
+          );
+        })()}
 
         {screen === "start" && presenceScore > 0 && (
           <div
