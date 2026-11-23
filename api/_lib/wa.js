@@ -47,8 +47,19 @@ const wa = {
     }),
 
   // Pre-approved template, the only way to message someone 24h+ after their last message.
-  template: (to, name, lang) =>
-    send(to, { type: "template", template: { name, language: { code: lang === "ar" ? "ar" : "en" } } }),
+  // opts.body: values for {{1}}, {{2}}…; opts.buttons: payloads for the template's quick-reply
+  // buttons, in order, so a tap comes back with a known id (see docs/WHATSAPP_TEMPLATES.md).
+  template: (to, name, lang, opts = {}) => {
+    const components = [];
+    if (opts.body && opts.body.length) {
+      components.push({ type: "body", parameters: opts.body.map((v) => ({ type: "text", text: String(v) })) });
+    }
+    (opts.buttons || []).forEach((payload, i) =>
+      components.push({ type: "button", sub_type: "quick_reply", index: String(i), parameters: [{ type: "payload", payload }] })
+    );
+    const code = lang === "ar" ? "ar" : process.env.WHATSAPP_TEMPLATE_LANG_EN || "en";
+    return send(to, { type: "template", template: { name, language: { code }, ...(components.length ? { components } : {}) } });
+  },
 };
 
 module.exports = { wa };

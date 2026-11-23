@@ -3,7 +3,8 @@
 const assert = require("assert");
 const { Readable } = require("stream");
 const crypto = require("crypto");
-const { handleInbound, tick, applyStripeEvent, TRIAL_DAYS } = require("../api/_lib/flow");
+const { handleInbound, tick, applyStripeEvent, dubaiDay, TRIAL_DAYS } = require("../api/_lib/flow");
+const { normalize } = require("../api/whatsapp");
 const { rawBody, metaSignatureOk, stripeSignatureOk } = require("../api/_lib/http");
 
 function memDb() {
@@ -137,6 +138,55 @@ test("morning nudge only inside the 24h window (no template configured)", async 
   assert.equal((await tick(d, t0)).nudges, 1); // 09:00 Dubai next day, inside 24h
   assert.equal((await tick(d, t0)).nudges, 0); // once a day
   assert.equal((await tick(d, new Date("2026-11-25T05:00:00Z"))).nudges, 0); // window closed
+});
+
+test("outside 24h: nudge + trial templates carry button payloads; their taps work", async () => {
+  process.env.WHATSAPP_NUDGE_TEMPLATE = "reset_daily_reminder";
+  process.env.WHATSAPP_TRIAL_TEMPLATE = "reset_trial_ending";
+  process.env.PAY_LINK_MONTHLY = "https://buy.stripe.com/m";
+  process.env.PAY_LINK_YEARLY = "https://buy.stripe.com/y";
+  const db = memDb(), wa = recorder();
+  const d = { db, wa };
+  const start = new Date("2026-11-20T06:00:00Z"); // trial ends 27 Nov 10:00 Dubai
+  await handleInbound(d, { phone: PHONE, msg: text("hi"), now: start });
+
+  const nudgeAt = new Date("2026-11-23T05:00:00Z"); // 09:00 Dubai, 3 days of silence
+  assert.equal((await tick(d, nudgeAt)).nudges, 1);
+  const nudge = wa.sent[wa.sent.length - 1];
+  assert.equal(nudge.type, "template");
+  assert.deepEqual(nudge.args.slice(0, 3), ["reset_daily_reminder", "en", { buttons: ["start"] }]);
+
+  // Tap on the template button arrives as a Meta "button" message.
+  const tapStart = normalize({ type: "button", button: { payload: "start", text: "Reset now" } });
+  await handleInbound(d, { phone: PHONE, msg: tapStart, now: nudgeAt });
+  assert.equal(db.users.get(PHONE).state, "ask_mind");
+
+  const dayBefore = new Date("2026-11-26T12:00:00Z"); // 22h before the end, window closed
+  assert.equal((await tick(d, dayBefore)).trialReminders, 1);
+  const tr = wa.sent.find((m) => m.type === "template" && m.args[0] === "reset_trial_ending");
+  assert.deepEqual(tr.args[2], { body: ["27 Nov"], buttons: ["plans"] });
+  assert.equal((await tick(d, dayBefore)).trialReminders, 0, "only once");
+
+  await handleInbound(d, { phone: PHONE, msg: tap("plans"), now: dayBefore });
+  const reply = wa.sent[wa.sent.length - 1];
+  assert.ok(reply.args[0].includes("https://buy.stripe.com/y?client_reference_id="), "plans reply has both links");
+});
+
+test("trial reminder is not marked sent when it couldn't be delivered", async () => {
+  delete process.env.WHATSAPP_TRIAL_TEMPLATE;
+  const db = memDb(), wa = recorder();
+  const d = { db, wa };
+  await handleInbound(d, { phone: PHONE, msg: text("hi"), now: new Date("2026-11-20T06:00:00Z") });
+  const dayBefore = new Date("2026-11-26T12:00:00Z");
+  assert.equal((await tick(d, dayBefore)).trialReminders, 0);
+  assert.ok(!db.users.get(PHONE).trial_reminded);
+  await handleInbound(d, { phone: PHONE, msg: text("hi"), now: dayBefore }); // they write -> window opens
+  assert.equal((await tick(d, dayBefore)).trialReminders, 1);
+});
+
+test("dubaiDay formats the template date in both languages", async () => {
+  assert.equal(dubaiDay("2026-11-30T21:00:00Z", "en"), "1 Dec"); // already 1 Dec in Dubai
+  assert.equal(dubaiDay("2026-11-27T06:00:00Z", "ar"), "27 نوفمبر");
 });
 
 test("rawBody reads the stream before req.body; signatures check out", async () => {

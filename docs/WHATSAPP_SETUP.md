@@ -59,8 +59,9 @@ Project reset-cjii → Settings → Environment Variables (Production), then Red
 | REACT_APP_WHATSAPP_NUMBER | the WhatsApp number, digits only, e.g. 9715XXXXXXXX |
 | REACT_APP_CONTACT_EMAIL | optional: email shown on the Privacy and Terms pages |
 
-Optional, after Meta approves message templates (needed to message people who haven't written in 24h):
-`WHATSAPP_NUDGE_TEMPLATE`, `WHATSAPP_TRIAL_TEMPLATE` (template names).
+After Meta approves the two message templates (exact text in docs/WHATSAPP_TEMPLATES.md — submit them on day 1, approval can take hours to days):
+`WHATSAPP_NUDGE_TEMPLATE=reset_daily_reminder`, `WHATSAPP_TRIAL_TEMPLATE=reset_trial_ending`.
+Without them Reset still works; it just can't reach people who've been quiet for 24h+.
 
 ## 5. Test
 Send "hi" to the number from your phone. You should get the welcome and the first question.

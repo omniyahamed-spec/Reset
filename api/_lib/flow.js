@@ -156,6 +156,16 @@ async function handleInbound(deps, { phone, name, msg, now = new Date() }) {
 
   if (msg.kind === "voice") return deps.wa.text(phone, t().voice);
 
+  // "See plans" tap on the trial-ending template.
+  if (msg.kind === "reply" && msg.id === "plans") {
+    if (user.sub_status === "active") return deps.wa.text(phone, t().activated);
+    if (entitled(user, now)) {
+      const { monthly, yearly } = payLinks(user);
+      return deps.wa.text(phone, t().plans(monthly, yearly));
+    }
+    return sendPaywall(deps, user, now);
+  }
+
   if (!entitled(user, now)) return sendPaywall(deps, user, now);
 
   const step = STEP[user.state];
@@ -190,6 +200,16 @@ async function handleInbound(deps, { phone, name, msg, now = new Date() }) {
   return deps.wa.text(phone, t().go(draft.move));
 }
 
+const MONTHS = {
+  en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+  ar: ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"],
+};
+/** "25 Nov" / "25 نوفمبر" in Dubai time — the {{1}} of the trial-ending template. */
+function dubaiDay(iso, lang) {
+  const d = new Date(new Date(iso).getTime() + DUBAI_OFFSET_H * 3600 * 1000);
+  return `${d.getUTCDate()} ${MONTHS[lang === "ar" ? "ar" : "en"][d.getUTCMonth()]}`;
+}
+
 const dubaiDate = (now) => new Date(now.getTime() + DUBAI_OFFSET_H * 3600 * 1000);
 
 /** Runs every minute: 5-minute follow-ups, trial-ending reminder, morning nudge. */
@@ -216,13 +236,22 @@ async function tick(deps, now = new Date()) {
     // One reminder the day before the trial ends.
     const left = user.trial_ends_at ? new Date(user.trial_ends_at) - now : -1;
     if (user.sub_status === "trial" && !user.trial_reminded && left > 0 && left <= DAY) {
+      let delivered = true;
       if (open) {
         await deps.wa.text(user.phone, t.trialEnding(payLinks(user).monthly));
       } else if (process.env.WHATSAPP_TRIAL_TEMPLATE) {
-        await deps.wa.template(user.phone, process.env.WHATSAPP_TRIAL_TEMPLATE, user.lang);
+        // No links in the template (keeps it utility); the "See plans" tap opens a free 24h window.
+        await deps.wa.template(user.phone, process.env.WHATSAPP_TRIAL_TEMPLATE, user.lang, {
+          body: [dubaiDay(user.trial_ends_at, user.lang)],
+          buttons: ["plans"],
+        });
+      } else {
+        delivered = false; // try again next minute, e.g. once they message us
       }
-      await deps.db.updateUser(user.phone, { trial_reminded: true });
-      sent.trialReminders++;
+      if (delivered) {
+        await deps.db.updateUser(user.phone, { trial_reminded: true });
+        sent.trialReminders++;
+      }
     }
 
     // Morning nudge at the user's hour (Dubai time), once a day, only while they have access.
@@ -231,7 +260,7 @@ async function tick(deps, now = new Date()) {
       if (open) {
         await deps.wa.buttons(user.phone, t.nudge, [{ id: "start", title: t.startButton }]);
       } else if (process.env.WHATSAPP_NUDGE_TEMPLATE) {
-        await deps.wa.template(user.phone, process.env.WHATSAPP_NUDGE_TEMPLATE, user.lang);
+        await deps.wa.template(user.phone, process.env.WHATSAPP_NUDGE_TEMPLATE, user.lang, { buttons: ["start"] });
       } else {
         continue;
       }
@@ -273,4 +302,4 @@ async function applyStripeEvent(deps, event) {
   return "ignored";
 }
 
-module.exports = { handleInbound, tick, applyStripeEvent, profileIdFor, phoneHash, entitled, learned, TRIAL_DAYS };
+module.exports = { handleInbound, tick, applyStripeEvent, profileIdFor, phoneHash, entitled, learned, dubaiDay, TRIAL_DAYS };
