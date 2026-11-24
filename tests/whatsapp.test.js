@@ -78,6 +78,15 @@ test("landing prefill texts: Arabic page -> Arabic bot, English page -> English 
   }
 });
 
+test("formal Arabic commands work: إيقاف التذكير, العربية", async () => {
+  const db = memDb(), wa = recorder();
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("hi"), now: t0 });
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("العربية"), now: t0 });
+  assert.equal(db.users.get(PHONE).lang, "ar");
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("إيقاف التذكير"), now: t0 });
+  assert.equal(db.users.get(PHONE).nudge_hour, null);
+});
+
 test("three taps save a whatsapp entry and schedule the 5-minute check", async () => {
   const db = memDb(), wa = recorder();
   const d = { db, wa };

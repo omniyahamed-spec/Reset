@@ -116,11 +116,11 @@ async function handleInbound(deps, { phone, name, msg, now = new Date() }) {
   const t = () => T[user.lang];
 
   // Commands work in any state.
-  if (["عربي", "arabic"].includes(lower)) {
+  if (["عربي", "العربية", "arabic"].includes(lower)) {
     user = await deps.db.updateUser(phone, { lang: "ar" });
     return deps.wa.text(phone, t().switched);
   }
-  if (["english", "انجليزي", "إنجليزي"].includes(lower)) {
+  if (["english", "انجليزي", "إنجليزي", "الإنجليزية"].includes(lower)) {
     user = await deps.db.updateUser(phone, { lang: "en" });
     return deps.wa.text(phone, t().switched);
   }
@@ -143,9 +143,9 @@ async function handleInbound(deps, { phone, name, msg, now = new Date() }) {
     await deps.db.deleteUserData(phone, user.profile_id);
     return deps.wa.text(phone, paid ? copy.deletedPaid(process.env.STRIPE_PORTAL_URL) : copy.deleted);
   }
-  if (["no reminders", "بدون تذكير"].includes(lower)) {
+  if (["no reminders", "بدون تذكير", "إيقاف التذكير", "ايقاف التذكير"].includes(lower)) {
     await deps.db.updateUser(phone, { nudge_hour: null });
-    return deps.wa.text(phone, "OK. No morning reminders. / تم. بدون تذكير صباحي.");
+    return deps.wa.text(phone, "OK. No morning reminders. / تم إيقاف التذكير الصباحي.");
   }
 
   // 5-minute follow-up answer (works even after the trial ends: it's the user's own data).
