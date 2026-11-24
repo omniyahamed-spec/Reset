@@ -65,3 +65,10 @@ Without them Reset still works; it just can't reach people who've been quiet for
 
 ## 5. Test
 Send "hi" to the number from your phone. You should get the welcome and the first question.
+
+## Landing page links (for outreach)
+- English: `https://reset-cjii.vercel.app/` · Arabic: `https://reset-cjii.vercel.app/?lang=ar` (Arabic phones get Arabic automatically).
+- The Arabic page opens WhatsApp with "ابدأ Reset", so the bot answers in Arabic from the first message.
+- Printable QR poster: `/?qr` (English) or `/?qr&lang=ar` — print or screenshot for events and flyers.
+- Link previews (WhatsApp, LinkedIn) use `public/og.png` and the title in `public/index.html`.
+- Google Analytics events: `start_whatsapp` (lang, top/bottom button), `share_click`, `switch_lang`. GA → Reports → Engagement → Events.

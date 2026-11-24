@@ -66,6 +66,18 @@ test("Arabic first message -> Arabic", async () => {
   assert.equal(db.users.get(PHONE).lang, "ar");
 });
 
+test("landing prefill texts: Arabic page -> Arabic bot, English page -> English bot, and the prefill is not saved as an answer", async () => {
+  // Must match FIRST_MSG in src/Landing.tsx.
+  for (const [first, lang] of [["ابدأ Reset", "ar"], ["Reset", "en"]]) {
+    const db = memDb(), wa = recorder();
+    await handleInbound({ db, wa }, { phone: PHONE, msg: text(first), now: t0 });
+    const u = db.users.get(PHONE);
+    assert.equal(u.lang, lang);
+    assert.equal(u.state, "ask_mind");
+    assert.equal(db.entries.length, 0);
+  }
+});
+
 test("three taps save a whatsapp entry and schedule the 5-minute check", async () => {
   const db = memDb(), wa = recorder();
   const d = { db, wa };
