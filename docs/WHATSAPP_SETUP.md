@@ -1,12 +1,13 @@
 # Reset on WhatsApp — setup
 
-The code is in PR #11. Merge it, then these steps connect your accounts. Do them in order.
+The code is on main (PR #11, merged 24 Nov). These steps connect your accounts. Do them in order.
+After each step, open the status page (step 6) — it tells you what's done and the exact next fix.
 Until step 4 is done, the site shows "Opening soon" instead of the WhatsApp button.
 
 Tests (no accounts needed): `node tests/whatsapp.test.js`
 
 ## 1. Supabase (2 minutes)
-SQL Editor → run `supabase/migrations/20261122_whatsapp.sql`.
+SQL Editor → run `supabase/migrations/20261122_whatsapp.sql`, then `supabase/migrations/20261125_wa_ref.sql` (one line: adds the `ref` column for outreach attribution).
 
 Then run this (replace CRON_SECRET_HERE with the same value you put in Vercel, step 4):
 
@@ -58,6 +59,7 @@ Project reset-cjii → Settings → Environment Variables (Production), then Red
 | CRON_SECRET | a long random string (same as in the step 1 SQL) |
 | REACT_APP_WHATSAPP_NUMBER | the WhatsApp number, digits only, e.g. 9715XXXXXXXX |
 | REACT_APP_CONTACT_EMAIL | optional: email shown on the Privacy and Terms pages |
+| WHATSAPP_BUSINESS_ACCOUNT_ID | optional: Meta → WhatsApp → API Setup → WhatsApp Business Account ID; lets the status page check templates and the webhook subscription |
 
 After Meta approves the two message templates (exact text in docs/WHATSAPP_TEMPLATES.md — submit them on day 1, approval can take hours to days):
 `WHATSAPP_NUDGE_TEMPLATE=reset_daily_reminder`, `WHATSAPP_TRIAL_TEMPLATE=reset_trial_ending`.
@@ -66,9 +68,17 @@ Without them Reset still works; it just can't reach people who've been quiet for
 ## 5. Test
 Send "hi" to the number from your phone. You should get the welcome and the first question.
 
+## 6. Check everything in one place
+Open `https://reset-cjii.vercel.app/api/status?key=CRON_SECRET_HERE` (your CRON_SECRET).
+- Green/red list of every step, with the exact fix for anything red, and "Next:" at the top.
+- Catches the usual mistakes: expired 24h Meta token, test-mode Stripe links, `sk_…` pasted instead of `whsec_…`, landing number ≠ Meta number, Meta's test number (max 5 recipients), pg_cron not running, missing tables, templates not approved or re-categorised Marketing.
+- Below it: the WhatsApp funnel (users, joined/active last 7 days, in trial, trial ended unpaid, paying, resets and "still done" in the last 7 days). Paste it (or `&format=json`) to the co-founder run so decisions use real numbers.
+- Before CRON_SECRET is set, it only lists missing settings. It never shows secrets or phone numbers.
+
 ## Landing page links (for outreach)
 - English: `https://reset-cjii.vercel.app/` · Arabic: `https://reset-cjii.vercel.app/?lang=ar` (Arabic phones get Arabic automatically).
 - The Arabic page opens WhatsApp with "ابدأ Reset", so the bot answers in Arabic from the first message.
 - Printable QR poster: `/?qr` (English) or `/?qr&lang=ar` — print or screenshot for events and flyers.
 - Link previews (WhatsApp, LinkedIn) use `public/og.png` and the title in `public/index.html`.
-- Google Analytics events: `start_whatsapp` (lang, top/bottom button), `share_click`, `switch_lang`. GA → Reports → Engagement → Events.
+- **Who brought whom: add `?ref=<name>` to every link you send.** Use one ref per person or channel you recruit through: `https://reset-cjii.vercel.app/?ref=sara`, `/?lang=ar&ref=mona`, `/?ref=linkedin`, `/?qr&ref=gym-poster` (the poster QR keeps the ref). Letters, digits, `-` and `_`, max 24. The WhatsApp first message becomes `Reset [sara]`; the bot saves `sara` on that user and doesn't treat it as an answer. `/api/status` shows `by ref: sara: 3 joined, 1 paying · (direct): …`. In SQL: `select ref, count(*), count(*) filter (where sub_status='active') as paying from wa_users group by ref;`
+- Google Analytics events: `start_whatsapp` (lang, top/bottom button, ref), `share_click`, `switch_lang`. GA → Reports → Engagement → Events.

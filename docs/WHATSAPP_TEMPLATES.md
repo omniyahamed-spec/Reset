@@ -36,13 +36,13 @@ Quick reply button: `Reset now`
 
 Body:
 ```
-تذكيرك اليومي من Reset. لما تكون جاهز، اضغط تحت وخذ أول خطوة صغيرة اليوم.
+هذا تذكيرك اليومي من Reset. عندما تكون مستعدًا، اضغط على الزر أدناه لتبدأ أول خطوة صغيرة اليوم.
 ```
 Footer:
 ```
-ارسل "بدون تذكير" لإيقاف التذكير
+أرسل "إيقاف التذكير" لإيقاف هذه الرسالة
 ```
-Quick reply button: `ابدأ الحين`
+Quick reply button: `ابدأ الآن`
 
 How it works in code: sent at 09:00 Dubai only to users who have access and haven't written in 24h.
 The button's payload is set to `start` at send time, so a tap opens the first question.
@@ -68,9 +68,9 @@ Quick reply button: `See plans`
 
 Body:
 ```
-تجربتك المجانية في Reset تنتهي يوم {{1}}. اضغط تحت عشان تشوف خيارات الاشتراك. ما ينخصم منك شي إلا إذا اخترت اشتراك.
+تنتهي تجربتك المجانية في Reset بتاريخ {{1}}. اضغط على الزر أدناه للاطلاع على خيارات الاشتراك. لن تُخصم منك أي رسوم ما لم تختر اشتراكًا.
 ```
-Quick reply button: `شوف الخيارات`
+Quick reply button: `عرض الخيارات`
 
 How it works in code: sent once, in the last 24h of the trial, only if the user hasn't written in 24h
 (otherwise a normal message with the link goes instead). The button payload is `plans`; the tap opens

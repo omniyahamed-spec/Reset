@@ -78,6 +78,40 @@ test("landing prefill texts: Arabic page -> Arabic bot, English page -> English 
   }
 });
 
+test("?ref attribution: [name] in the first message is saved, not treated as an answer; missing column doesn't block joining", async () => {
+  const { parseRef } = require("../api/_lib/flow");
+  assert.equal(parseRef("Reset [Sara_1]"), "sara_1");
+  assert.equal(parseRef("Reset"), null);
+  assert.equal(parseRef("Reset [bad name!]"), null);
+  // Must match refSuffix in src/Landing.tsx.
+  for (const [first, lang] of [["ابدأ Reset [sara]", "ar"], ["Reset [sara]", "en"]]) {
+    const db = memDb(), wa = recorder();
+    await handleInbound({ db, wa }, { phone: PHONE, msg: text(first), now: t0 });
+    const u = db.users.get(PHONE);
+    assert.equal(u.ref, "sara");
+    assert.equal(u.lang, lang);
+    assert.equal(u.state, "ask_mind");
+    assert.equal(db.entries.length, 0);
+  }
+  const db = memDb(), wa = recorder();
+  const update = db.updateUser;
+  db.updateUser = async (phone, patch) => { if ("ref" in patch) throw new Error("column ref does not exist"); return update(phone, patch); };
+  const warn = console.warn; console.warn = () => {};
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("Reset [sara]"), now: t0 });
+  console.warn = warn;
+  assert.equal(db.users.get(PHONE).state, "ask_mind");
+  assert.equal(wa.sent[1].type, "list");
+});
+
+test("formal Arabic commands work: إيقاف التذكير, العربية", async () => {
+  const db = memDb(), wa = recorder();
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("hi"), now: t0 });
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("العربية"), now: t0 });
+  assert.equal(db.users.get(PHONE).lang, "ar");
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("إيقاف التذكير"), now: t0 });
+  assert.equal(db.users.get(PHONE).nudge_hour, null);
+});
+
 test("three taps save a whatsapp entry and schedule the 5-minute check", async () => {
   const db = memDb(), wa = recorder();
   const d = { db, wa };
@@ -213,6 +247,77 @@ test("rawBody reads the stream before req.body; signatures check out", async () 
   const ts = Math.floor(Date.now() / 1000);
   const v1 = crypto.createHmac("sha256", "w").update(`${ts}.${body}`).digest("hex");
   assert.ok(stripeSignatureOk(body, `t=${ts},v1=${v1}`, "w"));
+});
+
+const { runStatus, renderHtml } = require("../api/_lib/status");
+
+test("status: nothing set -> not ready, first fix names the Vercel step, no network", async () => {
+  const r = await runStatus({}, { fetch: () => { throw new Error("no network"); }, rest: () => { throw new Error("no db"); } }, false);
+  assert.equal(r.ready_for_real_users, false);
+  assert.match(r.next_step, /SUPABASE_SERVICE_ROLE_KEY/);
+  assert.ok(renderHtml(r).includes("Not ready yet"));
+});
+
+test("status: fully set up -> ready, funnel counts, never leaks secrets or phone numbers", async () => {
+  const now = new Date("2026-11-30T10:00:00Z");
+  const env = {
+    SUPABASE_SERVICE_ROLE_KEY: "srk-ZZLEAK", CRON_SECRET: "c", WHATSAPP_TOKEN: "tok-ZZLEAK", WHATSAPP_PHONE_NUMBER_ID: "123",
+    WHATSAPP_VERIFY_TOKEN: "v", WHATSAPP_APP_SECRET: "a", REACT_APP_WHATSAPP_NUMBER: "971500000009",
+    PAY_LINK_MONTHLY: "https://buy.stripe.com/abc", PAY_LINK_YEARLY: "https://buy.stripe.com/def",
+    STRIPE_WEBHOOK_SECRET: "whsec_x", STRIPE_PORTAL_URL: "https://billing.stripe.com/p/login/x",
+    WHATSAPP_NUDGE_TEMPLATE: "reset_daily_reminder", WHATSAPP_TRIAL_TEMPLATE: "reset_trial_ending", WHATSAPP_BUSINESS_ACCOUNT_ID: "999",
+  };
+  const users = [
+    { phone: "971500000001", ref: "sara", sub_status: "trial", lang: "ar", created_at: "2026-11-28T00:00:00Z", last_inbound_at: "2026-11-29T00:00:00Z", trial_ends_at: "2026-12-05T00:00:00Z" },
+    { phone: "971500000002", ref: "sara", sub_status: "active", lang: "en", created_at: "2026-11-20T00:00:00Z", last_inbound_at: "2026-11-30T09:00:00Z" },
+    { phone: "971500000003", sub_status: "trial", lang: "en", created_at: "2026-11-10T00:00:00Z", trial_ends_at: "2026-11-17T00:00:00Z" },
+  ];
+  const rest = async (path) => {
+    if (path.startsWith("wa_users")) return users;
+    if (path.startsWith("entries")) return [{ follow_up: "confirmed" }, { follow_up: "slipped" }, { follow_up: null }];
+    return [];
+  };
+  const tpl = ["reset_daily_reminder", "reset_trial_ending"].flatMap((name) => ["en", "ar"].map((language) => ({ name, language, status: "APPROVED", category: "UTILITY" })));
+  const fetchFn = async (url) => ({
+    ok: true,
+    json: async () =>
+      url.includes("message_templates") ? { data: tpl }
+      : url.includes("subscribed_apps") ? { data: [{ id: "app" }] }
+      : { display_phone_number: "+971 50 000 0009", verified_name: "Reset", quality_rating: "GREEN", name_status: "APPROVED" },
+  });
+  const r = await runStatus(env, { fetch: fetchFn, rest, now }, true);
+  assert.equal(r.ready_for_real_users, true, JSON.stringify(r.checks.filter((c) => !c.ok)));
+  assert.equal(r.funnel.whatsapp_users, 3);
+  assert.equal(r.funnel.in_trial, 1);
+  assert.equal(r.funnel.trial_ended_unpaid, 1);
+  assert.equal(r.funnel.paying, 1);
+  assert.equal(r.funnel.mrr_aed_if_all_monthly, 29);
+  assert.equal(r.funnel.moved_after_reset, 1);
+  assert.equal(r.funnel.by_ref, "sara: 2 joined, 1 paying · (direct): 1 joined, 0 paying");
+  const out = JSON.stringify(r) + renderHtml(r);
+  for (const leak of ["ZZLEAK", "971500000001", "whsec_x"]) assert.ok(!out.includes(leak), `leaked ${leak}`);
+});
+
+test("status: catches the common setup mistakes", async () => {
+  const now = new Date("2026-11-30T10:00:00Z");
+  const env = {
+    SUPABASE_SERVICE_ROLE_KEY: "k", WHATSAPP_TOKEN: "t", WHATSAPP_PHONE_NUMBER_ID: "1", REACT_APP_WHATSAPP_NUMBER: "+971 50",
+    PAY_LINK_MONTHLY: "https://buy.stripe.com/test_abc", STRIPE_WEBHOOK_SECRET: "sk_live_wrong",
+  };
+  const rest = async (path) => {
+    if (path.startsWith("wa_users")) return [{ sub_status: "trial", created_at: now.toISOString(), followup_due_at: "2026-11-30T09:00:00Z" }];
+    if (path.startsWith("wa_trial_used")) throw new Error("relation does not exist");
+    return [];
+  };
+  const fetchFn = async () => ({ ok: false, status: 401, json: async () => ({ error: { message: "Session has expired" } }) });
+  const r = await runStatus(env, { fetch: fetchFn, rest, now }, true);
+  const bad = (n) => r.checks.find((c) => c.name === n && !c.ok);
+  assert.ok(bad("Stripe in live mode"));
+  assert.ok(bad("Stripe webhook secret format"));
+  assert.ok(bad("WhatsApp number format"));
+  assert.ok(bad("Every-minute tick is running"));
+  assert.ok(bad("Supabase table wa_trial_used"));
+  assert.match(bad("Meta token + phone number").fix, /expired/);
 });
 
 (async () => {

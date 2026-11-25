@@ -3652,7 +3652,7 @@ export default function App() {
             Put the phone down. Go do it.
           </div>
           <div style={{ fontSize: 15, color: "#4F6067", marginBottom: 28 }}>
-            خلصت. اترك الهاتف.
+            ضع الهاتف جانبًا، وابدأ التنفيذ.
           </div>
           <button
             onClick={() => setScreen("start")}
