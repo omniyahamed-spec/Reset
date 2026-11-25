@@ -7,7 +7,7 @@ Until step 4 is done, the site shows "Opening soon" instead of the WhatsApp butt
 Tests (no accounts needed): `node tests/whatsapp.test.js`
 
 ## 1. Supabase (2 minutes)
-SQL Editor → run `supabase/migrations/20261122_whatsapp.sql`.
+SQL Editor → run `supabase/migrations/20261122_whatsapp.sql`, then `supabase/migrations/20261125_wa_ref.sql` (one line: adds the `ref` column for outreach attribution).
 
 Then run this (replace CRON_SECRET_HERE with the same value you put in Vercel, step 4):
 
@@ -80,4 +80,5 @@ Open `https://reset-cjii.vercel.app/api/status?key=CRON_SECRET_HERE` (your CRON_
 - The Arabic page opens WhatsApp with "ابدأ Reset", so the bot answers in Arabic from the first message.
 - Printable QR poster: `/?qr` (English) or `/?qr&lang=ar` — print or screenshot for events and flyers.
 - Link previews (WhatsApp, LinkedIn) use `public/og.png` and the title in `public/index.html`.
-- Google Analytics events: `start_whatsapp` (lang, top/bottom button), `share_click`, `switch_lang`. GA → Reports → Engagement → Events.
+- **Who brought whom: add `?ref=<name>` to every link you send.** Use one ref per person or channel you recruit through: `https://reset-cjii.vercel.app/?ref=sara`, `/?lang=ar&ref=mona`, `/?ref=linkedin`, `/?qr&ref=gym-poster` (the poster QR keeps the ref). Letters, digits, `-` and `_`, max 24. The WhatsApp first message becomes `Reset [sara]`; the bot saves `sara` on that user and doesn't treat it as an answer. `/api/status` shows `by ref: sara: 3 joined, 1 paying · (direct): …`. In SQL: `select ref, count(*), count(*) filter (where sub_status='active') as paying from wa_users group by ref;`
+- Google Analytics events: `start_whatsapp` (lang, top/bottom button, ref), `share_click`, `switch_lang`. GA → Reports → Engagement → Events.

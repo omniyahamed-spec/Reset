@@ -78,6 +78,31 @@ test("landing prefill texts: Arabic page -> Arabic bot, English page -> English 
   }
 });
 
+test("?ref attribution: [name] in the first message is saved, not treated as an answer; missing column doesn't block joining", async () => {
+  const { parseRef } = require("../api/_lib/flow");
+  assert.equal(parseRef("Reset [Sara_1]"), "sara_1");
+  assert.equal(parseRef("Reset"), null);
+  assert.equal(parseRef("Reset [bad name!]"), null);
+  // Must match refSuffix in src/Landing.tsx.
+  for (const [first, lang] of [["ابدأ Reset [sara]", "ar"], ["Reset [sara]", "en"]]) {
+    const db = memDb(), wa = recorder();
+    await handleInbound({ db, wa }, { phone: PHONE, msg: text(first), now: t0 });
+    const u = db.users.get(PHONE);
+    assert.equal(u.ref, "sara");
+    assert.equal(u.lang, lang);
+    assert.equal(u.state, "ask_mind");
+    assert.equal(db.entries.length, 0);
+  }
+  const db = memDb(), wa = recorder();
+  const update = db.updateUser;
+  db.updateUser = async (phone, patch) => { if ("ref" in patch) throw new Error("column ref does not exist"); return update(phone, patch); };
+  const warn = console.warn; console.warn = () => {};
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("Reset [sara]"), now: t0 });
+  console.warn = warn;
+  assert.equal(db.users.get(PHONE).state, "ask_mind");
+  assert.equal(wa.sent[1].type, "list");
+});
+
 test("formal Arabic commands work: إيقاف التذكير, العربية", async () => {
   const db = memDb(), wa = recorder();
   await handleInbound({ db, wa }, { phone: PHONE, msg: text("hi"), now: t0 });
@@ -243,8 +268,8 @@ test("status: fully set up -> ready, funnel counts, never leaks secrets or phone
     WHATSAPP_NUDGE_TEMPLATE: "reset_daily_reminder", WHATSAPP_TRIAL_TEMPLATE: "reset_trial_ending", WHATSAPP_BUSINESS_ACCOUNT_ID: "999",
   };
   const users = [
-    { phone: "971500000001", sub_status: "trial", lang: "ar", created_at: "2026-11-28T00:00:00Z", last_inbound_at: "2026-11-29T00:00:00Z", trial_ends_at: "2026-12-05T00:00:00Z" },
-    { phone: "971500000002", sub_status: "active", lang: "en", created_at: "2026-11-20T00:00:00Z", last_inbound_at: "2026-11-30T09:00:00Z" },
+    { phone: "971500000001", ref: "sara", sub_status: "trial", lang: "ar", created_at: "2026-11-28T00:00:00Z", last_inbound_at: "2026-11-29T00:00:00Z", trial_ends_at: "2026-12-05T00:00:00Z" },
+    { phone: "971500000002", ref: "sara", sub_status: "active", lang: "en", created_at: "2026-11-20T00:00:00Z", last_inbound_at: "2026-11-30T09:00:00Z" },
     { phone: "971500000003", sub_status: "trial", lang: "en", created_at: "2026-11-10T00:00:00Z", trial_ends_at: "2026-11-17T00:00:00Z" },
   ];
   const rest = async (path) => {
@@ -268,6 +293,7 @@ test("status: fully set up -> ready, funnel counts, never leaks secrets or phone
   assert.equal(r.funnel.paying, 1);
   assert.equal(r.funnel.mrr_aed_if_all_monthly, 29);
   assert.equal(r.funnel.moved_after_reset, 1);
+  assert.equal(r.funnel.by_ref, "sara: 2 joined, 1 paying · (direct): 1 joined, 0 paying");
   const out = JSON.stringify(r) + renderHtml(r);
   for (const leak of ["ZZLEAK", "971500000001", "whsec_x"]) assert.ok(!out.includes(leak), `leaked ${leak}`);
 });

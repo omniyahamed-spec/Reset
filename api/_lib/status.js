@@ -85,6 +85,23 @@ async function runStatus(env, deps, live = true) {
       checks.push(check("Supabase table wa_users", false, `1. Supabase: run supabase/migrations/20261122_whatsapp.sql (${short(e)})`));
     }
     try {
+      // Who brought whom: outreach links ?ref=<name> -> wa_users.ref. Joined / paying per ref.
+      const refs = await deps.rest("wa_users?select=ref,sub_status");
+      const by = {};
+      refs.forEach((u) => {
+        const k = u.ref || "(direct)";
+        by[k] = by[k] || { joined: 0, paying: 0 };
+        by[k].joined++;
+        if (u.sub_status === "active") by[k].paying++;
+      });
+      funnel.by_ref = Object.entries(by)
+        .sort((a, b) => b[1].joined - a[1].joined)
+        .map(([k, v]) => `${k}: ${v.joined} joined, ${v.paying} paying`)
+        .join(" · ") || "none yet";
+    } catch (e) {
+      checks.push(check("wa_users.ref column", false, `1. Supabase: run supabase/migrations/20261125_wa_ref.sql (${short(e)})`));
+    }
+    try {
       await deps.rest("wa_trial_used?select=phone_hash&limit=1");
       checks.push(check("Supabase table wa_trial_used", true));
     } catch (e) {

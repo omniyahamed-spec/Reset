@@ -21,7 +21,15 @@ type Lang = "en" | "ar";
 const NUMBER = (process.env.REACT_APP_WHATSAPP_NUMBER || "").replace(/\D/g, "");
 // The first message decides the bot's language (Arabic letters → Arabic).
 const FIRST_MSG: Record<Lang, string> = { en: "Reset", ar: "ابدأ Reset" };
-export const waLink = (lang: Lang) => (NUMBER ? `https://wa.me/${NUMBER}?text=${encodeURIComponent(FIRST_MSG[lang])}` : "");
+// Outreach links carry ?ref=<name> (e.g. ?ref=sara, ?ref=gym-poster). The ref rides along
+// in the first WhatsApp message as "[name]"; the bot saves it (parseRef in api/_lib/flow.js).
+export function getRef(search: string): string {
+  const r = (new URLSearchParams(search).get("ref") || "").trim().toLowerCase();
+  return /^[a-z0-9_-]{1,24}$/.test(r) ? r : "";
+}
+export const refSuffix = (ref: string) => (ref ? ` [${ref}]` : "");
+export const waLink = (lang: Lang, ref = "") =>
+  NUMBER ? `https://wa.me/${NUMBER}?text=${encodeURIComponent(FIRST_MSG[lang] + refSuffix(ref))}` : "";
 
 export function pickLang(search: string, browser: string | undefined): Lang {
   const q = new URLSearchParams(search).get("lang");
@@ -36,7 +44,13 @@ const track = (name: string, params: Record<string, string>) => {
   } catch {}
 };
 
-const pageUrl = (lang: Lang) => `${window.location.origin}/${lang === "ar" ? "?lang=ar" : ""}`;
+const pageUrl = (lang: Lang, ref = "") => {
+  const p = new URLSearchParams();
+  if (lang === "ar") p.set("lang", "ar");
+  if (ref) p.set("ref", ref);
+  const q = p.toString();
+  return `${window.location.origin}/${q ? `?${q}` : ""}`;
+};
 
 // Option labels match api/_lib/copy.js so the preview shows what the bot really sends.
 const COPY = {
@@ -164,7 +178,7 @@ function Horizon() {
   );
 }
 
-function Poster({ lang }: { lang: Lang }) {
+function Poster({ lang, refName }: { lang: Lang; refName: string }) {
   const t = COPY[lang];
   return (
     <div dir={lang === "ar" ? "rtl" : "ltr"} style={{ minHeight: "100vh", background: "#fff", color: C.ink, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
@@ -172,7 +186,7 @@ function Poster({ lang }: { lang: Lang }) {
         <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 16 }}>Reset</div>
         <h1 style={{ fontSize: 30, lineHeight: 1.25, margin: "0 0 18px" }}>{t.posterH}</h1>
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
-          <Qr text={pageUrl(lang)} size={260} />
+          <Qr text={pageUrl(lang, refName)} size={260} />
         </div>
         <div style={{ fontSize: 17, color: C.sub, lineHeight: 1.5 }}>{t.posterSub}</div>
         <div style={{ fontSize: 14, color: C.muted, marginTop: 10 }}>{pageUrl(lang).replace(/^https?:\/\//, "")}</div>
@@ -187,11 +201,12 @@ export function Landing() {
   const [copied, setCopied] = useState(false);
   if (qs.has("privacy")) return <Privacy />;
   if (qs.has("terms")) return <Terms />;
-  if (qs.has("qr")) return <Poster lang={lang} />;
+  const ref = getRef(window.location.search);
+  if (qs.has("qr")) return <Poster lang={lang} refName={ref} />;
 
   const t = COPY[lang];
   const rtl = lang === "ar";
-  const wa = waLink(lang);
+  const wa = waLink(lang, ref);
   const desktop = typeof window.matchMedia === "function" && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 
   const switchLang = () => {
@@ -205,7 +220,7 @@ export function Landing() {
   };
 
   const share = async () => {
-    const url = pageUrl(lang);
+    const url = pageUrl(lang, ref);
     track("share_click", { lang });
     const nav = navigator as Navigator & { share?: (d: { text?: string; url?: string }) => Promise<void> };
     if (nav.share) {
@@ -233,7 +248,7 @@ export function Landing() {
     wa ? (
       <a
         href={wa}
-        onClick={() => track("start_whatsapp", { lang, where })}
+        onClick={() => track("start_whatsapp", { lang, where, ref: ref || "direct" })}
         style={{
           display: "block",
           textAlign: "center",

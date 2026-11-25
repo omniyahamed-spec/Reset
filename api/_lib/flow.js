@@ -21,6 +21,13 @@ function payLinks(user) {
 const entitled = (user, now) =>
   user.sub_status === "active" || (user.trial_ends_at && now < new Date(user.trial_ends_at));
 
+// Outreach links carry ?ref=<name>; the landing adds "[name]" to the prefilled first
+// message so we know who brought each user. Letters, digits, - and _ only, max 24.
+const parseRef = (text) => {
+  const m = /\[([A-Za-z0-9_-]{1,24})\]/.exec(text || "");
+  return m ? m[1].toLowerCase() : null;
+};
+
 const within24h = (user, now) => user.last_inbound_at && now - new Date(user.last_inbound_at) < DAY;
 
 /** Up to 2 of the user's own answers used 2+ times that aren't already options (as in the app). */
@@ -103,6 +110,15 @@ async function handleInbound(deps, { phone, name, msg, now = new Date() }) {
       last_inbound_at: now.toISOString(),
       nudge_hour: 9,
     });
+    const ref = parseRef(text);
+    if (ref) {
+      // Separate write: if the ref column isn't migrated yet, joining must still work.
+      try {
+        user = (await deps.db.updateUser(phone, { ref })) || user;
+      } catch (e) {
+        console.warn("ref not saved (run 20261125_wa_ref.sql):", e.message);
+      }
+    }
     if (hadTrial) {
       await deps.wa.text(phone, T[user.lang].welcomeBack);
       return sendPaywall(deps, user, now);
@@ -302,4 +318,4 @@ async function applyStripeEvent(deps, event) {
   return "ignored";
 }
 
-module.exports = { handleInbound, tick, applyStripeEvent, profileIdFor, phoneHash, entitled, learned, dubaiDay, TRIAL_DAYS };
+module.exports = { parseRef, handleInbound, tick, applyStripeEvent, profileIdFor, phoneHash, entitled, learned, dubaiDay, TRIAL_DAYS };
