@@ -320,6 +320,51 @@ test("status: catches the common setup mistakes", async () => {
   assert.match(bad("Meta token + phone number").fix, /expired/);
 });
 
+test("paywall + trial-ending show what they'd keep (resets, moves kept); no line when 0 resets", async () => {
+  process.env.PAY_LINK_MONTHLY = "https://buy.stripe.com/m";
+  const db = memDb(), wa = recorder();
+  const d = { db, wa };
+  await handleInbound(d, { phone: PHONE, msg: text("hi"), now: t0 });
+  for (const id of ["opt:Work", "opt:A message", "opt:Send it"]) await handleInbound(d, { phone: PHONE, msg: tap(id), now: t0 });
+  const e = db.entries[0];
+  await handleInbound(d, { phone: PHONE, msg: tap(`fu:confirmed:${e.id}`), now: t0 });
+  // Trial-ending, inside the 24h window
+  const dayBefore = new Date(t0.getTime() + 6.5 * 864e5);
+  db.users.get(PHONE).last_inbound_at = new Date(dayBefore.getTime() - 3600e3).toISOString();
+  db.users.get(PHONE).nudge_hour = null;
+  let n = wa.sent.length;
+  await tick(d, dayBefore);
+  assert.ok(wa.sent[n].args[0].includes("1 reset, 1 move kept"), wa.sent[n].args[0]);
+  // Paywall after the trial
+  n = wa.sent.length;
+  await handleInbound(d, { phone: PHONE, msg: text("hi"), now: new Date(t0.getTime() + 8 * 864e5) });
+  assert.ok(wa.sent[n].args[0].includes("1 reset, 1 move kept"));
+  // A user with no resets gets no recap line
+  const db2 = memDb(), wa2 = recorder();
+  await handleInbound({ db: db2, wa: wa2 }, { phone: PHONE, msg: text("hi"), now: t0 });
+  db2.users.get(PHONE).state = "idle";
+  n = wa2.sent.length;
+  await handleInbound({ db: db2, wa: wa2 }, { phone: PHONE, msg: text("hi"), now: new Date(t0.getTime() + 8 * 864e5) });
+  assert.ok(!wa2.sent[n].args[0].includes("free days:"));
+  assert.ok(wa2.sent[n].args[0].includes("29 AED"));
+});
+
+test("STOP turns off reminders (Meta opt-out), in EN and AR; it is not treated as 'cancel subscription'", async () => {
+  delete process.env.STRIPE_PORTAL_URL;
+  for (const word of ["STOP", "Stop", "توقف"]) {
+    const db = memDb(), wa = recorder();
+    await handleInbound({ db, wa }, { phone: PHONE, msg: text("hi"), now: t0 });
+    const n = wa.sent.length;
+    await handleInbound({ db, wa }, { phone: PHONE, msg: text(word), now: t0 });
+    assert.equal(db.users.get(PHONE).nudge_hour, null);
+    assert.equal(wa.sent.length, n + 1);
+    assert.ok(!/cancel, reply with your email|للإلغاء، أرسل/.test(wa.sent[n].args[0]));
+    // and the morning nudge no longer goes out
+    const out = await tick({ db, wa }, new Date(t0.getTime() + 864e5));
+    assert.equal(out.nudges, 0);
+  }
+});
+
 (async () => {
   let failed = 0;
   for (const { name, fn } of tests) {

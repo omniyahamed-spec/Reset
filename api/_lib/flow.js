@@ -1,7 +1,7 @@
 // The Reset conversation on WhatsApp. Pure logic: all I/O goes through deps
 // ({ db, wa }) so it can be tested without Meta, Stripe or Supabase.
 const crypto = require("crypto");
-const { OPTIONS, T, detectLang, CANCEL_WORDS, HELP_WORDS, DELETE_WORDS } = require("./copy");
+const { OPTIONS, T, detectLang, CANCEL_WORDS, STOP_WORDS, HELP_WORDS, DELETE_WORDS } = require("./copy");
 
 const TRIAL_DAYS = 7;
 const FOLLOWUP_MIN = 5;
@@ -66,11 +66,22 @@ async function startReset(deps, user) {
   await sendStep(deps, user, "ask_mind");
 }
 
+/** "In your free days: 6 resets, 4 moves kept." — shows what they'd be paying to keep. Empty if no resets. */
+async function recapLine(deps, user) {
+  try {
+    const past = await deps.db.pastAnswers(user.profile_id);
+    if (!past.length) return "";
+    return T[user.lang].recap(past.length, past.filter((e) => e.follow_up === "confirmed").length);
+  } catch (e) {
+    return ""; // never block a payment message on stats
+  }
+}
+
 async function sendPaywall(deps, user, now) {
   // At most once an hour, so a paused user isn't spammed.
   if (user.paywall_sent_at && now - new Date(user.paywall_sent_at) < 60 * 60 * 1000) return;
   const { monthly, yearly } = payLinks(user);
-  await deps.wa.text(user.phone, T[user.lang].paywall(monthly, yearly));
+  await deps.wa.text(user.phone, T[user.lang].paywall(monthly, yearly, await recapLine(deps, user)));
   await deps.db.updateUser(user.phone, { paywall_sent_at: now.toISOString() });
 }
 
@@ -159,9 +170,10 @@ async function handleInbound(deps, { phone, name, msg, now = new Date() }) {
     await deps.db.deleteUserData(phone, user.profile_id);
     return deps.wa.text(phone, paid ? copy.deletedPaid(process.env.STRIPE_PORTAL_URL) : copy.deleted);
   }
-  if (["no reminders", "بدون تذكير", "إيقاف التذكير", "ايقاف التذكير"].includes(lower)) {
+  if (STOP_WORDS.includes(lower)) {
     await deps.db.updateUser(phone, { nudge_hour: null });
-    return deps.wa.text(phone, "OK. No morning reminders. / تم إيقاف التذكير الصباحي.");
+    const url = process.env.STRIPE_PORTAL_URL;
+    return deps.wa.text(phone, user.sub_status === "active" && url ? t().stoppedPaid(url) : t().stopped);
   }
 
   // 5-minute follow-up answer (works even after the trial ends: it's the user's own data).
@@ -177,7 +189,7 @@ async function handleInbound(deps, { phone, name, msg, now = new Date() }) {
     if (user.sub_status === "active") return deps.wa.text(phone, t().activated);
     if (entitled(user, now)) {
       const { monthly, yearly } = payLinks(user);
-      return deps.wa.text(phone, t().plans(monthly, yearly));
+      return deps.wa.text(phone, t().plans(monthly, yearly, await recapLine(deps, user)));
     }
     return sendPaywall(deps, user, now);
   }
@@ -254,7 +266,7 @@ async function tick(deps, now = new Date()) {
     if (user.sub_status === "trial" && !user.trial_reminded && left > 0 && left <= DAY) {
       let delivered = true;
       if (open) {
-        await deps.wa.text(user.phone, t.trialEnding(payLinks(user).monthly));
+        await deps.wa.text(user.phone, t.trialEnding(payLinks(user).monthly, await recapLine(deps, user)));
       } else if (process.env.WHATSAPP_TRIAL_TEMPLATE) {
         // No links in the template (keeps it utility); the "See plans" tap opens a free 24h window.
         await deps.wa.template(user.phone, process.env.WHATSAPP_TRIAL_TEMPLATE, user.lang, {
