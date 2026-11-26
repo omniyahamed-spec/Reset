@@ -89,6 +89,7 @@ const COPY = {
     shareText: "This helped me stop avoiding things — 3 taps on WhatsApp, then one small move:",
     copied: "Link copied",
     privacy: "Privacy",
+    webApp: "Open the web app",
     terms: "Terms",
     neverSell: "We never sell your data.",
     posterH: "Stuck? Reset in 30 seconds.",
@@ -127,6 +128,7 @@ const COPY = {
     shareText: "ساعدني هذا على التوقف عن التأجيل: ثلاث ضغطات عبر واتساب، ثم خطوة صغيرة:",
     copied: "تم نسخ الرابط",
     privacy: "الخصوصية",
+    webApp: "افتح تطبيق الويب",
     terms: "الشروط",
     neverSell: "لا نبيع بياناتك أبدًا.",
     posterH: "متعثّر؟ أعد ضبط يومك في 30 ثانية.",
@@ -343,6 +345,8 @@ export function Landing() {
           <a href="/?privacy" style={{ color: C.muted }}>{t.privacy}</a>
           {" · "}
           <a href="/?terms" style={{ color: C.muted }}>{t.terms}</a>
+          {" · "}
+          <a href="/?app" style={{ color: C.muted }}>{t.webApp}</a>
           {" · "}
           {t.neverSell}
         </div>
