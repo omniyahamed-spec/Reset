@@ -7,7 +7,7 @@ Reset helps people act on what they avoid by taking the smallest possible step. 
 
 ## 2. Current business model (decided 22 Nov 2026, Omnia's decision)
 - WhatsApp-first, B2C only. Individuals pay **29 AED/month or 249 AED/year** after a **7-day free trial**, via Stripe Payment Links.
-- The website root is the landing + pricing page. The old web app is at `?app`.
+- The website root is the landing + pricing page. Two permanent addresses always work: `/?wa` (WhatsApp landing) and `/?app` (web app). `REACT_APP_HOME=app` switches the bare root to the web app without deleting anything.
 - B2B (teams, sponsor codes, invoices) is hidden but the code is kept (`?app&teams`).
 - Revenue goal: at least **30,000 AED/month recurring** (about 1,035 monthly subscribers at 29 AED).
 - Validation cohort of real users was **0** as of 25 Nov. The setup (Meta number, Stripe links, Vercel env, pg_cron) was not confirmed done.
@@ -67,7 +67,7 @@ Reset helps people act on what they avoid by taking the smallest possible step. 
 
 ## 6. Environment variables (Vercel)
 Server: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_API_VERSION` (optional), `WHATSAPP_NUDGE_TEMPLATE`, `WHATSAPP_TRIAL_TEMPLATE`, `WHATSAPP_TEMPLATE_LANG_EN` (optional), `WHATSAPP_BUSINESS_ACCOUNT_ID` (optional, lets the status page check templates), `PAY_LINK_MONTHLY`, `PAY_LINK_YEARLY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PORTAL_URL`.
-Build-time (public): `REACT_APP_SUPABASE_URL`, `REACT_APP_SUPABASE_ANON_KEY`, `REACT_APP_WHATSAPP_NUMBER` (landing shows "Opening soon" until set), `REACT_APP_CONTACT_EMAIL`, `REACT_APP_PILOT_PAYMENT_LINK`, `REACT_APP_PRO_PAYMENT_LINK` (B2B, hidden).
+Build-time (public): `REACT_APP_SUPABASE_URL`, `REACT_APP_SUPABASE_ANON_KEY`, `REACT_APP_WHATSAPP_NUMBER` (landing shows "Opening soon" until set), `REACT_APP_HOME` (optional; `app` makes the bare root show the web app instead of the landing), `REACT_APP_CONTACT_EMAIL`, `REACT_APP_PILOT_PAYMENT_LINK`, `REACT_APP_PRO_PAYMENT_LINK` (B2B, hidden).
 
 ## 7. Migrations (supabase/migrations, run in order, all safe to re-run)
 1. `20261120_entries_follow_up.sql` — follow_up columns on entries.

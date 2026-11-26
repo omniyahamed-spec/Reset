@@ -2058,7 +2058,12 @@ export default function App() {
       const qs = new URLSearchParams(window.location.search);
       // Reset is WhatsApp-first: the public site is the landing page.
       // The web app stays reachable with ?app (and calendar/deep links).
-      if (!["app", "src", "do", "screen"].some((k) => qs.has(k))) { // ?privacy / ?terms render inside Landing
+      // Two permanent addresses: /?wa = WhatsApp landing, /?app = web app. The bare root shows
+      // the landing unless REACT_APP_HOME=app is set in Vercel (then root = web app; /?wa still works).
+      const explicitApp = ["app", "src", "do", "screen"].some((k) => qs.has(k));
+      const explicitLanding = ["wa", "privacy", "terms", "qr", "lang", "ref"].some((k) => qs.has(k));
+      const rootIsApp = process.env.REACT_APP_HOME === "app";
+      if (!explicitApp && (explicitLanding || !rootIsApp)) { // ?privacy / ?terms render inside Landing
         setScreen("landing");
         setLoading(false);
         return;

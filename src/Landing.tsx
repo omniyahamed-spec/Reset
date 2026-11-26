@@ -46,6 +46,8 @@ const track = (name: string, params: Record<string, string>) => {
 
 const pageUrl = (lang: Lang, ref = "") => {
   const p = new URLSearchParams();
+  // If the site root is switched to the web app (REACT_APP_HOME=app), shared links must still open the landing.
+  if (process.env.REACT_APP_HOME === "app") p.set("wa", "1");
   if (lang === "ar") p.set("lang", "ar");
   if (ref) p.set("ref", ref);
   const q = p.toString();

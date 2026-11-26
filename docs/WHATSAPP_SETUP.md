@@ -75,6 +75,11 @@ Open `https://reset-cjii.vercel.app/api/status?key=CRON_SECRET_HERE` (your CRON_
 - Below it: the WhatsApp funnel (users, joined/active last 7 days, in trial, trial ended unpaid, paying, resets and "still done" in the last 7 days). Paste it (or `&format=json`) to the co-founder run so decisions use real numbers.
 - Before CRON_SECRET is set, it only lists missing settings. It never shows secrets or phone numbers.
 
+## Two permanent addresses (standby copies)
+- WhatsApp landing: `https://reset-cjii.vercel.app/?wa` (always works; the bare root shows it too by default).
+- Web app: `https://reset-cjii.vercel.app/?app` (always works).
+- To make the bare root show the web app instead, set Vercel env `REACT_APP_HOME=app` and redeploy. `?wa` still opens the landing and shared/QR links keep pointing to it. Remove the variable to go back. Nothing is deleted either way.
+
 ## Landing page links (for outreach)
 - English: `https://reset-cjii.vercel.app/` · Arabic: `https://reset-cjii.vercel.app/?lang=ar` (Arabic phones get Arabic automatically).
 - The Arabic page opens WhatsApp with "ابدأ Reset", so the bot answers in Arabic from the first message.
