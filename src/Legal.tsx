@@ -46,7 +46,7 @@ export function Privacy() {
         <h2 style={h2}>Your control</h2>
         <ul>
           <li>Send <b>"delete my data"</b> on WhatsApp to erase everything. We keep only a one-way code of your number so a free trial isn't reused.</li>
-          <li>Send <b>"no reminders"</b> to stop the morning message.</li>
+          <li>Send <b>"time"</b> to choose when the daily reminder comes, or <b>"no reminders"</b> to stop it. If you haven't chosen a time, the reminder moves to the hour you usually use Reset (we use only the times of your resets for this).</li>
           <li>Send <b>"cancel"</b> to manage or cancel your subscription.</li>
         </ul>
 

@@ -3,7 +3,7 @@
 const assert = require("assert");
 const { Readable } = require("stream");
 const crypto = require("crypto");
-const { handleInbound, tick, applyStripeEvent, dubaiDay, TRIAL_DAYS } = require("../api/_lib/flow");
+const { handleInbound, tick, applyStripeEvent, dubaiDay, usualHour, TRIAL_DAYS } = require("../api/_lib/flow");
 const { normalize } = require("../api/whatsapp");
 const { rawBody, metaSignatureOk, stripeSignatureOk } = require("../api/_lib/http");
 
@@ -38,7 +38,7 @@ function memDb() {
 function recorder() {
   const sent = [];
   const push = (type) => async (to, ...args) => { sent.push({ type, to, args }); return {}; };
-  return { sent, text: push("text"), list: push("list"), buttons: push("buttons"), template: push("template") };
+  return { sent, text: push("text"), list: push("list"), buttons: push("buttons"), template: push("template"), image: push("image") };
 }
 
 const PHONE = "971500000001";
@@ -318,6 +318,167 @@ test("status: catches the common setup mistakes", async () => {
   assert.ok(bad("Every-minute tick is running"));
   assert.ok(bad("Supabase table wa_trial_used"));
   assert.match(bad("Meta token + phone number").fix, /expired/);
+});
+
+test("paywall + trial-ending show what they'd keep (resets, moves kept); no line when 0 resets", async () => {
+  process.env.PAY_LINK_MONTHLY = "https://buy.stripe.com/m";
+  const db = memDb(), wa = recorder();
+  const d = { db, wa };
+  await handleInbound(d, { phone: PHONE, msg: text("hi"), now: t0 });
+  for (const id of ["opt:Work", "opt:A message", "opt:Send it"]) await handleInbound(d, { phone: PHONE, msg: tap(id), now: t0 });
+  const e = db.entries[0];
+  await handleInbound(d, { phone: PHONE, msg: tap(`fu:confirmed:${e.id}`), now: t0 });
+  // Trial-ending, inside the 24h window
+  const dayBefore = new Date(t0.getTime() + 6.5 * 864e5);
+  db.users.get(PHONE).last_inbound_at = new Date(dayBefore.getTime() - 3600e3).toISOString();
+  db.users.get(PHONE).nudge_hour = null;
+  let n = wa.sent.length;
+  await tick(d, dayBefore);
+  assert.ok(wa.sent[n].args[0].includes("1 reset, 1 move kept"), wa.sent[n].args[0]);
+  // Paywall after the trial
+  n = wa.sent.length;
+  await handleInbound(d, { phone: PHONE, msg: text("hi"), now: new Date(t0.getTime() + 8 * 864e5) });
+  assert.ok(wa.sent[n].args[0].includes("1 reset, 1 move kept"));
+  // A user with no resets gets no recap line
+  const db2 = memDb(), wa2 = recorder();
+  await handleInbound({ db: db2, wa: wa2 }, { phone: PHONE, msg: text("hi"), now: t0 });
+  db2.users.get(PHONE).state = "idle";
+  n = wa2.sent.length;
+  await handleInbound({ db: db2, wa: wa2 }, { phone: PHONE, msg: text("hi"), now: new Date(t0.getTime() + 8 * 864e5) });
+  assert.ok(!wa2.sent[n].args[0].includes("free days:"));
+  assert.ok(wa2.sent[n].args[0].includes("29 AED"));
+});
+
+test("STOP turns off reminders (Meta opt-out), in EN and AR; it is not treated as 'cancel subscription'", async () => {
+  delete process.env.STRIPE_PORTAL_URL;
+  for (const word of ["STOP", "Stop", "توقف"]) {
+    const db = memDb(), wa = recorder();
+    await handleInbound({ db, wa }, { phone: PHONE, msg: text("hi"), now: t0 });
+    const n = wa.sent.length;
+    await handleInbound({ db, wa }, { phone: PHONE, msg: text(word), now: t0 });
+    assert.equal(db.users.get(PHONE).nudge_hour, null);
+    assert.equal(wa.sent.length, n + 1);
+    assert.ok(!/cancel, reply with your email|للإلغاء، أرسل/.test(wa.sent[n].args[0]));
+    // and the morning nudge no longer goes out
+    const out = await tick({ db, wa }, new Date(t0.getTime() + 864e5));
+    assert.equal(out.nudges, 0);
+  }
+});
+
+// One full reset at `when` (Dubai = UTC+4), answering the 5-minute check with "Still done".
+async function fullReset(deps, when) {
+  const { db } = deps;
+  for (const id of ["opt:Work", "opt:Starting", "opt:Open it"]) {
+    // first message of a reset can be any text; then three taps
+    if (id === "opt:Work") await handleInbound(deps, { phone: PHONE, msg: tap("start"), now: when });
+    await handleInbound(deps, { phone: PHONE, msg: tap(id), now: when });
+  }
+  const u = db.users.get(PHONE);
+  await handleInbound(deps, { phone: PHONE, msg: tap(`fu:confirmed:${u.followup_entry_id}`), now: new Date(when.getTime() + 6 * 6e4) });
+}
+
+test("smart moments: after 3 resets around 4 PM the reminder moves from 9 AM to 4 PM, once; fires at 4 PM", async () => {
+  const db = memDb(), wa = recorder();
+  const day = (n, utcH) => new Date(Date.UTC(2026, 10, 23 + n, utcH, 10));
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("hi"), now: day(0, 12) }); // 16:10 Dubai
+  db.users.get(PHONE).nudge_chosen = false; // as after the migration (default false)
+  db.users.get(PHONE).state = "idle";
+  await fullReset({ db, wa }, day(0, 12));
+  await fullReset({ db, wa }, day(1, 12));
+  assert.equal(db.users.get(PHONE).nudge_hour, 9, "2 resets is not a habit yet");
+  await fullReset({ db, wa }, day(2, 12));
+  assert.equal(db.users.get(PHONE).nudge_hour, 16);
+  const learnedMsgs = wa.sent.filter((m) => m.type === "text" && /usually reset around 4 PM/.test(m.args[0]));
+  assert.equal(learnedMsgs.length, 1);
+  await fullReset({ db, wa }, day(3, 12));
+  assert.equal(wa.sent.filter((m) => m.type === "text" && /usually reset around/.test(m.args[0])).length, 1, "told only once");
+  // next day: no reminder at 9 AM, one at 4 PM (template, they're outside 24h)
+  process.env.WHATSAPP_NUDGE_TEMPLATE = "reset_daily_reminder";
+  assert.equal((await tick({ db, wa }, new Date(Date.UTC(2026, 10, 28, 5, 0)))).nudges, 0);
+  assert.equal((await tick({ db, wa }, new Date(Date.UTC(2026, 10, 28, 12, 0)))).nudges, 1);
+  delete process.env.WHATSAPP_NUDGE_TEMPLATE;
+});
+
+test("smart moments: an hour the user picked is never overridden; 'time' / 'الوقت' opens the picker", async () => {
+  const db = memDb(), wa = recorder();
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("hi"), now: t0 });
+  db.users.get(PHONE).nudge_chosen = false;
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("Time"), now: t0 });
+  const picker = wa.sent[wa.sent.length - 1];
+  assert.equal(picker.type, "list");
+  assert.ok(picker.args[2].some((r) => r.id === "hr:19") && picker.args[2].some((r) => r.id === "hr:off"));
+  assert.ok(picker.args[2].every((r) => r.title.length <= 24));
+  await handleInbound({ db, wa }, { phone: PHONE, msg: tap("hr:19"), now: t0 });
+  assert.equal(db.users.get(PHONE).nudge_hour, 19);
+  assert.equal(db.users.get(PHONE).nudge_chosen, true);
+  assert.ok(/7 PM/.test(wa.sent[wa.sent.length - 1].args[0]));
+  db.users.get(PHONE).state = "idle";
+  for (let n = 0; n < 3; n++) await fullReset({ db, wa }, new Date(t0.getTime() + n * 864e5 + 7 * 36e5));
+  assert.equal(db.users.get(PHONE).nudge_hour, 19);
+  // Arabic word + off
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("الوقت"), now: t0 });
+  assert.equal(wa.sent[wa.sent.length - 1].type, "list");
+  await handleInbound({ db, wa }, { phone: PHONE, msg: tap("hr:off"), now: t0 });
+  assert.equal(db.users.get(PHONE).nudge_hour, null);
+});
+
+test("smart moments: before the migration (nudge_chosen missing) nothing moves; no nudge if they already came today", async () => {
+  const db = memDb(), wa = recorder();
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("hi"), now: t0 });
+  db.users.get(PHONE).state = "idle";
+  for (let n = 0; n < 3; n++) await fullReset({ db, wa }, new Date(t0.getTime() + n * 864e5 + 7 * 36e5));
+  assert.equal(db.users.get(PHONE).nudge_hour, 9);
+  // they messaged at 08:30 Dubai today -> the 9 AM nudge is skipped
+  const day = new Date(Date.UTC(2026, 10, 28, 4, 30));
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("help"), now: day });
+  process.env.WHATSAPP_NUDGE_TEMPLATE = "reset_daily_reminder";
+  assert.equal((await tick({ db, wa }, new Date(Date.UTC(2026, 10, 28, 5, 0)))).nudges, 0);
+  assert.equal((await tick({ db, wa }, new Date(Date.UTC(2026, 10, 29, 5, 0)))).nudges, 1);
+  delete process.env.WHATSAPP_NUDGE_TEMPLATE;
+});
+
+test("usualHour needs a clear habit and Arabic hour labels read naturally", async () => {
+  const { T } = require("../api/_lib/copy");
+  const at = (utcH, d = 1) => ({ created_at: new Date(Date.UTC(2026, 10, d, utcH, 5)).toISOString() });
+  assert.equal(usualHour([at(12), at(12)]), null);
+  assert.equal(usualHour([at(1), at(5, 2), at(9, 3)]), null);
+  assert.equal(usualHour([at(12), at(12, 2), at(3, 3)]), 16);
+  assert.equal(T.ar.hour(16), "الساعة 4 عصرًا");
+  assert.equal(T.ar.hour(8), "الساعة 8 صباحًا");
+  assert.equal(T.en.hour(13), "1 PM");
+  assert.ok(!/morning|صباح/.test(T.en.nudge + T.ar.nudge));
+});
+
+test("calm: 'calm' / 'هدوء' / Calm-first tap sends a calm picture + breathing + calm page link, then Reset now; nudge offers it", async () => {
+  for (const [word, lang, page] of [["calm", "en", "/?calm"], ["هدوء", "ar", "/?calm&lang=ar"]]) {
+    const db = memDb(), wa = recorder();
+    await handleInbound({ db, wa }, { phone: PHONE, msg: text(lang === "ar" ? "مرحبا" : "hi"), now: t0 });
+    const n = wa.sent.length;
+    await handleInbound({ db, wa }, { phone: PHONE, msg: text(word), now: t0 });
+    assert.equal(wa.sent[n].type, "image");
+    assert.ok(/\/calm-[1-3]\.png$/.test(wa.sent[n].args[0]), wa.sent[n].args[0]);
+    assert.ok(wa.sent[n].args[1].includes(page));
+    assert.equal(wa.sent[n + 1].type, "buttons");
+    assert.equal(wa.sent[n + 1].args[1][0].id, "start");
+    assert.equal(db.entries.length, 0, "calm word is not saved as an answer");
+  }
+  // Tap from the nudge
+  const db = memDb(), wa = recorder();
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("hi"), now: t0 });
+  await handleInbound({ db, wa }, { phone: PHONE, msg: tap("calm"), now: t0 });
+  assert.ok(wa.sent.some((m) => m.type === "image"));
+  // No image sender / image fails -> words still go out as text
+  const db2 = memDb(), wa2 = recorder();
+  wa2.image = async () => { throw new Error("bad url"); };
+  await handleInbound({ db: db2, wa: wa2 }, { phone: PHONE, msg: text("hi"), now: t0 });
+  const m = wa2.sent.length;
+  await handleInbound({ db: db2, wa: wa2 }, { phone: PHONE, msg: text("calm"), now: t0 });
+  assert.equal(wa2.sent[m].type, "text");
+  assert.ok(wa2.sent[m].args[0].includes("Breathe in"));
+  // After the trial, calm is behind the paywall like the reset
+  const before = wa.sent.length;
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("calm"), now: new Date(t0.getTime() + 9 * 864e5) });
+  assert.ok(wa.sent.slice(before).every((x) => x.type !== "image"));
 });
 
 (async () => {

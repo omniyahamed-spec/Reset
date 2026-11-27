@@ -21,6 +21,9 @@ const cut = (s, n) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 const wa = {
   text: (to, body) => send(to, { type: "text", text: { body, preview_url: true } }),
 
+  // Image by public URL, with a caption (max 1024 chars).
+  image: (to, link, caption) => send(to, { type: "image", image: { link, caption: cut(caption, 1024) } }),
+
   // rows: [{ id, title }] — up to 10.
   list: (to, body, button, rows) =>
     send(to, {

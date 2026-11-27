@@ -86,7 +86,7 @@ It can happen, especially to the daily reminder (Meta reads "daily nudge" as eng
 - Worst case cost: 30 reminders/month × 0.18 = ~AED 5.5 per user/month out of 29 — and only for users
   who have gone quiet for 24h+. Users who reset every day never trigger a template.
 - Marketing templates also need the user to have opted in; the welcome message now says
-  "one short reminder each morning at 9 — reply 'no reminders' to turn it off", which covers that.
+  "one short reminder a day, at 9 AM at first, then at the hour you usually get stuck — reply 'time' to choose, 'no reminders' to turn it off", which covers that. The template text is time-neutral, so it fits any hour.
 - Do not appeal by adding fake transactional wording. If it stays Marketing, decide whether quiet users
   should get a reminder every day or only every 2–3 days (Omnia's call; it's a one-line change).
 
