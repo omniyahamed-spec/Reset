@@ -4,6 +4,7 @@
 import { useState } from "react";
 import qrcode from "qrcode-generator";
 import { Privacy, Terms } from "./Legal";
+import { Calm } from "./Calm";
 
 const C = {
   bg: "#F4F7F7",
@@ -91,6 +92,10 @@ const COPY = {
     neverSell: "We never sell your data.",
     posterH: "Stuck? Reset in 30 seconds.",
     posterSub: "Scan · 3 taps on WhatsApp · one small move. 7 days free.",
+    calmTitle: "One calm minute",
+    calmSub: "Breathe with the circle, with rain if you like. Then one small move.",
+    calmBefore: "Before work",
+    calmAfter: "After work",
   },
   ar: {
     switchTo: "English",
@@ -129,6 +134,10 @@ const COPY = {
     neverSell: "لا نبيع بياناتك أبدًا.",
     posterH: "متعثّر؟ أعد ضبط يومك في 30 ثانية.",
     posterSub: "امسح الرمز · ثلاث ضغطات عبر واتساب · خطوة صغيرة. 7 أيام مجانًا.",
+    calmTitle: "دقيقة هدوء",
+    calmSub: "تنفّس مع الدائرة، ومع صوت المطر إن شئت، ثم خطوة صغيرة واحدة.",
+    calmBefore: "قبل العمل",
+    calmAfter: "بعد العمل",
   },
 } as const;
 
@@ -203,6 +212,7 @@ export function Landing() {
   if (qs.has("terms")) return <Terms />;
   const ref = getRef(window.location.search);
   if (qs.has("qr")) return <Poster lang={lang} refName={ref} />;
+  if (qs.has("calm")) return <Calm lang={lang} wa={waLink(lang, ref)} />;
 
   const t = COPY[lang];
   const rtl = lang === "ar";
@@ -316,6 +326,26 @@ export function Landing() {
             </div>
           </div>
           <div style={{ fontSize: 13, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>{t.payNote}</div>
+        </div>
+
+        <div style={{ background: "#fff", border: `1px solid ${C.line}`, borderRadius: 18, overflow: "hidden", marginBottom: 22 }}>
+          <div aria-hidden="true" style={{ height: 96, backgroundImage: "url(/calm-1.png)", backgroundSize: "cover", backgroundPosition: "center 70%" }} />
+          <div style={{ padding: 16 }}>
+            <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>{t.calmTitle}</div>
+            <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.5, marginBottom: 12 }}>{t.calmSub}</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              {(["start", "end"] as const).map((m) => (
+                <a
+                  key={m}
+                  href={`/?calm=${m}${rtl ? "&lang=ar" : ""}${ref ? `&ref=${ref}` : ""}`}
+                  onClick={() => track("calm_open", { lang, mode: m })}
+                  style={{ flex: 1, textAlign: "center", border: `1px solid ${C.brand}`, color: C.brand, borderRadius: 12, padding: "10px 8px", fontWeight: 700, fontSize: 15, textDecoration: "none" }}
+                >
+                  {m === "start" ? t.calmBefore : t.calmAfter}
+                </a>
+              ))}
+            </div>
+          </div>
         </div>
 
         {cta(t.cta, "bottom")}

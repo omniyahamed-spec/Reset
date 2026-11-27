@@ -43,7 +43,7 @@ const T = {
     ended: "Your Reset subscription has ended. Message me if you want it back.",
     manage: (url) => `Manage or cancel your subscription here: ${url}`,
     manageMissing: "To cancel, reply with your email and we'll do it for you.",
-    help: "Send any message to start a reset.\n• \"cancel\" — manage your subscription\n• \"time\" — choose when I remind you\n• \"stop\" — stop the daily reminder\n• \"delete my data\" — erase everything\n• \"عربي\" — switch to Arabic",
+    help: "Send any message to start a reset.\n• \"cancel\" — manage your subscription\n• \"calm\" — one calm minute before you start\n• \"time\" — choose when I remind you\n• \"stop\" — stop the daily reminder\n• \"delete my data\" — erase everything\n• \"عربي\" — switch to Arabic",
     nudge: "Anything you're avoiding right now? Tap to reset.",
     timeAsk: "When should I remind you each day? Pick the hour you usually get stuck (Dubai time).",
     timeButton: "Pick a time",
@@ -52,6 +52,9 @@ const T = {
     timeLearned: (h) => `You usually reset around ${h}, so from tomorrow I'll remind you then instead. Reply "time" to pick another hour.`,
     hour: (h) => (h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`),
     startButton: "Reset now",
+    calmButton: "Calm first",
+    calm: (url) => `One calm minute.\n\nBreathe in for 4… out for 6. Three times. Let your shoulders drop.\n\nWant the full minute with rain and a breathing circle? ${url}\n\nWhen you're ready, tap below.`,
+    calmReady: "Ready? One small move.",
     switched: "Switched to English.",
     deleteAsk: "Delete everything Reset has about you: your resets, your history and this number's account? This can't be undone.",
     deleteYes: "Yes, delete",
@@ -88,7 +91,7 @@ const T = {
     ended: "انتهى اشتراكك في Reset. راسلني إذا رغبت في تجديده.",
     manage: (url) => `يمكنك إدارة اشتراكك أو إلغاؤه من هنا: ${url}`,
     manageMissing: "للإلغاء، أرسل بريدك الإلكتروني وسنلغي الاشتراك نيابةً عنك.",
-    help: "أرسل أي رسالة لتبدأ.\n• \"إلغاء\": إدارة الاشتراك\n• \"الوقت\": اختيار موعد التذكير\n• \"توقف\": إيقاف التذكير اليومي\n• \"احذف بياناتي\": حذف كل بياناتك\n• \"English\": التحويل إلى الإنجليزية",
+    help: "أرسل أي رسالة لتبدأ.\n• \"إلغاء\": إدارة الاشتراك\n• \"هدوء\": دقيقة هدوء قبل أن تبدأ\n• \"الوقت\": اختيار موعد التذكير\n• \"توقف\": إيقاف التذكير اليومي\n• \"احذف بياناتي\": حذف كل بياناتك\n• \"English\": التحويل إلى الإنجليزية",
     nudge: "هل هناك أمر تتجنبه الآن؟ اضغط وابدأ.",
     timeAsk: "متى تريد أن أذكّرك كل يوم؟ اختر الساعة التي تتعثّر فيها عادةً (بتوقيت دبي).",
     timeButton: "اختر الوقت",
@@ -101,6 +104,9 @@ const T = {
       return `الساعة ${n} ${part}`;
     },
     startButton: "ابدأ الآن",
+    calmButton: "لحظة هدوء أولًا",
+    calm: (url) => `دقيقة هدوء.\n\nخذ شهيقًا لأربع ثوانٍ… وزفيرًا لست ثوانٍ. ثلاث مرات. ودع كتفيك يسترخيان.\n\nأتريد الدقيقة كاملة مع صوت المطر ودائرة التنفس؟ ${url}\n\nعندما تكون مستعدًا، اضغط أدناه.`,
+    calmReady: "هل أنت مستعد؟ خطوة صغيرة واحدة.",
     switched: "تم التحويل إلى العربية.",
     deleteAsk: "هل تريد حذف كل ما لدينا عنك: خطواتك وسجلك وحساب هذا الرقم؟ لا يمكن استرجاع البيانات بعد الحذف.",
     deleteYes: "نعم، احذف",
@@ -124,6 +130,8 @@ const HELP_WORDS = ["help", "?", "مساعدة", "؟"];
 const TIME_WORDS = ["time", "reminder time", "remind me", "الوقت", "وقت", "وقت التذكير", "موعد التذكير"];
 // Hours offered in the picker (Dubai time).
 const NUDGE_HOURS = [8, 10, 13, 16, 19, 21];
+// One calm minute (breathing + a calm picture), then the reset.
+const CALM_WORDS = ["calm", "relax", "breathe", "calm first", "هدوء", "استرخاء", "تنفس", "تنفّس", "لحظة هدوء"];
 const DELETE_WORDS = ["delete my data", "delete", "احذف بياناتي", "احذف"];
 
-module.exports = { OPTIONS, T, detectLang, CANCEL_WORDS, STOP_WORDS, HELP_WORDS, DELETE_WORDS, TIME_WORDS, NUDGE_HOURS };
+module.exports = { OPTIONS, T, detectLang, CANCEL_WORDS, STOP_WORDS, HELP_WORDS, DELETE_WORDS, TIME_WORDS, NUDGE_HOURS, CALM_WORDS };

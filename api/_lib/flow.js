@@ -1,7 +1,7 @@
 // The Reset conversation on WhatsApp. Pure logic: all I/O goes through deps
 // ({ db, wa }) so it can be tested without Meta, Stripe or Supabase.
 const crypto = require("crypto");
-const { OPTIONS, T, detectLang, CANCEL_WORDS, STOP_WORDS, HELP_WORDS, DELETE_WORDS, TIME_WORDS, NUDGE_HOURS } = require("./copy");
+const { OPTIONS, T, detectLang, CANCEL_WORDS, STOP_WORDS, HELP_WORDS, DELETE_WORDS, TIME_WORDS, NUDGE_HOURS, CALM_WORDS } = require("./copy");
 
 const TRIAL_DAYS = 7;
 const FOLLOWUP_MIN = 5;
@@ -45,6 +45,24 @@ function usualHour(entries) {
   });
   const [h, n] = Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
   return n >= 2 ? Number(h) : null;
+}
+
+// The public site (calm minute page and calm pictures live there).
+const siteUrl = () => (process.env.SITE_URL || "https://reset-cjii.vercel.app").replace(/\/+$/, "");
+const CALM_PICS = 3; // public/calm-1.png … calm-3.png, rotated by day
+
+/** "Calm first": a calm picture + 3 breaths, a link to the full minute, then the reset button. */
+async function sendCalm(deps, user, now) {
+  const t = T[user.lang];
+  const page = `${siteUrl()}/?calm${user.lang === "ar" ? "&lang=ar" : ""}`;
+  const pic = `${siteUrl()}/calm-${(Math.floor(now.getTime() / DAY) % CALM_PICS) + 1}.png`;
+  try {
+    if (!deps.wa.image) throw new Error("no image sender");
+    await deps.wa.image(user.phone, pic, t.calm(page));
+  } catch (e) {
+    await deps.wa.text(user.phone, t.calm(page)); // the words matter more than the picture
+  }
+  return deps.wa.buttons(user.phone, t.calmReady, [{ id: "start", title: t.startButton }]);
 }
 
 const within24h = (user, now) => user.last_inbound_at && now - new Date(user.last_inbound_at) < DAY;
@@ -237,6 +255,8 @@ async function handleInbound(deps, { phone, name, msg, now = new Date() }) {
 
   if (!entitled(user, now)) return sendPaywall(deps, user, now);
 
+  if (CALM_WORDS.includes(lower) || (msg.kind === "reply" && msg.id === "calm")) return sendCalm(deps, user, now);
+
   const step = STEP[user.state];
   if (!step || (msg.kind === "reply" && msg.id === "start")) return startReset(deps, user);
 
@@ -350,7 +370,10 @@ async function tick(deps, now = new Date()) {
         continue;
       }
       if (open) {
-        await deps.wa.buttons(user.phone, t.nudge, [{ id: "start", title: t.startButton }]);
+        await deps.wa.buttons(user.phone, t.nudge, [
+          { id: "start", title: t.startButton },
+          { id: "calm", title: t.calmButton },
+        ]);
       } else if (process.env.WHATSAPP_NUDGE_TEMPLATE) {
         await deps.wa.template(user.phone, process.env.WHATSAPP_NUDGE_TEMPLATE, user.lang, { buttons: ["start"] });
       } else {
@@ -394,4 +417,4 @@ async function applyStripeEvent(deps, event) {
   return "ignored";
 }
 
-module.exports = { usualHour, parseRef, handleInbound, tick, applyStripeEvent, profileIdFor, phoneHash, entitled, learned, dubaiDay, TRIAL_DAYS };
+module.exports = { sendCalm, usualHour, parseRef, handleInbound, tick, applyStripeEvent, profileIdFor, phoneHash, entitled, learned, dubaiDay, TRIAL_DAYS };

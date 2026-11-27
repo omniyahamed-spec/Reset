@@ -38,7 +38,7 @@ function memDb() {
 function recorder() {
   const sent = [];
   const push = (type) => async (to, ...args) => { sent.push({ type, to, args }); return {}; };
-  return { sent, text: push("text"), list: push("list"), buttons: push("buttons"), template: push("template") };
+  return { sent, text: push("text"), list: push("list"), buttons: push("buttons"), template: push("template"), image: push("image") };
 }
 
 const PHONE = "971500000001";
@@ -447,6 +447,38 @@ test("usualHour needs a clear habit and Arabic hour labels read naturally", asyn
   assert.equal(T.ar.hour(8), "الساعة 8 صباحًا");
   assert.equal(T.en.hour(13), "1 PM");
   assert.ok(!/morning|صباح/.test(T.en.nudge + T.ar.nudge));
+});
+
+test("calm: 'calm' / 'هدوء' / Calm-first tap sends a calm picture + breathing + calm page link, then Reset now; nudge offers it", async () => {
+  for (const [word, lang, page] of [["calm", "en", "/?calm"], ["هدوء", "ar", "/?calm&lang=ar"]]) {
+    const db = memDb(), wa = recorder();
+    await handleInbound({ db, wa }, { phone: PHONE, msg: text(lang === "ar" ? "مرحبا" : "hi"), now: t0 });
+    const n = wa.sent.length;
+    await handleInbound({ db, wa }, { phone: PHONE, msg: text(word), now: t0 });
+    assert.equal(wa.sent[n].type, "image");
+    assert.ok(/\/calm-[1-3]\.png$/.test(wa.sent[n].args[0]), wa.sent[n].args[0]);
+    assert.ok(wa.sent[n].args[1].includes(page));
+    assert.equal(wa.sent[n + 1].type, "buttons");
+    assert.equal(wa.sent[n + 1].args[1][0].id, "start");
+    assert.equal(db.entries.length, 0, "calm word is not saved as an answer");
+  }
+  // Tap from the nudge
+  const db = memDb(), wa = recorder();
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("hi"), now: t0 });
+  await handleInbound({ db, wa }, { phone: PHONE, msg: tap("calm"), now: t0 });
+  assert.ok(wa.sent.some((m) => m.type === "image"));
+  // No image sender / image fails -> words still go out as text
+  const db2 = memDb(), wa2 = recorder();
+  wa2.image = async () => { throw new Error("bad url"); };
+  await handleInbound({ db: db2, wa: wa2 }, { phone: PHONE, msg: text("hi"), now: t0 });
+  const m = wa2.sent.length;
+  await handleInbound({ db: db2, wa: wa2 }, { phone: PHONE, msg: text("calm"), now: t0 });
+  assert.equal(wa2.sent[m].type, "text");
+  assert.ok(wa2.sent[m].args[0].includes("Breathe in"));
+  // After the trial, calm is behind the paywall like the reset
+  const before = wa.sent.length;
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("calm"), now: new Date(t0.getTime() + 9 * 864e5) });
+  assert.ok(wa.sent.slice(before).every((x) => x.type !== "image"));
 });
 
 (async () => {
