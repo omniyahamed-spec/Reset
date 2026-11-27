@@ -7,7 +7,7 @@ Until step 4 is done, the site shows "Opening soon" instead of the WhatsApp butt
 Tests (no accounts needed): `node tests/whatsapp.test.js`
 
 ## 1. Supabase (2 minutes)
-SQL Editor → run `supabase/migrations/20261122_whatsapp.sql`, then `supabase/migrations/20261125_wa_ref.sql` (one line: adds the `ref` column for outreach attribution).
+SQL Editor → run `supabase/migrations/20261122_whatsapp.sql`, then `supabase/migrations/20261125_wa_ref.sql` (one line: adds the `ref` column for outreach attribution), then `supabase/migrations/20261127_wa_smart_moments.sql` (one line: lets the daily reminder move to each user's usual stuck hour).
 
 Then run this (replace CRON_SECRET_HERE with the same value you put in Vercel, step 4):
 

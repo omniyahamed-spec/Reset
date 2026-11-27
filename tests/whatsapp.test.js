@@ -3,7 +3,7 @@
 const assert = require("assert");
 const { Readable } = require("stream");
 const crypto = require("crypto");
-const { handleInbound, tick, applyStripeEvent, dubaiDay, TRIAL_DAYS } = require("../api/_lib/flow");
+const { handleInbound, tick, applyStripeEvent, dubaiDay, usualHour, TRIAL_DAYS } = require("../api/_lib/flow");
 const { normalize } = require("../api/whatsapp");
 const { rawBody, metaSignatureOk, stripeSignatureOk } = require("../api/_lib/http");
 
@@ -363,6 +363,90 @@ test("STOP turns off reminders (Meta opt-out), in EN and AR; it is not treated a
     const out = await tick({ db, wa }, new Date(t0.getTime() + 864e5));
     assert.equal(out.nudges, 0);
   }
+});
+
+// One full reset at `when` (Dubai = UTC+4), answering the 5-minute check with "Still done".
+async function fullReset(deps, when) {
+  const { db } = deps;
+  for (const id of ["opt:Work", "opt:Starting", "opt:Open it"]) {
+    // first message of a reset can be any text; then three taps
+    if (id === "opt:Work") await handleInbound(deps, { phone: PHONE, msg: tap("start"), now: when });
+    await handleInbound(deps, { phone: PHONE, msg: tap(id), now: when });
+  }
+  const u = db.users.get(PHONE);
+  await handleInbound(deps, { phone: PHONE, msg: tap(`fu:confirmed:${u.followup_entry_id}`), now: new Date(when.getTime() + 6 * 6e4) });
+}
+
+test("smart moments: after 3 resets around 4 PM the reminder moves from 9 AM to 4 PM, once; fires at 4 PM", async () => {
+  const db = memDb(), wa = recorder();
+  const day = (n, utcH) => new Date(Date.UTC(2026, 10, 23 + n, utcH, 10));
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("hi"), now: day(0, 12) }); // 16:10 Dubai
+  db.users.get(PHONE).nudge_chosen = false; // as after the migration (default false)
+  db.users.get(PHONE).state = "idle";
+  await fullReset({ db, wa }, day(0, 12));
+  await fullReset({ db, wa }, day(1, 12));
+  assert.equal(db.users.get(PHONE).nudge_hour, 9, "2 resets is not a habit yet");
+  await fullReset({ db, wa }, day(2, 12));
+  assert.equal(db.users.get(PHONE).nudge_hour, 16);
+  const learnedMsgs = wa.sent.filter((m) => m.type === "text" && /usually reset around 4 PM/.test(m.args[0]));
+  assert.equal(learnedMsgs.length, 1);
+  await fullReset({ db, wa }, day(3, 12));
+  assert.equal(wa.sent.filter((m) => m.type === "text" && /usually reset around/.test(m.args[0])).length, 1, "told only once");
+  // next day: no reminder at 9 AM, one at 4 PM (template, they're outside 24h)
+  process.env.WHATSAPP_NUDGE_TEMPLATE = "reset_daily_reminder";
+  assert.equal((await tick({ db, wa }, new Date(Date.UTC(2026, 10, 28, 5, 0)))).nudges, 0);
+  assert.equal((await tick({ db, wa }, new Date(Date.UTC(2026, 10, 28, 12, 0)))).nudges, 1);
+  delete process.env.WHATSAPP_NUDGE_TEMPLATE;
+});
+
+test("smart moments: an hour the user picked is never overridden; 'time' / 'الوقت' opens the picker", async () => {
+  const db = memDb(), wa = recorder();
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("hi"), now: t0 });
+  db.users.get(PHONE).nudge_chosen = false;
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("Time"), now: t0 });
+  const picker = wa.sent[wa.sent.length - 1];
+  assert.equal(picker.type, "list");
+  assert.ok(picker.args[2].some((r) => r.id === "hr:19") && picker.args[2].some((r) => r.id === "hr:off"));
+  assert.ok(picker.args[2].every((r) => r.title.length <= 24));
+  await handleInbound({ db, wa }, { phone: PHONE, msg: tap("hr:19"), now: t0 });
+  assert.equal(db.users.get(PHONE).nudge_hour, 19);
+  assert.equal(db.users.get(PHONE).nudge_chosen, true);
+  assert.ok(/7 PM/.test(wa.sent[wa.sent.length - 1].args[0]));
+  db.users.get(PHONE).state = "idle";
+  for (let n = 0; n < 3; n++) await fullReset({ db, wa }, new Date(t0.getTime() + n * 864e5 + 7 * 36e5));
+  assert.equal(db.users.get(PHONE).nudge_hour, 19);
+  // Arabic word + off
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("الوقت"), now: t0 });
+  assert.equal(wa.sent[wa.sent.length - 1].type, "list");
+  await handleInbound({ db, wa }, { phone: PHONE, msg: tap("hr:off"), now: t0 });
+  assert.equal(db.users.get(PHONE).nudge_hour, null);
+});
+
+test("smart moments: before the migration (nudge_chosen missing) nothing moves; no nudge if they already came today", async () => {
+  const db = memDb(), wa = recorder();
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("hi"), now: t0 });
+  db.users.get(PHONE).state = "idle";
+  for (let n = 0; n < 3; n++) await fullReset({ db, wa }, new Date(t0.getTime() + n * 864e5 + 7 * 36e5));
+  assert.equal(db.users.get(PHONE).nudge_hour, 9);
+  // they messaged at 08:30 Dubai today -> the 9 AM nudge is skipped
+  const day = new Date(Date.UTC(2026, 10, 28, 4, 30));
+  await handleInbound({ db, wa }, { phone: PHONE, msg: text("help"), now: day });
+  process.env.WHATSAPP_NUDGE_TEMPLATE = "reset_daily_reminder";
+  assert.equal((await tick({ db, wa }, new Date(Date.UTC(2026, 10, 28, 5, 0)))).nudges, 0);
+  assert.equal((await tick({ db, wa }, new Date(Date.UTC(2026, 10, 29, 5, 0)))).nudges, 1);
+  delete process.env.WHATSAPP_NUDGE_TEMPLATE;
+});
+
+test("usualHour needs a clear habit and Arabic hour labels read naturally", async () => {
+  const { T } = require("../api/_lib/copy");
+  const at = (utcH, d = 1) => ({ created_at: new Date(Date.UTC(2026, 10, d, utcH, 5)).toISOString() });
+  assert.equal(usualHour([at(12), at(12)]), null);
+  assert.equal(usualHour([at(1), at(5, 2), at(9, 3)]), null);
+  assert.equal(usualHour([at(12), at(12, 2), at(3, 3)]), 16);
+  assert.equal(T.ar.hour(16), "الساعة 4 عصرًا");
+  assert.equal(T.ar.hour(8), "الساعة 8 صباحًا");
+  assert.equal(T.en.hour(13), "1 PM");
+  assert.ok(!/morning|صباح/.test(T.en.nudge + T.ar.nudge));
 });
 
 (async () => {

@@ -62,7 +62,7 @@ const db = {
     await rest(`entries?id=eq.${enc(id)}`, { method: "PATCH", body: patch });
   },
   async pastAnswers(profileId) {
-    return rest(`entries?profile_id=eq.${enc(profileId)}&select=mind,avoiding,move,follow_up&order=created_at.desc&limit=50`);
+    return rest(`entries?profile_id=eq.${enc(profileId)}&select=mind,avoiding,move,follow_up,created_at&order=created_at.desc&limit=50`);
   },
   async dueFollowups(nowIso) {
     return rest(`wa_users?followup_due_at=lte.${enc(nowIso)}&select=*`);

@@ -1,7 +1,7 @@
 // The Reset conversation on WhatsApp. Pure logic: all I/O goes through deps
 // ({ db, wa }) so it can be tested without Meta, Stripe or Supabase.
 const crypto = require("crypto");
-const { OPTIONS, T, detectLang, CANCEL_WORDS, STOP_WORDS, HELP_WORDS, DELETE_WORDS } = require("./copy");
+const { OPTIONS, T, detectLang, CANCEL_WORDS, STOP_WORDS, HELP_WORDS, DELETE_WORDS, TIME_WORDS, NUDGE_HOURS } = require("./copy");
 
 const TRIAL_DAYS = 7;
 const FOLLOWUP_MIN = 5;
@@ -27,6 +27,25 @@ const parseRef = (text) => {
   const m = /\[([A-Za-z0-9_-]{1,24})\]/.exec(text || "");
   return m ? m[1].toLowerCase() : null;
 };
+
+const dubaiHour = (iso) => new Date(new Date(iso).getTime() + DUBAI_OFFSET_H * 3600 * 1000).getUTCHours();
+const dubaiDayKey = (d) => new Date(new Date(d).getTime() + DUBAI_OFFSET_H * 3600 * 1000).toISOString().slice(0, 10);
+
+/**
+ * Smart moments: the Dubai hour this user most often resets at, if it's a clear habit
+ * (3+ resets, and the top hour holds at least 2 of the last 10). Otherwise null.
+ */
+function usualHour(entries) {
+  const recent = entries.filter((e) => e.created_at).slice(0, 10);
+  if (recent.length < 3) return null;
+  const counts = {};
+  recent.forEach((e) => {
+    const h = dubaiHour(e.created_at);
+    counts[h] = (counts[h] || 0) + 1;
+  });
+  const [h, n] = Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
+  return n >= 2 ? Number(h) : null;
+}
 
 const within24h = (user, now) => user.last_inbound_at && now - new Date(user.last_inbound_at) < DAY;
 
@@ -95,6 +114,8 @@ async function answerFollowup(deps, user, entryId, answer, now) {
   } else {
     await deps.wa.text(user.phone, t.slippedReply);
   }
+  // After the move, not during it: maybe move their reminder to their usual stuck hour.
+  await learnMoment(deps, user);
 }
 
 /**
@@ -170,6 +191,26 @@ async function handleInbound(deps, { phone, name, msg, now = new Date() }) {
     await deps.db.deleteUserData(phone, user.profile_id);
     return deps.wa.text(phone, paid ? copy.deletedPaid(process.env.STRIPE_PORTAL_URL) : copy.deleted);
   }
+  if (TIME_WORDS.includes(lower)) {
+    const rows = NUDGE_HOURS.map((h) => ({ id: `hr:${h}`, title: t().hour(h) }));
+    rows.push({ id: "hr:off", title: t().timeOff });
+    return deps.wa.list(phone, t().timeAsk, t().timeButton, rows);
+  }
+  if (msg.kind === "reply" && msg.id && msg.id.startsWith("hr:")) {
+    const v = msg.id.slice(3);
+    const h = Number(v);
+    if (v === "off" || !Number.isInteger(h) || h < 0 || h > 23) {
+      await deps.db.updateUser(phone, { nudge_hour: null });
+      return deps.wa.text(phone, t().stopped);
+    }
+    user = await deps.db.updateUser(phone, { nudge_hour: h });
+    try {
+      await deps.db.updateUser(phone, { nudge_chosen: true }); // separate: column may not be migrated yet
+    } catch (e) {
+      console.warn("nudge_chosen not saved (run 20261127_wa_smart_moments.sql):", e.message);
+    }
+    return deps.wa.text(phone, t().timeSet(t().hour(h)));
+  }
   if (STOP_WORDS.includes(lower)) {
     await deps.db.updateUser(phone, { nudge_hour: null });
     const url = process.env.STRIPE_PORTAL_URL;
@@ -213,6 +254,7 @@ async function handleInbound(deps, { phone, name, msg, now = new Date() }) {
 
   // Last tap: save the reset, send them off, schedule the 5-minute check.
   const base = { profile_id: user.profile_id, mind: draft.mind, avoiding: draft.avoiding, move: draft.move, status: "done", feedback: "" };
+  base.created_at = now.toISOString();
   let entry;
   try {
     entry = await deps.db.insertEntry({ ...base, source: "whatsapp" });
@@ -228,6 +270,23 @@ async function handleInbound(deps, { phone, name, msg, now = new Date() }) {
   return deps.wa.text(phone, t().go(draft.move));
 }
 
+/**
+ * Smart moments: move the daily reminder to the hour this user actually gets stuck.
+ * Only if they haven't picked an hour themselves (nudge_chosen === false, i.e. migrated),
+ * haven't turned reminders off, and the habit is clear. Never blocks the reset.
+ */
+async function learnMoment(deps, user) {
+  try {
+    if (user.nudge_chosen !== false || user.nudge_hour === null || user.nudge_hour === undefined) return;
+    const h = usualHour(await deps.db.pastAnswers(user.profile_id));
+    if (h === null || h === user.nudge_hour) return;
+    await deps.db.updateUser(user.phone, { nudge_hour: h });
+    await deps.wa.text(user.phone, T[user.lang].timeLearned(T[user.lang].hour(h)));
+  } catch (e) {
+    console.warn("smart moment skipped:", e.message);
+  }
+}
+
 const MONTHS = {
   en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
   ar: ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"],
@@ -240,7 +299,7 @@ function dubaiDay(iso, lang) {
 
 const dubaiDate = (now) => new Date(now.getTime() + DUBAI_OFFSET_H * 3600 * 1000);
 
-/** Runs every minute: 5-minute follow-ups, trial-ending reminder, morning nudge. */
+/** Runs every minute: 5-minute follow-ups, trial-ending reminder, daily nudge at the user's hour. */
 async function tick(deps, now = new Date()) {
   const sent = { followups: 0, trialReminders: 0, nudges: 0 };
 
@@ -282,9 +341,14 @@ async function tick(deps, now = new Date()) {
       }
     }
 
-    // Morning nudge at the user's hour (Dubai time), once a day, only while they have access.
+    // Daily nudge at the user's hour (Dubai time), once a day, only while they have access.
     if (user.nudge_hour !== null && user.nudge_hour !== undefined && local.getUTCHours() === user.nudge_hour &&
         user.last_nudge_on !== today && entitled(user, now)) {
+      // They already came by today: no reminder needed (and no template cost).
+      if (user.last_inbound_at && dubaiDayKey(user.last_inbound_at) === today) {
+        await deps.db.updateUser(user.phone, { last_nudge_on: today });
+        continue;
+      }
       if (open) {
         await deps.wa.buttons(user.phone, t.nudge, [{ id: "start", title: t.startButton }]);
       } else if (process.env.WHATSAPP_NUDGE_TEMPLATE) {
@@ -330,4 +394,4 @@ async function applyStripeEvent(deps, event) {
   return "ignored";
 }
 
-module.exports = { parseRef, handleInbound, tick, applyStripeEvent, profileIdFor, phoneHash, entitled, learned, dubaiDay, TRIAL_DAYS };
+module.exports = { usualHour, parseRef, handleInbound, tick, applyStripeEvent, profileIdFor, phoneHash, entitled, learned, dubaiDay, TRIAL_DAYS };
